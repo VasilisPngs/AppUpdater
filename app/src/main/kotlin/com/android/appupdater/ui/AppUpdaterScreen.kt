@@ -6,6 +6,7 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -185,7 +186,7 @@ private val FocusRingWidth = 2.dp
 private val FocusRingOffset = 2.dp
 
 private enum class AppTab(val labelRes: Int, val iconRes: Int) {
-    Home(R.string.home, R.drawable.ic_home),
+    Updates(R.string.updates, R.drawable.ic_updates),
     Settings(R.string.settings, R.drawable.ic_settings)
 }
 
@@ -197,10 +198,10 @@ fun AppUpdaterScreen(
 ) {
     val colors = Design.colors
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var selectedTab by rememberSaveable { mutableStateOf(AppTab.Home) }
-    val homeListState = rememberLazyListState()
+    var selectedTab by rememberSaveable { mutableStateOf(AppTab.Updates) }
+    val updatesListState = rememberLazyListState()
     val settingsListState = rememberLazyListState()
-    val homeFocus = remember { FocusRequester() }
+    val updatesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -211,7 +212,7 @@ fun AppUpdaterScreen(
     }
     var manualPackage by rememberSaveable { mutableStateOf<String?>(null) }
     val manualTarget = uiState.updates.firstOrNull { it.packageName == manualPackage }
-    BackHandler(enabled = manualTarget == null && selectedTab != AppTab.Home) { selectedTab = AppTab.Home }
+    BackHandler(enabled = manualTarget == null && selectedTab != AppTab.Updates) { selectedTab = AppTab.Updates }
     BackHandler(enabled = manualTarget != null) { manualPackage = null }
     val sheetProgress = animateFloatAsState(
         targetValue = if (manualTarget != null) 1f else 0f,
@@ -260,7 +261,7 @@ fun AppUpdaterScreen(
         }
     }
 
-    val activeListState = if (selectedTab == AppTab.Home) homeListState else settingsListState
+    val activeListState = if (selectedTab == AppTab.Updates) updatesListState else settingsListState
     val scanning = uiState.scanStatus == ScanStatus.Scanning
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -305,9 +306,9 @@ fun AppUpdaterScreen(
                         label = "view"
                     ) { tab ->
                         when (tab) {
-                            AppTab.Home -> HomeView(
-                                listState = homeListState,
-                                focus = homeFocus,
+                            AppTab.Updates -> UpdatesView(
+                                listState = updatesListState,
+                                focus = updatesFocus,
                                 topInset = topBarHeight,
                                 bottomInset = tabBarHeight,
                                 scanning = scanning,
@@ -375,7 +376,7 @@ fun AppUpdaterScreen(
 
             TabBar(
                 backdrop = backdrop,
-                listFocus = if (selectedTab == AppTab.Home) homeFocus else settingsFocus,
+                listFocus = if (selectedTab == AppTab.Updates) updatesFocus else settingsFocus,
                 observe = { activeListState.firstVisibleItemScrollOffset },
                 height = tabBarHeight,
                 bottomInset = max(insets.calculateBottomPadding(), TabBarPadding),
@@ -384,9 +385,9 @@ fun AppUpdaterScreen(
                 onSelect = { tab ->
                     when {
                         tab != selectedTab -> selectedTab = tab
-                        tab != AppTab.Home -> Unit
-                        homeListState.canScrollBackward ->
-                            coroutineScope.launch { homeListState.animateScrollToItem(0) }
+                        tab != AppTab.Updates -> Unit
+                        updatesListState.canScrollBackward ->
+                            coroutineScope.launch { updatesListState.animateScrollToItem(0) }
                         else -> viewModel.scanForUpdates()
                     }
                 }
@@ -414,7 +415,7 @@ fun AppUpdaterScreen(
 }
 
 @Composable
-private fun HomeView(
+private fun UpdatesView(
     listState: LazyListState,
     focus: FocusRequester,
     topInset: Dp,
@@ -658,6 +659,7 @@ private fun UpdateCard(
                     enabled = install == null,
                     busy = install?.manual == false,
                     progress = install?.progress,
+                    icon = if (update.apkMirrorUrl == null) R.drawable.ic_source_play else R.drawable.ic_source_apkmirror,
                     onClick = { onUpdate(update) },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -668,6 +670,7 @@ private fun UpdateCard(
                         enabled = install == null,
                         busy = install?.manual == true,
                         progress = install?.progress,
+                        icon = R.drawable.ic_source_play,
                         onClick = { onManual(update) },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -686,7 +689,8 @@ private fun Button(
     primary: Boolean = false,
     enabled: Boolean = true,
     busy: Boolean = false,
-    progress: Float? = null
+    progress: Float? = null,
+    @DrawableRes icon: Int? = null
 ) {
     val colors = Design.colors
     val shape = if (small) ShapeS else ShapeM
@@ -744,6 +748,7 @@ private fun Button(
         ) {
             val style = if (small) Design.type.buttonSmall else Design.type.button
             val color = if (primary) Color.White else colors.text
+            if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, tint = color)
             Text(text = text, style = style, color = color, maxLines = 1)
             if (busy && progress != null) {
                 val digits = style.copy(fontFeatureSettings = TABULAR_FIGURES)
