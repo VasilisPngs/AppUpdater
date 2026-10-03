@@ -292,6 +292,7 @@ fun AppUpdaterScreen(
                     isRefreshing = false,
                     onRefresh = viewModel::scanForUpdates,
                     state = pullState,
+                    enabled = LocalInputModeManager.current.inputMode == InputMode.Touch,
                     indicator = {
                         Box(
                             modifier = Modifier
