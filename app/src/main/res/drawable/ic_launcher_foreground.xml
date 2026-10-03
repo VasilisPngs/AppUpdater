@@ -9,7 +9,7 @@
         android:translateX="18"
         android:translateY="18">
         <path
-            android:pathData="M15.5,32a16.5,16.5 0,1 0,33 0a16.5,16.5 0,1 0,-33 0M32,40V24.5M25.5,31L32,24.5L38.5,31"
+            android:pathData="M24,17H40A7,7 0,0 1,47,24V40A7,7 0,0 1,40,47H24A7,7 0,0 1,17,40V24A7,7 0,0 1,24,17ZM32,24.5V39.5M25.5,33L32,39.5L38.5,33"
             android:strokeWidth="4.1"
             android:strokeColor="#FFFFFFFF"
             android:strokeLineCap="round"
