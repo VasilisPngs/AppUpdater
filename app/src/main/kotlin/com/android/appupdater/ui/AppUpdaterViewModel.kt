@@ -61,12 +61,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     init {
         viewModelScope.launch {
             val includeDisabledApps = withContext(Dispatchers.IO) { preferences.includeDisabledApps }
-            _uiState.update {
-                it.copy(
-                    installedApps = repository.getInstalledApps(),
-                    includeDisabledApps = includeDisabledApps
-                )
-            }
+            _uiState.update { it.copy(includeDisabledApps = includeDisabledApps) }
             scanForUpdates()
         }
     }
@@ -74,13 +69,10 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     fun scanForUpdates() {
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
-            val state = _uiState.value
-            val allApps = state.installedApps.ifEmpty {
-                repository.getInstalledApps().also { apps ->
-                    _uiState.update { it.copy(installedApps = apps) }
-                }
-            }
-            val appsToCheck = allApps.filter { state.includeDisabledApps || it.isEnabled }
+            _uiState.update { it.copy(scanStatus = ScanStatus.Scanning) }
+            val apps = refreshInstalledApps()
+            val includeDisabledApps = _uiState.value.includeDisabledApps
+            val appsToCheck = apps.filter { includeDisabledApps || it.isEnabled }
 
             repository.scanForUpdates(appsToCheck).collect { status ->
                 _uiState.update { current ->
@@ -114,7 +106,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
 
             installJobs.remove(key)
             _uiState.update { it.copy(installs = it.installs - key) }
-            if (result.isSuccess) dropInstalledUpdates()
+            if (result.isSuccess) refreshInstalledApps()
         }
     }
 
@@ -133,7 +125,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
             result
                 .onSuccess {
                     _events.tryEmit(InstallEvent.Finished(update.appName))
-                    dropInstalledUpdates()
+                    refreshInstalledApps()
                 }
                 .onFailure { _events.tryEmit(InstallEvent.Failed(it.message ?: "Installation failed")) }
         }
@@ -146,7 +138,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         scanForUpdates()
     }
 
-    private suspend fun dropInstalledUpdates() {
+    private suspend fun refreshInstalledApps(): List<InstalledApp> {
         val apps = repository.getInstalledApps()
         val versions = apps.associate { it.packageName to it.versionCode }
         _uiState.update { state ->
@@ -157,6 +149,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
                 }
             )
         }
+        return apps
     }
 
     override fun onCleared() {

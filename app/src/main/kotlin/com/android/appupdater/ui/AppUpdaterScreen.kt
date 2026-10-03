@@ -41,7 +41,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -95,6 +97,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.draw.paint
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -106,6 +109,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
@@ -127,6 +131,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -161,6 +167,7 @@ import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.sin
 
 private val BarPadding = 12.dp
@@ -348,7 +355,9 @@ fun AppUpdaterScreen(
                 topInset = insets.calculateTopPadding(),
                 scanning = scanning,
                 failed = uiState.scanStatus is ScanStatus.Error,
-                count = updates.size
+                count = updates.size,
+                listFocus = if (selectedTab == AppTab.Updates) updatesFocus else settingsFocus,
+                onRefresh = viewModel::scanForUpdates
             )
 
             SnackbarHost(
@@ -780,6 +789,47 @@ private fun Button(
     }
 }
 
+@Composable
+private fun IconButton(
+    @DrawableRes icon: Int,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = Design.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) PressedScale else 1f,
+        animationSpec = tween(Motion.FAST, easing = Motion.ease),
+        label = "press"
+    )
+
+    Box(
+        modifier = modifier
+            .scale(scale)
+            .focusRing(focused, colors.accent, Dp.Infinity)
+            .clip(CircleShape)
+            .background(colors.surface2)
+            .border(Space.hairline, colors.border, CircleShape)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            )
+            .semantics { contentDescription = label }
+            .padding(Space.s)
+            .paint(
+                painter = painterResource(icon),
+                sizeToIntrinsics = false,
+                contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.tint(colors.text)
+            )
+    )
+}
+
 private fun primaryGradient(size: Size, start: Color, end: Color): Brush {
     val angle = Math.toRadians(PrimaryGradientAngle)
     val direction = Offset(sin(angle).toFloat(), -cos(angle).toFloat())
@@ -949,7 +999,9 @@ private fun TopBar(
     topInset: Dp,
     scanning: Boolean,
     failed: Boolean,
-    count: Int
+    count: Int,
+    listFocus: FocusRequester,
+    onRefresh: () -> Unit
 ) {
     val colors = Design.colors
     BackdropSurface(
@@ -974,7 +1026,22 @@ private fun TopBar(
                 style = Design.type.brand,
                 color = colors.text
             )
-            StatusPill(scanning = scanning, failed = failed, count = count)
+            Row(
+                modifier = Modifier.height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(Space.s),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                StatusPill(scanning = scanning, failed = failed, count = count)
+                IconButton(
+                    icon = R.drawable.ic_refresh,
+                    label = stringResource(R.string.refresh),
+                    onClick = onRefresh,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(1f)
+                        .focusProperties { down = listFocus }
+                )
+            }
         }
         Box(
             modifier = Modifier
@@ -1181,7 +1248,7 @@ private fun Modifier.focusRing(focused: Boolean, color: Color, cornerRadius: Dp)
         if (focused) {
             val width = FocusRingWidth.toPx()
             val inset = FocusRingOffset.toPx() + width / 2
-            val radius = cornerRadius.toPx() + inset
+            val radius = min(cornerRadius.toPx(), size.minDimension / 2) + inset
             drawRoundRect(
                 color = color,
                 topLeft = Offset(-inset, -inset),
