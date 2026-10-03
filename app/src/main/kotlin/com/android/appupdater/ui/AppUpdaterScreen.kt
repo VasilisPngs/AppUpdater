@@ -94,6 +94,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -196,6 +200,8 @@ fun AppUpdaterScreen(
     var selectedTab by rememberSaveable { mutableStateOf(AppTab.Home) }
     val homeListState = rememberLazyListState()
     val settingsListState = rememberLazyListState()
+    val homeFocus = remember { FocusRequester() }
+    val settingsFocus = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val insets = WindowInsets.systemBars.asPaddingValues()
@@ -301,6 +307,7 @@ fun AppUpdaterScreen(
                         when (tab) {
                             AppTab.Home -> HomeView(
                                 listState = homeListState,
+                                focus = homeFocus,
                                 topInset = topBarHeight,
                                 bottomInset = tabBarHeight,
                                 scanning = scanning,
@@ -319,6 +326,7 @@ fun AppUpdaterScreen(
                             )
                             AppTab.Settings -> SettingsView(
                                 listState = settingsListState,
+                                focus = settingsFocus,
                                 topInset = topBarHeight,
                                 bottomInset = tabBarHeight,
                                 includeDisabledApps = uiState.includeDisabledApps,
@@ -367,6 +375,7 @@ fun AppUpdaterScreen(
 
             TabBar(
                 backdrop = backdrop,
+                listFocus = if (selectedTab == AppTab.Home) homeFocus else settingsFocus,
                 observe = { activeListState.firstVisibleItemScrollOffset },
                 height = tabBarHeight,
                 bottomInset = max(insets.calculateBottomPadding(), TabBarPadding),
@@ -407,6 +416,7 @@ fun AppUpdaterScreen(
 @Composable
 private fun HomeView(
     listState: LazyListState,
+    focus: FocusRequester,
     topInset: Dp,
     bottomInset: Dp,
     scanning: Boolean,
@@ -418,7 +428,10 @@ private fun HomeView(
 ) {
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .focusRequester(focus)
+            .focusRestorer(),
         contentPadding = PaddingValues(
             start = Space.l,
             end = Space.l,
@@ -465,6 +478,7 @@ private fun HomeView(
 @Composable
 private fun SettingsView(
     listState: LazyListState,
+    focus: FocusRequester,
     topInset: Dp,
     bottomInset: Dp,
     includeDisabledApps: Boolean,
@@ -474,7 +488,10 @@ private fun SettingsView(
     val colors = Design.colors
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .focusRequester(focus)
+            .focusRestorer(),
         contentPadding = PaddingValues(
             start = Space.l,
             end = Space.l,
@@ -1000,6 +1017,7 @@ private fun StatusDot(color: Color, pulsing: Boolean) {
 @Composable
 private fun TabBar(
     backdrop: GraphicsLayer,
+    listFocus: FocusRequester,
     observe: () -> Unit,
     height: Dp,
     bottomInset: Dp,
@@ -1053,6 +1071,7 @@ private fun TabBar(
                         .focusRing(focused, colors.accent, Radius.m)
                         .clip(ShapeM)
                         .background(fill)
+                        .focusProperties { up = listFocus }
                         .selectable(
                             selected = selected,
                             interactionSource = interaction,
