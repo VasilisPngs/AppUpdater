@@ -349,10 +349,8 @@ fun AppUpdaterScreen(
                     (if (tab == AppTab.Updates) updatesListState else settingsListState).scrollToItem(0)
                 }
             }
-            tab != AppTab.Updates -> Unit
-            updatesListState.canScrollBackward ->
+            tab == AppTab.Updates && updatesListState.canScrollBackward ->
                 coroutineScope.launch { updatesListState.animateScrollToItem(0) }
-            else -> viewModel.scanForUpdates()
         }
     }
 

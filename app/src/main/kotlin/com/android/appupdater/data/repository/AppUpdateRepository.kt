@@ -25,6 +25,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.time.LocalDate
@@ -87,10 +89,10 @@ class AppUpdateRepository(
         val mirrorApps = mirrorResults.mapNotNull(Result<List<ApkMirrorApp>>::getOrNull).flatten()
         val playApps = playResult.getOrNull().orEmpty()
         val installedByPackage = appsToCheck.associateBy(InstalledApp::packageName)
-        val testBuilds = testBuilds(
+        val confirmation = confirmPlayUpdates(
             playApps.filter { app -> installedByPackage[app.packageName]?.let { playUpdate(app, it) } != null }
         )
-        val updates = merge(appsToCheck, mirrorApps, playApps, testBuilds).sortedWith(NEWEST_FIRST)
+        val updates = merge(appsToCheck, mirrorApps, playApps, confirmation.apps).sortedWith(NEWEST_FIRST)
 
         val failures = buildList {
             val failedBatches = mirrorResults.count(Result<List<ApkMirrorApp>>::isFailure)
@@ -100,6 +102,9 @@ class AppUpdateRepository(
                 failedBatches > 0 -> add("Some applications were not checked on APKMirror: $mirrorFailure")
             }
             playResult.exceptionOrNull()?.let { add("Google Play: ${reason(it)}") }
+            if (confirmation.unconfirmed > 0) {
+                add("Google Play: ${confirmation.unconfirmed} updates could not be confirmed as stable releases")
+            }
         }
 
         emit(
@@ -119,19 +124,19 @@ class AppUpdateRepository(
     private fun reason(exception: Throwable): String =
         exception.message?.takeIf(String::isNotBlank) ?: exception::class.simpleName.orEmpty()
 
-    private suspend fun testBuilds(candidates: List<App>): Set<String> = coroutineScope {
-        candidates.map { app ->
+    private suspend fun confirmPlayUpdates(candidates: List<App>): PlayConfirmation = coroutineScope {
+        val permits = Semaphore(PLAY_CONFIRMATIONS)
+        val results = candidates.filterNot { it.isTestBuild }.map { app ->
             async {
-                val confirmed = if (app.isTestBuild) {
-                    null
-                } else {
-                    attempt { playCatalog.details(app.packageName).second }.getOrNull()
-                }
-                app.packageName.takeIf {
-                    confirmed == null || confirmed.isTestBuild || confirmed.versionCode != app.versionCode
-                }
+                app.packageName to permits.withPermit { attempt { playCatalog.details(app.packageName).second } }
             }
-        }.awaitAll().filterNotNull().toSet()
+        }.awaitAll()
+        PlayConfirmation(
+            apps = results.mapNotNull { (packageName, result) ->
+                result.getOrNull()?.takeUnless { it.isTestBuild }?.let { packageName to it }
+            }.toMap(),
+            unconfirmed = results.count { it.second.isFailure }
+        )
     }
 
     private val App.isTestBuild: Boolean
@@ -145,7 +150,7 @@ class AppUpdateRepository(
         installed: List<InstalledApp>,
         mirrorApps: List<ApkMirrorApp>,
         playApps: List<App>,
-        testBuilds: Set<String>
+        confirmedPlayApps: Map<String, App>
     ): List<AppUpdateInfo> {
         val mirrorByPackage = mirrorApps.groupBy(ApkMirrorApp::packageName)
         val playByPackage = playApps.associateBy(App::packageName)
@@ -156,7 +161,7 @@ class AppUpdateRepository(
             val mirror = mirrorByPackage[app.packageName]
                 ?.mapNotNull { mirrorCandidate(it, app, requiresTelevisionBuild) }
                 ?.maxByOrNull { it.apk.versionCode }
-            val playUpdate = play?.takeUnless { it.packageName in testBuilds }?.let { playUpdate(it, app) }
+            val playUpdate = confirmedPlayApps[app.packageName]?.let { playUpdate(it, app) }
 
             when {
                 playUpdate != null && (mirror == null || playUpdate.versionCode >= mirror.apk.versionCode) -> AppUpdateInfo(
@@ -187,9 +192,8 @@ class AppUpdateRepository(
         installed: InstalledApp,
         requiresTelevisionBuild: Boolean
     ): MirrorCandidate? {
-        if (!isStableRelease(app.packageName)) return null
         if (!isStableRelease(app.versionName)) return null
-        val apk = bestApk(app.apks, installed, requiresTelevisionBuild) ?: return null
+        val apk = bestApk(app.apks, installed, app.versionName, requiresTelevisionBuild) ?: return null
         return MirrorCandidate(
             apk = apk,
             versionName = fullVersionName(apk, app.versionName),
@@ -205,12 +209,14 @@ class AppUpdateRepository(
     private fun bestApk(
         apks: List<ApkMirrorApk>,
         installed: InstalledApp,
+        releaseVersion: String,
         requiresTelevisionBuild: Boolean
     ): ApkMirrorApk? = apks
         .asSequence()
         .filter { it.versionCode > installed.versionCode }
         .filter { it.minimumApi <= Build.VERSION.SDK_INT }
         .filter { isStableLink(it.link) }
+        .filter { matchesFlavour(it, installed, releaseVersion) }
         .filter { matchesFormFactor(it, requiresTelevisionBuild) }
         .filter { matchesSignature(it, installed) }
         .filter { abiRank(it) != UNSUPPORTED_ABI }
@@ -256,6 +262,27 @@ class AppUpdateRepository(
         requiresTelevisionBuild -> LEANBACK in apk.capabilities || LEANBACK_STANDALONE in apk.capabilities
         isTelevision -> true
         else -> LEANBACK_STANDALONE !in apk.capabilities
+    }
+
+    private fun matchesFlavour(apk: ApkMirrorApk, installed: InstalledApp, releaseVersion: String): Boolean {
+        val installedFlavour = flavour(installed.versionName.lowercase().split(*VERSION_SEPARATORS)) ?: return true
+        val apkFlavour = flavour(variantTokens(apk.link, releaseVersion)) ?: return true
+        return apkFlavour == installedFlavour
+    }
+
+    private fun variantTokens(link: String, releaseVersion: String): List<String> {
+        val numbers = releaseVersion.split(*VERSION_SEPARATORS).filter { it.isNotEmpty() && it.all(Char::isDigit) }
+        if (numbers.isEmpty()) return emptyList()
+        val tokens = link.trimEnd('/').substringAfterLast('/').lowercase().split('-')
+        var matched = 0
+        tokens.forEachIndexed { index, token ->
+            if (token == numbers[matched] && ++matched == numbers.size) return tokens.drop(index + 1)
+        }
+        return emptyList()
+    }
+
+    private fun flavour(tokens: List<String>): String? = tokens.firstOrNull { token ->
+        token.isNotEmpty() && token.all { it.isLetter() || it == '_' } && token !in NEUTRAL_TOKENS
     }
 
     private fun matchesSignature(apk: ApkMirrorApk, installed: InstalledApp): Boolean = when {
@@ -334,6 +361,9 @@ class AppUpdateRepository(
         const val WEAR_STANDALONE = "wear_standalone"
         const val LEANBACK = "leanback"
         const val LEANBACK_STANDALONE = "leanback_standalone"
+        const val PLAY_CONFIRMATIONS = 4
+        val VERSION_SEPARATORS = charArrayOf('.', '-', ' ', '(', ')', '[', ']')
+        val NEUTRAL_TOKENS = setOf("android", "apk", "bundle", "download", "arm", "armeabi", "universal", "noarch", "nodpi")
         val DENSITY_BUCKETS = listOf(
             DisplayMetrics.DENSITY_LOW,
             DisplayMetrics.DENSITY_MEDIUM,
@@ -346,4 +376,6 @@ class AppUpdateRepository(
     }
 
     private class MirrorCandidate(val apk: ApkMirrorApk, val versionName: String, val publishedAt: Long?)
+
+    private class PlayConfirmation(val apps: Map<String, App>, val unconfirmed: Int)
 }
