@@ -29,7 +29,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -144,6 +143,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -748,8 +751,32 @@ private fun UpdateCard(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
-    val latestInteraction = remember { MutableInteractionSource() }
-    val latestFocused by latestInteraction.collectIsFocusedAsState()
+    val latestText = stringResource(R.string.version_latest, update.newVersionName, update.newVersionCode)
+    val latest = remember(latestText, update.newVersionCode, colors) {
+        val code = update.newVersionCode.toString()
+        val start = latestText.lastIndexOf(code)
+        buildAnnotatedString {
+            append(latestText)
+            if (start >= 0) {
+                addLink(
+                    LinkAnnotation.Clickable(
+                        tag = code,
+                        styles = TextLinkStyles(
+                            style = SpanStyle(color = colors.accentText),
+                            focusedStyle = SpanStyle(color = Color.White, background = colors.accent),
+                            pressedStyle = SpanStyle(color = Color.White, background = colors.accent)
+                        )
+                    ) {
+                        coroutineScope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, code)))
+                        }
+                    },
+                    start,
+                    start + code.length
+                )
+            }
+        }
+    }
     val iconSizePx = with(LocalDensity.current) { AppIconSize.roundToPx() }
     val iconBitmap by produceState(AppIconCache.peek(app.packageName), app.packageName) {
         if (value == null) {
@@ -790,25 +817,7 @@ private fun UpdateCard(
                     style = Design.type.tiny,
                     color = colors.text
                 )
-                Text(
-                    text = stringResource(R.string.version_latest, update.newVersionName, update.newVersionCode),
-                    style = Design.type.tiny,
-                    color = colors.text,
-                    modifier = Modifier
-                        .focusRing(latestFocused, colors.accent, 0.dp)
-                        .combinedClickable(
-                            interactionSource = latestInteraction,
-                            indication = null,
-                            onClick = {},
-                            onLongClick = {
-                                coroutineScope.launch {
-                                    clipboard.setClipEntry(
-                                        ClipEntry(ClipData.newPlainText(null, update.newVersionCode.toString()))
-                                    )
-                                }
-                            }
-                        )
-                )
+                Text(text = latest, style = Design.type.tiny, color = colors.text)
             }
             Column(
                 modifier = Modifier.width(IntrinsicSize.Max),
