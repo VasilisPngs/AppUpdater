@@ -111,8 +111,7 @@ data class TypeScale(
     val pill: TextStyle,
     val muted: TextStyle,
     val tiny: TextStyle,
-    val tab: TextStyle,
-    val railTab: TextStyle
+    val tab: TextStyle
 )
 
 private val Medium = FontWeight(560)
@@ -149,8 +148,7 @@ private val Scale = TypeScale(
     pill = TextStyle(fontFamily = SystemSans, fontSize = 13.sp, lineHeight = 18.85.sp, fontWeight = Medium),
     muted = TextStyle(fontFamily = SystemSans, fontSize = 13.sp, lineHeight = 18.85.sp),
     tiny = TextStyle(fontFamily = SystemSans, fontSize = 12.sp, lineHeight = 17.4.sp),
-    tab = TextStyle(fontFamily = SystemSans, fontSize = 11.sp, lineHeight = 15.95.sp, fontWeight = Medium),
-    railTab = TextStyle(fontFamily = SystemSans, fontSize = 14.sp, lineHeight = 20.3.sp, fontWeight = Medium)
+    tab = TextStyle(fontFamily = SystemSans, fontSize = 11.sp, lineHeight = 15.95.sp, fontWeight = Medium)
 )
 
 object Radius {

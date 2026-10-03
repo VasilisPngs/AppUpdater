@@ -191,15 +191,7 @@ private val TabBarGap = 2.dp
 private val TabBarBottom = 12.dp
 private val TabBarSafeOverlap = 8.dp
 private val ContentBottomGap = 28.dp
-private val RailBottom = 60.dp
-private val RailBreakpoint = 900.dp
 private val FloatingSheetBreakpoint = 600.dp
-private val RailMin = 192.dp
-private val RailMax = 320.dp
-private val ColumnMin = 736.dp
-private val ColumnMax = 1088.dp
-private val RailGutter = 24.dp
-private val RailTabGap = 4.dp
 private val AppIconSize = 44.dp
 private val BrandMarkSize = 26.dp
 private val BrandMarkLayer = 39.dp
@@ -215,7 +207,6 @@ private val SheetMaxWidth = 560.dp
 private val SheetFloatingBottom = 24.dp
 private val ToastMaxWidth = 544.dp
 private val ToastGap = 20.dp
-private val RailToastBottom = 24.dp
 private val ToastEnter = 10.dp
 private val ToastExit = 6.dp
 private val ViewEnter = 6.dp
@@ -230,8 +221,6 @@ private val KnobShadowOffset = 2.dp
 private val KnobShadow = Color(0x4D000000)
 private val FocusRingWidth = 2.dp
 private val FocusRingOffset = 2.dp
-private const val RAIL_FRACTION = 0.15f
-private const val COLUMN_FRACTION = 0.44f
 private const val TOAST_MILLIS = 2200L
 private const val PULSE_MILLIS = 550
 private const val FOCUSED_BORDER_ALPHA = 0.6f
@@ -365,7 +354,6 @@ fun AppUpdaterScreen(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val rail = maxWidth >= RailBreakpoint
         val floatingSheet = maxWidth >= FloatingSheetBreakpoint
         val topInset = insets.calculateTopPadding()
         val bottomInset = insets.calculateBottomPadding()
@@ -374,24 +362,13 @@ fun AppUpdaterScreen(
         val topBarHeight = topInset + BarPadding * 2 + max(Space.controlSmall, pillLine)
         val tabBarBottom = max(TabBarBottom, bottomInset - TabBarSafeOverlap)
         val tabBarHeight = (TabPadding + Space.hairline) * 2 + TabPadding * 2 + TabIconSize + TabGap + tabLine
-        val railWidth = (maxWidth * RAIL_FRACTION).coerceIn(RailMin, RailMax)
-        val railSide = max(railWidth + RailGutter, (maxWidth - (maxWidth * COLUMN_FRACTION).coerceIn(ColumnMin, ColumnMax)) / 2)
-        val contentPadding = if (rail) {
-            PaddingValues(
-                start = railSide,
-                end = railSide,
-                top = topBarHeight + Space.l,
-                bottom = bottomInset + RailBottom
-            )
-        } else {
-            PaddingValues(
-                start = startPadding,
-                end = endPadding,
-                top = topBarHeight + Space.l,
-                bottom = tabBarBottom + tabBarHeight + ContentBottomGap
-            )
-        }
-        val toastBottom = if (rail) bottomInset + RailToastBottom else tabBarBottom + tabBarHeight + ToastGap
+        val contentPadding = PaddingValues(
+            start = startPadding,
+            end = endPadding,
+            top = topBarHeight + Space.l,
+            bottom = tabBarBottom + tabBarHeight + ContentBottomGap
+        )
+        val toastBottom = tabBarBottom + tabBarHeight + ToastGap
 
         Box(
             modifier = Modifier
@@ -483,25 +460,16 @@ fun AppUpdaterScreen(
                 onRefresh = viewModel::scanForUpdates
             )
 
-            if (rail) {
-                RailNav(
-                    listFocus = activeFocus,
-                    selectedTab = selectedTab,
-                    modifier = Modifier.padding(top = topBarHeight).width(railWidth),
-                    onSelect = selectTab
-                )
-            } else {
-                TabBar(
-                    backdrop = backdrop,
-                    listFocus = activeFocus,
-                    observe = { activeListState.firstVisibleItemScrollOffset },
-                    selectedTab = selectedTab,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(start = startPadding, end = endPadding, bottom = tabBarBottom),
-                    onSelect = selectTab
-                )
-            }
+            TabBar(
+                backdrop = backdrop,
+                listFocus = activeFocus,
+                observe = { activeListState.firstVisibleItemScrollOffset },
+                selectedTab = selectedTab,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = startPadding, end = endPadding, bottom = tabBarBottom),
+                onSelect = selectTab
+            )
         }
 
         if (sheetShown) {
@@ -1433,7 +1401,6 @@ private fun TabBar(
                 TabItem(
                     tab = tab,
                     selected = tab == selectedTab,
-                    rail = false,
                     modifier = Modifier
                         .weight(1f)
                         .focusProperties { up = listFocus },
@@ -1445,35 +1412,9 @@ private fun TabBar(
 }
 
 @Composable
-private fun RailNav(
-    listFocus: FocusRequester,
-    selectedTab: AppTab,
-    modifier: Modifier,
-    onSelect: (AppTab) -> Unit
-) {
-    Column(
-        modifier = modifier.padding(top = Space.l, start = Space.l),
-        verticalArrangement = Arrangement.spacedBy(RailTabGap)
-    ) {
-        AppTab.entries.forEach { tab ->
-            TabItem(
-                tab = tab,
-                selected = tab == selectedTab,
-                rail = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusProperties { right = listFocus },
-                onClick = { onSelect(tab) }
-            )
-        }
-    }
-}
-
-@Composable
 private fun TabItem(
     tab: AppTab,
     selected: Boolean,
-    rail: Boolean,
     modifier: Modifier,
     onClick: () -> Unit
 ) {
@@ -1496,48 +1437,31 @@ private fun TabItem(
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "ring"
     )
-    val base = modifier
-        .alpha(fade)
-        .focusRing(focused, colors.accent, Dp.Infinity)
-        .clip(ShapePill)
-        .background(fill)
-        .border(Space.hairline, ring, ShapePill)
-        .selectable(
-            selected = selected,
-            interactionSource = interaction,
-            indication = null,
-            role = Role.Tab,
-            onClick = onClick
-        )
-    val icon = @Composable {
+    Column(
+        modifier = modifier
+            .alpha(fade)
+            .focusRing(focused, colors.accent, Dp.Infinity)
+            .clip(ShapePill)
+            .background(fill)
+            .border(Space.hairline, ring, ShapePill)
+            .selectable(
+                selected = selected,
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick
+            )
+            .padding(vertical = TabPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(TabGap)
+    ) {
         Icon(
             painter = painterResource(tab.iconRes),
             contentDescription = null,
             tint = colors.text,
             modifier = Modifier.size(TabIconSize)
         )
-    }
-
-    if (rail) {
-        Row(
-            modifier = base
-                .defaultMinSize(minHeight = Space.control)
-                .padding(horizontal = Space.l),
-            horizontalArrangement = Arrangement.spacedBy(Space.m),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            icon()
-            Text(text = stringResource(tab.labelRes), style = Design.type.railTab, color = colors.text)
-        }
-    } else {
-        Column(
-            modifier = base.padding(vertical = TabPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(TabGap)
-        ) {
-            icon()
-            Text(text = stringResource(tab.labelRes), style = Design.type.tab, color = colors.text)
-        }
+        Text(text = stringResource(tab.labelRes), style = Design.type.tab, color = colors.text)
     }
 }
 
