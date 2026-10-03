@@ -76,7 +76,11 @@ class AppUpdateRepository(
 
         val mirrorApps = mirrorResults.mapNotNull(Result<List<ApkMirrorApp>>::getOrNull).flatten()
         val playApps = playResult.getOrNull().orEmpty()
-        val updates = merge(appsToCheck, mirrorApps, playApps).sortedWith(NEWEST_FIRST)
+        val installedByPackage = appsToCheck.associateBy(InstalledApp::packageName)
+        val testBuilds = testBuilds(
+            playApps.filter { app -> installedByPackage[app.packageName]?.let { playUpdate(app, it) } != null }
+        )
+        val updates = merge(appsToCheck, mirrorApps, playApps, testBuilds).sortedWith(NEWEST_FIRST)
 
         val failures = buildList {
             val failedBatches = mirrorResults.count(Result<List<ApkMirrorApp>>::isFailure)
@@ -105,10 +109,33 @@ class AppUpdateRepository(
     private fun reason(exception: Throwable): String =
         exception.message?.takeIf(String::isNotBlank) ?: exception::class.simpleName.orEmpty()
 
+    private suspend fun testBuilds(candidates: List<App>): Set<String> = coroutineScope {
+        candidates.map { app ->
+            async {
+                val confirmed = if (app.isTestBuild) {
+                    null
+                } else {
+                    attempt { playCatalog.details(app.packageName).second }.getOrNull()
+                }
+                app.packageName.takeIf {
+                    confirmed == null || confirmed.isTestBuild || confirmed.versionCode != app.versionCode
+                }
+            }
+        }.awaitAll().filterNotNull().toSet()
+    }
+
+    private val App.isTestBuild: Boolean
+        get() = testingProgram?.isSubscribed == true || earlyAccess
+
+    private fun playUpdate(app: App, installed: InstalledApp): App? = app.takeIf {
+        matchesSignature(it, installed) && it.versionCode > installed.versionCode && isStableRelease(it.versionName)
+    }
+
     private fun merge(
         installed: List<InstalledApp>,
         mirrorApps: List<ApkMirrorApp>,
-        playApps: List<App>
+        playApps: List<App>,
+        testBuilds: Set<String>
     ): List<AppUpdateInfo> {
         val mirrorByPackage = mirrorApps.associateBy(ApkMirrorApp::packageName)
         val playByPackage = playApps.associateBy(App::packageName)
@@ -119,7 +146,7 @@ class AppUpdateRepository(
             val mirror = mirrorByPackage[app.packageName]
                 ?.takeUnless { isTelevision && carried != null }
                 ?.let { mirrorCandidate(it, app) }
-            val playUpdate = play?.takeIf { it.versionCode > app.versionCode && isStableRelease(it.versionName) }
+            val playUpdate = play?.takeUnless { it.packageName in testBuilds }?.let { playUpdate(it, app) }
 
             when {
                 playUpdate != null && (mirror == null || playUpdate.versionCode >= mirror.apk.versionCode) -> AppUpdateInfo(
