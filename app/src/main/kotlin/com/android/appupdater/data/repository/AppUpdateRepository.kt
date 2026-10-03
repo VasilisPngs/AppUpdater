@@ -46,8 +46,6 @@ class AppUpdateRepository(
 ) {
     private val packageManager = context.packageManager
     private val isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
-    private val excludedCapabilities =
-        if (isTelevision) setOf(WEAR_STANDALONE) else setOf(WEAR_STANDALONE, LEANBACK_STANDALONE)
     private val deviceAbis = Build.SUPPORTED_ABIS.map(String::lowercase)
     private val universalAbiRank = deviceAbis.size
     private val deviceDensityBucket = DENSITY_BUCKETS
@@ -137,15 +135,14 @@ class AppUpdateRepository(
         playApps: List<App>,
         testBuilds: Set<String>
     ): List<AppUpdateInfo> {
-        val mirrorByPackage = mirrorApps.associateBy(ApkMirrorApp::packageName)
+        val mirrorByPackage = mirrorApps.groupBy(ApkMirrorApp::packageName)
         val playByPackage = playApps.associateBy(App::packageName)
 
         return installed.mapNotNull { app ->
-            val carried = playByPackage[app.packageName]
-            val play = carried?.takeIf { matchesSignature(it, app) }
+            val play = playByPackage[app.packageName]?.takeIf { matchesSignature(it, app) }
             val mirror = mirrorByPackage[app.packageName]
-                ?.takeUnless { isTelevision && carried != null }
-                ?.let { mirrorCandidate(it, app) }
+                ?.mapNotNull { mirrorCandidate(it, app) }
+                ?.maxByOrNull { it.apk.versionCode }
             val playUpdate = play?.takeUnless { it.packageName in testBuilds }?.let { playUpdate(it, app) }
 
             when {
@@ -193,7 +190,7 @@ class AppUpdateRepository(
         .filter { it.versionCode > installed.versionCode }
         .filter { it.minimumApi <= Build.VERSION.SDK_INT }
         .filter { isStableLink(it.link) }
-        .filter { apk -> apk.capabilities.none { it in excludedCapabilities } }
+        .filter(::matchesFormFactor)
         .filter { matchesSignature(it, installed) }
         .filter { abiRank(it) != UNSUPPORTED_ABI }
         .minWithOrNull(
@@ -232,6 +229,12 @@ class AppUpdateRepository(
     }
 
     private fun densityBucket(density: String): Int? = density.toIntOrNull()
+
+    private fun matchesFormFactor(apk: ApkMirrorApk): Boolean = when {
+        WEAR_STANDALONE in apk.capabilities -> false
+        isTelevision -> LEANBACK in apk.capabilities || LEANBACK_STANDALONE in apk.capabilities
+        else -> LEANBACK_STANDALONE !in apk.capabilities
+    }
 
     private fun matchesSignature(apk: ApkMirrorApk, installed: InstalledApp): Boolean = when {
         apk.signatureSha256s.isNotEmpty() && installed.signatureSha256s.isNotEmpty() ->
@@ -307,6 +310,7 @@ class AppUpdateRepository(
         )
         val UNIVERSAL_ARCHITECTURES = setOf("universal", "noarch")
         const val WEAR_STANDALONE = "wear_standalone"
+        const val LEANBACK = "leanback"
         const val LEANBACK_STANDALONE = "leanback_standalone"
         val DENSITY_BUCKETS = listOf(
             DisplayMetrics.DENSITY_LOW,
