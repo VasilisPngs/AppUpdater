@@ -26,6 +26,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -84,6 +85,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,6 +114,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
@@ -119,6 +122,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -403,6 +407,7 @@ fun AppUpdaterScreen(
 
         ManualSheet(
             target = manualTarget,
+            returnFocus = updatesFocus,
             modifier = Modifier.align(Alignment.BottomCenter),
             onSubmit = { update, versionCode ->
                 manualPackage = null
@@ -701,6 +706,11 @@ private fun Button(
         label = "press"
     )
     val percent = remember { NumberFormat.getPercentInstance() }
+    val progressShown by animateFloatAsState(
+        targetValue = if (busy && progress != null) 1f else 0f,
+        animationSpec = tween(Motion.FAST, easing = Motion.ease),
+        label = "progress"
+    )
 
     Box(
         modifier = modifier
@@ -747,12 +757,23 @@ private fun Button(
             val style = if (small) Design.type.buttonSmall else Design.type.button
             val color = if (primary) Color.White else colors.text
             if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, tint = color)
-            Text(text = text, style = style, color = color, maxLines = 1)
-            if (busy && progress != null) {
-                val digits = style.copy(fontFeatureSettings = TABULAR_FIGURES)
-                Box(contentAlignment = Alignment.CenterEnd) {
-                    Text(text = percent.format(1), style = digits, color = Color.Transparent, maxLines = 1)
-                    Text(text = percent.format(progress), style = digits, color = color, maxLines = 1)
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = text,
+                    style = style,
+                    color = color,
+                    maxLines = 1,
+                    modifier = Modifier.graphicsLayer { alpha = 1f - progressShown }
+                )
+                if (busy && progress != null) {
+                    Text(
+                        text = percent.format(progress),
+                        style = style.copy(fontFeatureSettings = TABULAR_FIGURES),
+                        color = color,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.matchParentSize().graphicsLayer { alpha = progressShown }
+                    )
                 }
             }
         }
@@ -774,6 +795,7 @@ private fun primaryGradient(size: Size, start: Color, end: Color): Brush {
 @Composable
 private fun ManualSheet(
     target: AppUpdateInfo?,
+    returnFocus: FocusRequester,
     modifier: Modifier,
     onSubmit: (AppUpdateInfo, Long) -> Unit
 ) {
@@ -786,15 +808,20 @@ private fun ManualSheet(
         val update = remember { checkNotNull(target) }
         val colors = Design.colors
         val focusManager = LocalFocusManager.current
+        val inputModeManager = LocalInputModeManager.current
+        val fieldFocus = remember { FocusRequester() }
+        val open by rememberUpdatedState(target != null)
         val code = rememberTextFieldState()
         val versionCode = code.text.toString().toLongOrNull()
         val submit = {
-            if (versionCode != null) {
-                focusManager.clearFocus()
-                onSubmit(update, versionCode)
-            }
+            if (versionCode != null) onSubmit(update, versionCode)
         }
-        if (target == null) LaunchedEffect(Unit) { focusManager.clearFocus() }
+        LaunchedEffect(Unit) {
+            if (inputModeManager.inputMode == InputMode.Keyboard) fieldFocus.requestFocus()
+        }
+        if (target == null) LaunchedEffect(Unit) {
+            if (inputModeManager.inputMode == InputMode.Keyboard) returnFocus.requestFocus() else focusManager.clearFocus()
+        }
 
         Column(
             modifier = Modifier
@@ -804,6 +831,8 @@ private fun ManualSheet(
                 .background(colors.surface.copy(alpha = SheetSurfaceAlpha))
                 .border(Space.hairline, colors.border, ShapeSheet)
                 .pointerInput(Unit) { detectTapGestures { } }
+                .focusProperties { onExit = { if (open) cancelFocusChange() } }
+                .focusGroup()
                 .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars).only(WindowInsetsSides.Bottom))
                 .padding(horizontal = Space.l, vertical = SheetPadding),
             verticalArrangement = Arrangement.spacedBy(Space.m)
@@ -815,7 +844,7 @@ private fun ManualSheet(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            VersionCodeField(state = code, onDone = submit)
+            VersionCodeField(state = code, focus = fieldFocus, onDone = submit)
             Button(
                 text = stringResource(R.string.update),
                 onClick = submit,
@@ -828,7 +857,7 @@ private fun ManualSheet(
 }
 
 @Composable
-private fun VersionCodeField(state: TextFieldState, onDone: () -> Unit) {
+private fun VersionCodeField(state: TextFieldState, focus: FocusRequester, onDone: () -> Unit) {
     val colors = Design.colors
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -846,7 +875,7 @@ private fun VersionCodeField(state: TextFieldState, onDone: () -> Unit) {
 
     BasicTextField(
         state = state,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().focusRequester(focus),
         inputTransformation = DigitsOnly.maxLengthTrim(MAX_VERSION_CODE_DIGITS),
         textStyle = Design.type.body.copy(color = colors.text),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
