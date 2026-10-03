@@ -762,7 +762,6 @@ private fun UpdateCard(
                     LinkAnnotation.Clickable(
                         tag = code,
                         styles = TextLinkStyles(
-                            style = SpanStyle(color = colors.accentText),
                             focusedStyle = SpanStyle(color = Color.White, background = colors.accent),
                             pressedStyle = SpanStyle(color = Color.White, background = colors.accent)
                         )
