@@ -1,0 +1,9 @@
+package com.android.appupdater.data.model
+
+sealed interface InstallState {
+    val appName: String
+
+    data class Installing(override val appName: String) : InstallState
+    data class Success(override val appName: String) : InstallState
+    data class Error(override val appName: String, val message: String) : InstallState
+}

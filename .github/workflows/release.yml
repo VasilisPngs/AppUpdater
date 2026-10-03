@@ -66,11 +66,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          TAG_NAME: APKUpdater
+          TAG_NAME: AppUpdater
         run: |
-          cp app/build/outputs/apk/release/app-release.apk APKUpdater.apk
+          cp app/build/outputs/apk/release/app-release.apk AppUpdater.apk
           if gh release view "$TAG_NAME" --repo "$REPO" >/dev/null 2>&1; then
-            gh release upload "$TAG_NAME" APKUpdater.apk --repo "$REPO" --clobber
+            gh release upload "$TAG_NAME" AppUpdater.apk --repo "$REPO" --clobber
             gh api --method PATCH "repos/$REPO/git/refs/tags/$TAG_NAME" \
               -f sha="$GITHUB_SHA" -F force=true --silent \
               || echo "::warning::The tag still points at an older commit."
@@ -81,8 +81,8 @@ jobs:
             done
             test "$(gh release view "$TAG_NAME" --repo "$REPO" --json isDraft --jq .isDraft)" = false
           else
-            gh release create "$TAG_NAME" APKUpdater.apk \
+            gh release create "$TAG_NAME" AppUpdater.apk \
               --repo "$REPO" \
-              --title "APKUpdater" \
+              --title "AppUpdater" \
               --notes " "
           fi

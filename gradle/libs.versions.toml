@@ -6,6 +6,7 @@ activityCompose = "1.14.0-alpha03"
 lifecycle = "2.12.0-alpha04"
 okhttp = "5.5.0"
 kotlinxCoroutines = "1.11.0"
+gplayapi = "3.6.4"
 
 [libraries]
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -16,6 +17,7 @@ androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+aurora-gplayapi = { group = "com.auroraoss", name = "gplayapi", version.ref = "gplayapi" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

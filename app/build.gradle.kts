@@ -4,16 +4,16 @@ plugins {
 }
 
 android {
-    namespace = "com.android.apkupdater"
+    namespace = "com.android.appupdater"
     compileSdk = 37
     compileSdkMinor = 2
 
     defaultConfig {
-        applicationId = "com.android.apkupdater"
-        minSdk = 36
+        applicationId = "com.android.appupdater"
+        minSdk = 34
         targetSdk = 37
         versionCode = (System.currentTimeMillis() / 1000).toInt()
-        versionName = "APKUpdater"
+        versionName = "AppUpdater"
     }
 
     val releaseKeystore = rootProject.file("release.keystore")
@@ -59,4 +59,5 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.aurora.gplayapi)
 }
