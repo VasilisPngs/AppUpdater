@@ -6,7 +6,8 @@ data class InstalledApp(
     val versionCode: Long,
     val signatureSha1s: Set<String>,
     val signatureSha256s: Set<String>,
-    val isEnabled: Boolean
+    val isEnabled: Boolean,
+    val isTelevisionBuild: Boolean
 )
 
 data class AppUpdateInfo(

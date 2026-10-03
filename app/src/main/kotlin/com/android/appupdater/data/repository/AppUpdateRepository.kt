@@ -1,6 +1,7 @@
 package com.android.appupdater.data.repository
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.Signature
@@ -46,6 +47,9 @@ class AppUpdateRepository(
 ) {
     private val packageManager = context.packageManager
     private val isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    private val packageFlags = PackageManager.PackageInfoFlags.of(
+        (PACKAGE_FLAGS or if (isTelevision) PackageManager.GET_CONFIGURATIONS else 0).toLong()
+    )
     private val deviceAbis = Build.SUPPORTED_ABIS.map(String::lowercase)
     private val universalAbiRank = deviceAbis.size
     private val deviceDensityBucket = DENSITY_BUCKETS
@@ -53,9 +57,17 @@ class AppUpdateRepository(
         ?: DENSITY_BUCKETS.last()
 
     suspend fun getInstalledApps(): List<InstalledApp> = withContext(Dispatchers.IO) {
-        packageManager.getInstalledPackages(PACKAGE_FLAGS)
-            .mapNotNull { packageInfo -> runCatching { packageInfo.toInstalledApp() }.getOrNull() }
+        val televisionLaunchers = if (isTelevision) televisionLaunchers() else emptySet()
+        packageManager.getInstalledPackages(packageFlags)
+            .mapNotNull { packageInfo -> runCatching { packageInfo.toInstalledApp(televisionLaunchers) }.getOrNull() }
     }
+
+    private fun televisionLaunchers(): Set<String> = packageManager
+        .queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER),
+            PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DISABLED_COMPONENTS.toLong())
+        )
+        .mapTo(HashSet()) { it.activityInfo.packageName }
 
     fun scanForUpdates(appsToCheck: List<InstalledApp>): Flow<ScanStatus> = flow {
         if (appsToCheck.isEmpty()) {
@@ -140,8 +152,9 @@ class AppUpdateRepository(
 
         return installed.mapNotNull { app ->
             val play = playByPackage[app.packageName]?.takeIf { matchesSignature(it, app) }
+            val requiresTelevisionBuild = isTelevision && (app.isTelevisionBuild || play != null)
             val mirror = mirrorByPackage[app.packageName]
-                ?.mapNotNull { mirrorCandidate(it, app) }
+                ?.mapNotNull { mirrorCandidate(it, app, requiresTelevisionBuild) }
                 ?.maxByOrNull { it.apk.versionCode }
             val playUpdate = play?.takeUnless { it.packageName in testBuilds }?.let { playUpdate(it, app) }
 
@@ -169,10 +182,14 @@ class AppUpdateRepository(
         }
     }
 
-    private fun mirrorCandidate(app: ApkMirrorApp, installed: InstalledApp): MirrorCandidate? {
+    private fun mirrorCandidate(
+        app: ApkMirrorApp,
+        installed: InstalledApp,
+        requiresTelevisionBuild: Boolean
+    ): MirrorCandidate? {
         if (!isStableRelease(app.packageName)) return null
         if (!isStableRelease(app.versionName)) return null
-        val apk = bestApk(app.apks, installed) ?: return null
+        val apk = bestApk(app.apks, installed, requiresTelevisionBuild) ?: return null
         return MirrorCandidate(
             apk = apk,
             versionName = fullVersionName(apk, app.versionName),
@@ -185,12 +202,16 @@ class AppUpdateRepository(
             runCatching { Base64.getUrlDecoder().decode(set.certificateSet).toHex() }.getOrNull() in installed.signatureSha1s
         }
 
-    private fun bestApk(apks: List<ApkMirrorApk>, installed: InstalledApp): ApkMirrorApk? = apks
+    private fun bestApk(
+        apks: List<ApkMirrorApk>,
+        installed: InstalledApp,
+        requiresTelevisionBuild: Boolean
+    ): ApkMirrorApk? = apks
         .asSequence()
         .filter { it.versionCode > installed.versionCode }
         .filter { it.minimumApi <= Build.VERSION.SDK_INT }
         .filter { isStableLink(it.link) }
-        .filter(::matchesFormFactor)
+        .filter { matchesFormFactor(it, requiresTelevisionBuild) }
         .filter { matchesSignature(it, installed) }
         .filter { abiRank(it) != UNSUPPORTED_ABI }
         .minWithOrNull(
@@ -230,9 +251,10 @@ class AppUpdateRepository(
 
     private fun densityBucket(density: String): Int? = density.toIntOrNull()
 
-    private fun matchesFormFactor(apk: ApkMirrorApk): Boolean = when {
+    private fun matchesFormFactor(apk: ApkMirrorApk, requiresTelevisionBuild: Boolean): Boolean = when {
         WEAR_STANDALONE in apk.capabilities -> false
-        isTelevision -> LEANBACK in apk.capabilities || LEANBACK_STANDALONE in apk.capabilities
+        requiresTelevisionBuild -> LEANBACK in apk.capabilities || LEANBACK_STANDALONE in apk.capabilities
+        isTelevision -> true
         else -> LEANBACK_STANDALONE !in apk.capabilities
     }
 
@@ -261,7 +283,7 @@ class AppUpdateRepository(
         .drop(1)
         .all(::isStableRelease)
 
-    private fun PackageInfo.toInstalledApp(): InstalledApp? {
+    private fun PackageInfo.toInstalledApp(televisionLaunchers: Set<String>): InstalledApp? {
         val appInfo = applicationInfo ?: return null
         val certificates = signingInfo.certificates()
 
@@ -271,7 +293,9 @@ class AppUpdateRepository(
             versionCode = longVersionCode,
             signatureSha1s = certificates.digests("SHA-1"),
             signatureSha256s = certificates.digests("SHA-256"),
-            isEnabled = appInfo.enabled
+            isEnabled = appInfo.enabled,
+            isTelevisionBuild = packageName in televisionLaunchers ||
+                reqFeatures?.any { it.name == PackageManager.FEATURE_LEANBACK } == true
         )
     }
 
@@ -305,9 +329,7 @@ class AppUpdateRepository(
         const val MATCHING_DENSITY_RANK = 0
         const val UNIVERSAL_DENSITY_RANK = 1
         const val FOREIGN_DENSITY_RANK = 2
-        val PACKAGE_FLAGS: PackageManager.PackageInfoFlags = PackageManager.PackageInfoFlags.of(
-            (PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.MATCH_DISABLED_COMPONENTS).toLong()
-        )
+        const val PACKAGE_FLAGS = PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.MATCH_DISABLED_COMPONENTS
         val UNIVERSAL_ARCHITECTURES = setOf("universal", "noarch")
         const val WEAR_STANDALONE = "wear_standalone"
         const val LEANBACK = "leanback"
