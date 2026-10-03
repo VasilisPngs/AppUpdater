@@ -3,10 +3,8 @@ package com.android.appupdater.ui.theme
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -29,13 +27,10 @@ data class Palette(
     val muted: Color,
     val accent: Color,
     val accentEnd: Color,
-    val accentText: Color,
     val accentSoft: Color,
     val success: Color,
-    val warning: Color,
     val danger: Color,
     val glassEdge: Color,
-    val shadow: Color,
     val scrim: Color
 )
 
@@ -49,13 +44,10 @@ private val DarkPalette = Palette(
     muted = Color(0xFF97A0B2),
     accent = Color(0xFF7958FF),
     accentEnd = Color(0xFF6A5CFF),
-    accentText = Color(0xFF967DFF),
     accentSoft = Color(0x2E7C5CFF),
     success = Color(0xFF23C56E),
-    warning = Color(0xFFFFB020),
     danger = Color(0xFFFF5470),
     glassEdge = Color(0x1FFFFFFF),
-    shadow = Color(0x73000000),
     scrim = Color(0x6B04060A)
 )
 
@@ -69,19 +61,15 @@ private val LightPalette = Palette(
     muted = Color(0xFF5F6878),
     accent = Color(0xFF6A48F0),
     accentEnd = Color(0xFF6A5CFF),
-    accentText = Color(0xFF6A48F0),
     accentSoft = Color(0x246A48F0),
     success = Color(0xFF23C56E),
-    warning = Color(0xFF905D00),
     danger = Color(0xFFD10022),
     glassEdge = Color(0xD9FFFFFF),
-    shadow = Color(0x1F121828),
     scrim = Color(0x6B04060A)
 )
 
 @Immutable
 data class TypeScale(
-    val h1: TextStyle,
     val h2: TextStyle,
     val h3: TextStyle,
     val body: TextStyle,
@@ -96,7 +84,6 @@ data class TypeScale(
 )
 
 private val Scale = TypeScale(
-    h1 = TextStyle(fontSize = 21.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.42).sp),
     h2 = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.16).sp),
     h3 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight(600)),
     body = TextStyle(fontSize = 15.sp, lineHeight = 21.8.sp),
@@ -111,13 +98,11 @@ private val Scale = TypeScale(
 )
 
 object Radius {
-    val xs = 8.dp
     val s = 10.dp
     val m = 14.dp
     val l = 20.dp
 }
 
-val ShapeXs = RoundedCornerShape(Radius.xs)
 val ShapeS = RoundedCornerShape(Radius.s)
 val ShapeM = RoundedCornerShape(Radius.m)
 val ShapeL = RoundedCornerShape(Radius.l)
@@ -162,42 +147,15 @@ fun AppUpdaterTheme(
     content: @Composable () -> Unit
 ) {
     val palette = if (darkTheme) DarkPalette else LightPalette
-    val scheme = if (darkTheme) {
-        darkColorScheme(
-            primary = palette.accent,
-            onPrimary = Color.White,
-            background = palette.background,
-            onBackground = palette.text,
-            surface = palette.surface,
-            onSurface = palette.text,
-            surfaceVariant = palette.surface2,
-            onSurfaceVariant = palette.text,
-            outline = palette.border,
-            error = palette.danger
-        )
-    } else {
-        lightColorScheme(
-            primary = palette.accent,
-            onPrimary = Color.White,
-            background = palette.background,
-            onBackground = palette.text,
-            surface = palette.surface,
-            onSurface = palette.text,
-            surfaceVariant = palette.surface2,
-            onSurfaceVariant = palette.text,
-            outline = palette.border,
-            error = palette.danger
-        )
-    }
-
     CompositionLocalProvider(
         LocalPalette provides palette,
-        LocalTypeScale provides Scale
-    ) {
-        MaterialTheme(
-            colorScheme = scheme,
-            typography = Typography(bodyLarge = Scale.body),
-            content = content
-        )
-    }
+        LocalTypeScale provides Scale,
+        LocalTextSelectionColors provides TextSelectionColors(
+            handleColor = palette.accent,
+            backgroundColor = palette.accent.copy(alpha = SELECTION_ALPHA)
+        ),
+        content = content
+    )
 }
+
+private const val SELECTION_ALPHA = 0.4f

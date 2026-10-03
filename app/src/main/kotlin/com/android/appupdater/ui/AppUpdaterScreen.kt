@@ -69,7 +69,6 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.maxLengthTrim
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -190,7 +189,6 @@ private enum class AppTab(val labelRes: Int, val iconRes: Int) {
     Settings(R.string.settings, R.drawable.ic_settings)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppUpdaterScreen(
     viewModel: AppUpdaterViewModel,

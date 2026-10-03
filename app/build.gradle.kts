@@ -24,14 +24,12 @@ android {
             storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
             keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "release"
             keyPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            enableV2Signing = true
             enableV3Signing = true
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
         }
     }
@@ -44,17 +42,13 @@ android {
     buildFeatures {
         compose = true
     }
-
-    lint {
-        toolchain.languageVersion.set(JavaLanguageVersion.of(26))
-    }
 }
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.okhttp)
