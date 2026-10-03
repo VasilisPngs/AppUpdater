@@ -5,7 +5,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.appupdater.ui.AppUpdaterScreen
 import com.android.appupdater.ui.AppUpdaterViewModel
 import com.android.appupdater.ui.theme.AppUpdaterTheme
@@ -18,7 +20,8 @@ class MainActivity : ComponentActivity() {
         WindowCompat.enableEdgeToEdge(window)
         if (savedInstanceState == null) installFromIntent(intent)
         setContent {
-            AppUpdaterTheme {
+            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            AppUpdaterTheme(themeMode = themeMode) {
                 AppUpdaterScreen(viewModel = viewModel)
             }
         }

@@ -1,6 +1,7 @@
 package com.android.appupdater.ui
 
 import android.app.Application
+import android.app.UiModeManager
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,7 @@ import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
+import com.android.appupdater.data.model.ThemeMode
 import com.android.appupdater.data.play.PlayAuthProvider
 import com.android.appupdater.data.play.PlayCatalog
 import com.android.appupdater.data.play.PlayHttpClient
@@ -51,16 +53,21 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     private val bundleInstaller = BundleInstaller(application.applicationContext)
     private val playInstaller = PlayInstaller(application.applicationContext, playCatalog, playHttpClient)
     private val _uiState = MutableStateFlow(AppUpdaterUiState())
+    private val _themeMode = MutableStateFlow(ThemeMode.System)
     private val _events = MutableSharedFlow<InstallEvent>(extraBufferCapacity = 16)
     private val installJobs = ConcurrentHashMap<String, Job>()
     private var scanJob: Job? = null
 
     val uiState: StateFlow<AppUpdaterUiState> = _uiState.asStateFlow()
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
     val events: SharedFlow<InstallEvent> = _events.asSharedFlow()
 
     init {
         viewModelScope.launch {
-            val includeDisabledApps = withContext(Dispatchers.IO) { preferences.includeDisabledApps }
+            val (includeDisabledApps, themeMode) = withContext(Dispatchers.IO) {
+                preferences.includeDisabledApps to preferences.themeMode
+            }
+            _themeMode.value = themeMode
             _uiState.update { it.copy(includeDisabledApps = includeDisabledApps) }
             scanForUpdates()
         }
@@ -136,6 +143,13 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.update { it.copy(includeDisabledApps = include) }
         viewModelScope.launch(Dispatchers.IO) { preferences.includeDisabledApps = include }
         scanForUpdates()
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        if (_themeMode.value == mode) return
+        _themeMode.value = mode
+        viewModelScope.launch(Dispatchers.IO) { preferences.themeMode = mode }
+        getApplication<Application>().getSystemService(UiModeManager::class.java).setApplicationNightMode(mode.nightMode)
     }
 
     private suspend fun refreshInstalledApps(): List<InstalledApp> {
