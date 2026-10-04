@@ -20,7 +20,7 @@ class BundleInstaller(private val context: Context) {
     suspend fun install(uri: Uri, onState: (InstallState) -> Unit): Result<Unit> =
         withContext(Dispatchers.IO) {
             val label = displayName(uri)
-            val archive = File(context.cacheDir, "bundle_archive")
+            val archive = File(context.cacheDir, "$ARCHIVE_PREFIX${System.nanoTime()}")
             try {
                 onState(InstallState.Installing(label))
                 copyToCache(uri, archive)
@@ -28,7 +28,6 @@ class BundleInstaller(private val context: Context) {
                 ZipFile(archive).use { zip ->
                     packageInstaller.install(sources(zip, archive)).getOrThrow()
                 }
-                archive.delete()
                 onState(InstallState.Success(label))
                 Result.success(Unit)
             } catch (exception: CancellationException) {
@@ -40,6 +39,8 @@ class BundleInstaller(private val context: Context) {
             } catch (exception: Exception) {
                 onState(InstallState.Error(label, exception.message ?: "Installation failed"))
                 Result.failure(exception)
+            } finally {
+                archive.delete()
             }
         }
 
@@ -122,14 +123,17 @@ class BundleInstaller(private val context: Context) {
 
     private fun displayName(uri: Uri): String {
         val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
-        val name = context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }
+        val name = runCatching {
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull()
         return name ?: uri.lastPathSegment ?: "Package"
     }
 
     private companion object {
         const val APK_SUFFIX = ".apk"
+        const val ARCHIVE_PREFIX = "bundle_"
         const val BASE_APK = "base.apk"
         const val SPLIT_CONFIG_PREFIX = "split_config."
         const val CONFIG_PREFIX = "config."

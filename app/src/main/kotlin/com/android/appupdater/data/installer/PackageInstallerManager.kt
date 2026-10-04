@@ -19,6 +19,7 @@ class PackageInstallerManager(private val context: Context) {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setSize(sources.sumOf { it.size.coerceAtLeast(0) })
+            setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
         }
         val sessionId = try {
             installer.createSession(params)
@@ -38,13 +39,9 @@ class PackageInstallerManager(private val context: Context) {
             override fun onReceive(receiverContext: Context, intent: Intent) {
                 when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
                     PackageInstaller.STATUS_SUCCESS -> result.complete(Result.success(Unit))
-                    PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                        val confirmation = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
-                        if (confirmation != null) {
-                            confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            receiverContext.startActivity(confirmation)
-                        }
-                    }
+                    PackageInstaller.STATUS_PENDING_USER_ACTION ->
+                        intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                            ?.let(InstallConfirmation::request)
                     else -> {
                         val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
                         result.complete(Result.failure(IllegalStateException(failureMessage(message))))
@@ -80,6 +77,7 @@ class PackageInstallerManager(private val context: Context) {
             runCatching { session.abandon() }
             Result.failure(exception)
         } finally {
+            InstallConfirmation.clear()
             runCatching { context.unregisterReceiver(receiver) }
         }
     }
