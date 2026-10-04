@@ -193,7 +193,7 @@ class AppUpdateRepository(
         requiresTelevisionBuild: Boolean
     ): MirrorCandidate? {
         if (!isStableRelease(app.versionName)) return null
-        val apk = bestApk(app.apks, installed, app.versionName, requiresTelevisionBuild) ?: return null
+        val apk = bestApk(app.apks, installed, versionNumbers(app.versionName), requiresTelevisionBuild) ?: return null
         return MirrorCandidate(
             apk = apk,
             versionName = fullVersionName(apk, app.versionName),
@@ -209,14 +209,14 @@ class AppUpdateRepository(
     private fun bestApk(
         apks: List<ApkMirrorApk>,
         installed: InstalledApp,
-        releaseVersion: String,
+        releaseNumbers: List<String>,
         requiresTelevisionBuild: Boolean
     ): ApkMirrorApk? = apks
         .asSequence()
         .filter { it.versionCode > installed.versionCode }
         .filter { it.minimumApi <= Build.VERSION.SDK_INT }
-        .filter { isStableLink(it.link) }
-        .filter { matchesFlavour(it, installed, releaseVersion) }
+        .filter { isStableLink(it.link, releaseNumbers) }
+        .filter { matchesFlavour(it, installed, releaseNumbers) }
         .filter { matchesFormFactor(it, requiresTelevisionBuild) }
         .filter { matchesSignature(it, installed) }
         .filter { abiRank(it) != UNSUPPORTED_ABI }
@@ -264,14 +264,16 @@ class AppUpdateRepository(
         else -> LEANBACK_STANDALONE !in apk.capabilities
     }
 
-    private fun matchesFlavour(apk: ApkMirrorApk, installed: InstalledApp, releaseVersion: String): Boolean {
+    private fun matchesFlavour(apk: ApkMirrorApk, installed: InstalledApp, releaseNumbers: List<String>): Boolean {
         val installedFlavour = flavour(installed.versionName.lowercase().split(*VERSION_SEPARATORS)) ?: return true
-        val apkFlavour = flavour(variantTokens(apk.link, releaseVersion)) ?: return true
+        val apkFlavour = flavour(variantTokens(apk.link, releaseNumbers)) ?: return true
         return apkFlavour == installedFlavour
     }
 
-    private fun variantTokens(link: String, releaseVersion: String): List<String> {
-        val numbers = releaseVersion.split(*VERSION_SEPARATORS).filter { it.isNotEmpty() && it.all(Char::isDigit) }
+    private fun versionNumbers(version: String): List<String> =
+        version.split(*VERSION_SEPARATORS).filter { it.isNotEmpty() && it.all(Char::isDigit) }
+
+    private fun variantTokens(link: String, numbers: List<String>): List<String> {
         if (numbers.isEmpty()) return emptyList()
         val tokens = link.trimEnd('/').substringAfterLast('/').lowercase().split('-')
         var matched = 0
@@ -304,11 +306,17 @@ class AppUpdateRepository(
             ?.toEpochMilli()
     }
 
-    private fun isStableLink(link: String): Boolean = link
+    private fun isStableLink(link: String, releaseNumbers: List<String>): Boolean = link
         .substringAfter(APKMIRROR_PATH_PREFIX, "")
         .split('/')
-        .drop(1)
-        .all(::isStableRelease)
+        .drop(2)
+        .all { isStableRelease(versionPart(it, releaseNumbers)) }
+
+    private fun versionPart(slug: String, releaseNumbers: List<String>): String {
+        val tokens = slug.split('-')
+        val start = releaseNumbers.firstOrNull()?.let(tokens::indexOf) ?: -1
+        return if (start < 0) slug else tokens.subList(start, tokens.size).joinToString("-")
+    }
 
     private fun PackageInfo.toInstalledApp(televisionLaunchers: Set<String>): InstalledApp? {
         val appInfo = applicationInfo ?: return null
