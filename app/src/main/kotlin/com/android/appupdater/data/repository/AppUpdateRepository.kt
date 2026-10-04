@@ -51,6 +51,7 @@ class AppUpdateRepository(
 ) {
     private val packageManager = context.packageManager
     private val isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    private val isAutomotive = packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
     private val packageFlags = PackageManager.PackageInfoFlags.of(
         (PACKAGE_FLAGS or if (isTelevision) PackageManager.GET_CONFIGURATIONS else 0).toLong()
     )
@@ -229,12 +230,21 @@ class AppUpdateRepository(
         requiresTelevisionBuild: Boolean
     ): MirrorCandidate? {
         if (!isStableRelease(app.versionName)) return null
-        val apk = bestApk(app.apks, installed, versionNumbers(app.versionName), requiresTelevisionBuild) ?: return null
+        val releaseNumbers = versionNumbers(app.versionName)
+        if (isInstalledVersion(releaseNumbers, installed)) return null
+        val apk = bestApk(app.apks, installed, releaseNumbers, requiresTelevisionBuild) ?: return null
         return MirrorCandidate(
             apk = apk,
             versionName = fullVersionName(apk, app.versionName),
             publishedAt = publishedAt(apk.publishDate.ifBlank { app.publishDate })
         )
+    }
+
+    private fun isInstalledVersion(releaseNumbers: List<String>, installed: InstalledApp): Boolean {
+        val installedNumbers = versionNumbers(installed.versionName)
+        return releaseNumbers.isNotEmpty() &&
+            installedNumbers.size >= releaseNumbers.size &&
+            releaseNumbers.indices.all { releaseNumbers[it].trimStart('0') == installedNumbers[it].trimStart('0') }
     }
 
     private fun matchesSignature(app: App, installed: InstalledApp): Boolean =
@@ -294,20 +304,29 @@ class AppUpdateRepository(
         deviceAbis.indexOf(architecture).takeIf { it >= 0 } ?: UNSUPPORTED_ABI
 
     private fun densityRank(apk: ApkMirrorApk): Int {
-        if (apk.densities.contains(NO_DENSITY)) return UNIVERSAL_DENSITY_RANK
+        if (apk.densities.isEmpty() || NO_DENSITY in apk.densities) return UNIVERSAL_DENSITY_RANK
 
-        val buckets = apk.densities.mapNotNull(::densityBucket)
+        val ranges = apk.densities.mapNotNull(::densityRange)
         return when {
-            buckets.isEmpty() -> UNIVERSAL_DENSITY_RANK
-            deviceDensityBucket in buckets -> MATCHING_DENSITY_RANK
+            ranges.isEmpty() -> UNIVERSAL_DENSITY_RANK
+            ranges.any { it.first == it.last && it.first == deviceDensityBucket } -> MATCHING_DENSITY_RANK
+            ranges.any { it.first < it.last && deviceDensityBucket in it } -> UNIVERSAL_DENSITY_RANK
             else -> FOREIGN_DENSITY_RANK
         }
     }
 
-    private fun densityBucket(density: String): Int? = density.toIntOrNull()
+    private fun densityRange(density: String): IntRange? {
+        val bounds = density.removeSuffix(DPI_SUFFIX).split('-').map { it.trim().toIntOrNull() ?: return null }
+        return when (bounds.size) {
+            1 -> bounds[0]..bounds[0]
+            2 -> bounds[0]..bounds[1]
+            else -> null
+        }
+    }
 
     private fun matchesFormFactor(apk: ApkMirrorApk, requiresTelevisionBuild: Boolean): Boolean = when {
         WEAR_STANDALONE in apk.capabilities -> false
+        !isAutomotive && apk.capabilities.any { AUTOMOTIVE in it } -> false
         requiresTelevisionBuild -> LEANBACK in apk.capabilities || LEANBACK_STANDALONE in apk.capabilities
         isTelevision -> true
         else -> LEANBACK_STANDALONE !in apk.capabilities
@@ -373,7 +392,7 @@ class AppUpdateRepository(
 
         return InstalledApp(
             packageName = packageName,
-            versionName = versionName ?: "Unknown",
+            versionName = versionName.orEmpty(),
             versionCode = longVersionCode,
             signatureSha1s = certificates.digests("SHA-1"),
             signatureSha256s = certificates.digests("SHA-256"),
@@ -406,6 +425,7 @@ class AppUpdateRepository(
         const val APKMIRROR_URL = "https://www.apkmirror.com"
         const val APKMIRROR_PATH_PREFIX = "/apk/"
         const val NO_DENSITY = "nodpi"
+        const val DPI_SUFFIX = "dpi"
         const val MAX_VERSION_NAME = 60
         val NEWEST_FIRST = compareByDescending<AppUpdateInfo> { it.publishedAt ?: Long.MAX_VALUE }
             .thenBy { it.appName.lowercase(Locale.ROOT) }
@@ -418,6 +438,7 @@ class AppUpdateRepository(
         const val WEAR_STANDALONE = "wear_standalone"
         const val LEANBACK = "leanback"
         const val LEANBACK_STANDALONE = "leanback_standalone"
+        const val AUTOMOTIVE = "automotive"
         const val PLAY_CONFIRMATIONS = 4
         const val MIN_VARIANT_SUFFIX = 2
         val VERSION_SEPARATORS = charArrayOf('.', '-', ' ', '(', ')', '[', ']')

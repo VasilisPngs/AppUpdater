@@ -809,7 +809,11 @@ private fun UpdateCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = stringResource(R.string.version_current, app.versionName, app.versionCode),
+                    text = if (app.versionName.isEmpty()) {
+                        stringResource(R.string.version_current_code, app.versionCode)
+                    } else {
+                        stringResource(R.string.version_current, app.versionName, app.versionCode)
+                    },
                     style = Design.type.tiny,
                     color = colors.text
                 )
