@@ -14,6 +14,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -30,7 +31,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -87,10 +91,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -130,6 +138,7 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -140,9 +149,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -174,7 +180,6 @@ import com.android.appupdater.ui.theme.Radius
 import com.android.appupdater.ui.theme.ShapeCard
 import com.android.appupdater.ui.theme.ShapeMark
 import com.android.appupdater.ui.theme.ShapePill
-import com.android.appupdater.ui.theme.ShapeSheet
 import com.android.appupdater.ui.theme.Space
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -186,7 +191,6 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-private val BarPadding = 10.dp
 private val TabPadding = 6.dp
 private val TabGap = 3.dp
 private val TabIconSize = 21.dp
@@ -194,7 +198,7 @@ private val TabBarGap = 2.dp
 private val TabBarBottom = 12.dp
 private val TabBarSafeOverlap = 8.dp
 private val ContentBottomGap = 28.dp
-private val FloatingSheetBreakpoint = 600.dp
+private val WideSheetBreakpoint = 600.dp
 private val AppIconSize = 44.dp
 private val BrandMarkSize = 26.dp
 private val BrandMarkLayer = 39.dp
@@ -202,12 +206,16 @@ private val BrandGap = 10.dp
 private val DotSize = 7.dp
 private val PillGap = 7.dp
 private val IconSize = 18.dp
-private val SwitchWidth = 58.dp
-private val SwitchHeight = 34.dp
-private val SwitchKnob = 28.dp
-private val SwitchInset = 3.dp
+private val SwitchWidth = 51.dp
+private val SwitchHeight = 31.dp
+private val SwitchKnob = 27.dp
+private val SwitchInset = 2.dp
 private val SheetMaxWidth = 560.dp
-private val SheetFloatingBottom = 24.dp
+private val SheetWideBottom = 24.dp
+private val SheetDragClose = 200.dp
+private val GrabberWidth = 36.dp
+private val GrabberHeight = 5.dp
+private val GrabberTop = 6.dp
 private val ToastMaxWidth = 544.dp
 private val ToastGap = 20.dp
 private val ToastEnter = 10.dp
@@ -231,6 +239,10 @@ private const val SELECTED_RING_ALPHA = 0.5f
 private const val PRIMARY_GRADIENT_ANGLE = 140.0
 private const val MAX_VERSION_CODE_DIGITS = 19
 private const val TABULAR_FIGURES = "tnum"
+private const val TOP_BAR_EMS = 3.5f
+private const val SHEET_FLICK_DP_PER_SECOND = 500
+private const val SHEET_DRAG_FADE = 0.6f
+private const val GRABBER_ALPHA = 0.28f
 
 private enum class AppTab(@StringRes val labelRes: Int, @DrawableRes val iconRes: Int) {
     Updates(R.string.updates, R.drawable.ic_updates),
@@ -296,12 +308,13 @@ fun AppUpdaterScreen(
         label = "sheet"
     )
     val sheetShown by remember { derivedStateOf { sheetProgress.value > 0f } }
+    val sheetDrag = remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout).asPaddingValues()
     val viewEnter = with(density) { ViewEnter.roundToPx() }
-    val pillLine = with(density) { Design.type.pill.lineHeight.toDp() }
+    val barHeight = with(density) { (Design.type.body.fontSize * TOP_BAR_EMS).toDp() }
     val tabLine = with(density) { Design.type.tab.lineHeight.toDp() }
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
@@ -352,12 +365,12 @@ fun AppUpdaterScreen(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val floatingSheet = maxWidth >= FloatingSheetBreakpoint
+        val wideSheet = maxWidth >= WideSheetBreakpoint
         val topInset = insets.calculateTopPadding()
         val bottomInset = insets.calculateBottomPadding()
         val startPadding = max(Space.l, insets.calculateStartPadding(layoutDirection))
         val endPadding = max(Space.l, insets.calculateEndPadding(layoutDirection))
-        val topBarHeight = topInset + BarPadding * 2 + max(Space.controlSmall, pillLine)
+        val topBarHeight = topInset + barHeight
         val tabBarBottom = max(TabBarBottom, bottomInset - TabBarSafeOverlap)
         val tabBarHeight = (TabPadding + Space.hairline) * 2 + TabPadding * 2 + TabIconSize + TabGap + tabLine
         val contentPadding = PaddingValues(
@@ -372,7 +385,7 @@ fun AppUpdaterScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    renderEffect = sheetProgress.value.takeIf { it > 0f }?.let { progress ->
+                    renderEffect = (sheetProgress.value * (1f - SHEET_DRAG_FADE * sheetDrag.floatValue)).takeIf { it > 0f }?.let { progress ->
                         backdropEffect(
                             Glass.sheetBackdropBlur.toPx() * progress,
                             1f + (Glass.SHEET_BACKDROP_SATURATION - 1f) * progress
@@ -469,14 +482,18 @@ fun AppUpdaterScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .drawBehind { drawRect(colors.scrim.copy(alpha = colors.scrim.alpha * sheetProgress.value)) }
+                    .drawBehind {
+                        val progress = sheetProgress.value * (1f - SHEET_DRAG_FADE * sheetDrag.floatValue)
+                        drawRect(colors.scrim.copy(alpha = colors.scrim.alpha * progress))
+                    }
                     .pointerInput(Unit) { detectTapGestures { closeSheets() } }
             )
         }
 
         ManualSheet(
             target = manualTarget,
-            floating = floatingSheet,
+            wide = wideSheet,
+            drag = sheetDrag,
             returnFocus = updatesFocus,
             modifier = Modifier.align(Alignment.BottomCenter),
             onCancel = { manualPackage = null },
@@ -489,7 +506,8 @@ fun AppUpdaterScreen(
         ThemeSheet(
             visible = themeSheet,
             current = themeMode,
-            floating = floatingSheet,
+            wide = wideSheet,
+            drag = sheetDrag,
             returnFocus = settingsFocus,
             modifier = Modifier.align(Alignment.BottomCenter),
             onCancel = { themeSheet = false },
@@ -502,9 +520,11 @@ fun AppUpdaterScreen(
         ToastHost(
             toasts = toasts,
             backdrop = backdrop,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = toastBottom)
+            modifier = if (sheetOpen) {
+                Modifier.align(Alignment.TopCenter).padding(top = topInset + Space.m)
+            } else {
+                Modifier.align(Alignment.BottomCenter).padding(bottom = toastBottom)
+            }
         )
     }
 }
@@ -532,6 +552,10 @@ private fun UpdatesView(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Space.l)
     ) {
+        item(key = "title") {
+            Text(text = stringResource(R.string.updates), style = Design.type.h1, color = Design.colors.text)
+        }
+
         if (notice != null) {
             item(key = "notice") {
                 Card(style = CardStyle.Tight, modifier = Modifier.animateItem()) {
@@ -635,9 +659,17 @@ private fun SettingsView(
         }
 
         item(key = "disabled-apps") {
+            val interaction = remember { MutableInteractionSource() }
+            val focused by interaction.collectIsFocusedAsState()
             Group(note = stringResource(R.string.disabled_apps_description)) {
                 Card(style = CardStyle.Tight) {
                     Row(
+                        modifier = Modifier.toggleable(
+                            value = includeDisabledApps,
+                            interactionSource = interaction,
+                            indication = null,
+                            onValueChange = onIncludeDisabledAppsChange
+                        ),
                         horizontalArrangement = Arrangement.spacedBy(Space.m),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -647,7 +679,7 @@ private fun SettingsView(
                             color = colors.text,
                             modifier = Modifier.weight(1f)
                         )
-                        SwitchTrack(checked = includeDisabledApps, onCheckedChange = onIncludeDisabledAppsChange)
+                        SwitchTrack(checked = includeDisabledApps, focused = focused)
                     }
                 }
             }
@@ -683,7 +715,7 @@ private fun Group(
         if (note != null) {
             Text(
                 text = note,
-                style = Design.type.tiny,
+                style = Design.type.muted,
                 color = colors.text,
                 modifier = Modifier.padding(horizontal = GroupInset)
             )
@@ -735,7 +767,6 @@ private fun ListRow(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                role = Role.Button,
                 onClick = onClick
             )
             .padding(horizontal = Space.l, vertical = Space.m),
@@ -825,10 +856,10 @@ private fun UpdateCard(
                     } else {
                         stringResource(R.string.version_current, app.versionName, app.versionCode)
                     },
-                    style = Design.type.tiny,
+                    style = Design.type.caption,
                     color = colors.text
                 )
-                Text(text = latest, style = Design.type.tiny, color = colors.text)
+                Text(text = latest, style = Design.type.caption, color = colors.text)
             }
             Column(
                 modifier = Modifier.width(IntrinsicSize.Max),
@@ -950,7 +981,6 @@ private fun Button(
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled && !busy,
-                role = Role.Button,
                 onClick = onClick
             )
             .padding(horizontal = if (small) Space.m else Space.l),
@@ -989,7 +1019,6 @@ private fun Button(
 @Composable
 private fun IconButton(
     @DrawableRes icon: Int,
-    label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1013,10 +1042,8 @@ private fun IconButton(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                role = Role.Button,
                 onClick = onClick
             )
-            .semantics { contentDescription = label }
             .padding(Space.s)
             .paint(
                 painter = painterResource(icon),
@@ -1042,9 +1069,11 @@ private fun primaryGradient(size: Size, start: Color, end: Color): Brush {
 @Composable
 private fun Sheet(
     visible: Boolean,
-    floating: Boolean,
+    wide: Boolean,
+    drag: MutableFloatState,
     returnFocus: FocusRequester,
     modifier: Modifier,
+    onDismiss: () -> Unit,
     content: @Composable ColumnScope.(FocusRequester) -> Unit
 ) {
     AnimatedVisibility(
@@ -1056,17 +1085,24 @@ private fun Sheet(
             fadeOut(tween(Motion.SHEET, easing = Motion.easeSheet))
     ) {
         val colors = Design.colors
+        val density = LocalDensity.current
         val focusManager = LocalFocusManager.current
         val inputModeManager = LocalInputModeManager.current
+        val touch = inputModeManager.inputMode == InputMode.Touch
         val initialFocus = remember { FocusRequester() }
         val open by rememberUpdatedState(visible)
-        val shape = if (floating) ShapeCard else ShapeSheet
-        val margin = WindowInsets(bottom = SheetFloatingBottom)
-        val floatingInsets = WindowInsets.ime.add(margin)
-            .union(WindowInsets.navigationBars)
-            .union(margin)
+        var height by remember { mutableIntStateOf(0) }
+        var offset by remember { mutableFloatStateOf(0f) }
+        val follow = { value: Float ->
+            offset = value
+            drag.floatValue = if (height > 0) (value / height).coerceAtMost(1f) else 0f
+        }
+        val dragState = rememberDraggableState { delta -> follow((offset + delta).coerceAtLeast(0f)) }
+        val closeDistance = with(density) { SheetDragClose.toPx() }
+        val flick = with(density) { SHEET_FLICK_DP_PER_SECOND.dp.toPx() }
+        val insets = WindowInsets.ime.union(WindowInsets.navigationBars)
+            .add(WindowInsets(bottom = if (wide) SheetWideBottom else Space.s))
             .only(WindowInsetsSides.Bottom)
-        val dockedInsets = WindowInsets.ime.union(WindowInsets.navigationBars).only(WindowInsetsSides.Bottom)
 
         LaunchedEffect(Unit) {
             if (inputModeManager.inputMode == InputMode.Keyboard) initialFocus.requestFocus()
@@ -1074,24 +1110,55 @@ private fun Sheet(
         if (!visible) LaunchedEffect(Unit) {
             if (inputModeManager.inputMode == InputMode.Keyboard) returnFocus.requestFocus() else focusManager.clearFocus()
         }
+        DisposableEffect(Unit) {
+            onDispose { drag.floatValue = 0f }
+        }
 
-        Column(
+        Box(
             modifier = Modifier
-                .then(if (floating) Modifier.windowInsetsPadding(floatingInsets).padding(horizontal = Space.l) else Modifier)
+                .windowInsetsPadding(insets)
+                .padding(horizontal = if (wide) Space.l else Space.s)
                 .widthIn(max = SheetMaxWidth)
                 .fillMaxWidth()
-                .clip(shape)
+                .onSizeChanged { height = it.height }
+                .graphicsLayer { translationY = offset }
+                .clip(ShapeCard)
                 .background(colors.surface.copy(alpha = Glass.SHEET))
-                .innerTopHighlight(shape, colors.glassEdge)
-                .border(Space.hairline, colors.glassRim, shape)
+                .innerTopHighlight(ShapeCard, colors.glassEdge)
+                .border(Space.hairline, colors.glassRim, ShapeCard)
                 .pointerInput(Unit) { detectTapGestures { } }
+                .draggable(
+                    state = dragState,
+                    orientation = Orientation.Vertical,
+                    enabled = touch && visible,
+                    onDragStopped = { velocity ->
+                        if (offset > min(height / 2f, closeDistance) || velocity > flick) {
+                            onDismiss()
+                        } else {
+                            animate(offset, 0f, animationSpec = tween(Motion.SHEET, easing = Motion.easeSheet)) { value, _ ->
+                                follow(value)
+                            }
+                        }
+                    }
+                )
                 .focusProperties { onExit = { if (open) cancelFocusChange() } }
                 .focusGroup()
-                .then(if (floating) Modifier else Modifier.windowInsetsPadding(dockedInsets))
-                .padding(horizontal = Space.l, vertical = Space.xl),
-            verticalArrangement = Arrangement.spacedBy(Space.m)
         ) {
-            content(initialFocus)
+            Column(
+                modifier = Modifier.padding(horizontal = Space.l, vertical = Space.xl),
+                verticalArrangement = Arrangement.spacedBy(Space.m)
+            ) {
+                content(initialFocus)
+            }
+            if (touch) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = GrabberTop)
+                        .size(width = GrabberWidth, height = GrabberHeight)
+                        .background(colors.text.copy(alpha = GRABBER_ALPHA), ShapePill)
+                )
+            }
         }
     }
 }
@@ -1099,13 +1166,21 @@ private fun Sheet(
 @Composable
 private fun ManualSheet(
     target: AppUpdateInfo?,
-    floating: Boolean,
+    wide: Boolean,
+    drag: MutableFloatState,
     returnFocus: FocusRequester,
     modifier: Modifier,
     onCancel: () -> Unit,
     onSubmit: (AppUpdateInfo, Long) -> Unit
 ) {
-    Sheet(visible = target != null, floating = floating, returnFocus = returnFocus, modifier = modifier) { initialFocus ->
+    Sheet(
+        visible = target != null,
+        wide = wide,
+        drag = drag,
+        returnFocus = returnFocus,
+        modifier = modifier,
+        onDismiss = onCancel
+    ) { initialFocus ->
         val update = remember { checkNotNull(target) }
         val code = rememberTextFieldState()
         val versionCode = code.text.toString().toLongOrNull()
@@ -1142,13 +1217,21 @@ private fun ManualSheet(
 private fun ThemeSheet(
     visible: Boolean,
     current: ThemeMode,
-    floating: Boolean,
+    wide: Boolean,
+    drag: MutableFloatState,
     returnFocus: FocusRequester,
     modifier: Modifier,
     onCancel: () -> Unit,
     onSelect: (ThemeMode) -> Unit
 ) {
-    Sheet(visible = visible, floating = floating, returnFocus = returnFocus, modifier = modifier) { initialFocus ->
+    Sheet(
+        visible = visible,
+        wide = wide,
+        drag = drag,
+        returnFocus = returnFocus,
+        modifier = modifier,
+        onDismiss = onCancel
+    ) { initialFocus ->
         Text(text = stringResource(R.string.theme), style = Design.type.h2, color = Design.colors.text)
         Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
             ThemeMode.entries.forEach { mode ->
@@ -1270,8 +1353,8 @@ private fun TopBar(
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = topInset + BarPadding, bottom = BarPadding, start = startPadding, end = endPadding),
+                .fillMaxSize()
+                .padding(top = topInset, start = startPadding, end = endPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1290,7 +1373,6 @@ private fun TopBar(
                 StatusPill(scanning = scanning, failed = failed, count = count)
                 IconButton(
                     icon = R.drawable.ic_refresh,
-                    label = stringResource(R.string.refresh),
                     onClick = onRefresh,
                     modifier = Modifier
                         .fillMaxHeight()
@@ -1480,7 +1562,6 @@ private fun TabItem(
                 selected = selected,
                 interactionSource = interaction,
                 indication = null,
-                role = Role.Tab,
                 onClick = onClick
             )
             .padding(vertical = TabPadding),
@@ -1498,7 +1579,7 @@ private fun TabItem(
 }
 
 @Composable
-private fun SwitchTrack(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SwitchTrack(checked: Boolean, focused: Boolean) {
     val colors = Design.colors
     val track by animateColorAsState(
         targetValue = if (checked) colors.accent else colors.surface3,
@@ -1510,21 +1591,11 @@ private fun SwitchTrack(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "knob"
     )
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-
     Box(
         modifier = Modifier
             .size(width = SwitchWidth, height = SwitchHeight)
             .focusRing(focused, colors.accent, Dp.Infinity)
             .background(track, ShapePill)
-            .toggleable(
-                value = checked,
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Switch,
-                onValueChange = onCheckedChange
-            )
             .padding(SwitchInset),
         contentAlignment = Alignment.CenterStart
     ) {

@@ -107,32 +107,36 @@ data class TypeScale(
     val buttonSmall: TextStyle,
     val pill: TextStyle,
     val muted: TextStyle,
-    val tiny: TextStyle,
+    val caption: TextStyle,
     val tab: TextStyle
 )
 
 private val Medium = FontWeight(560)
 private val Semibold = FontWeight(650)
 
+private fun text(size: Float, weight: FontWeight = FontWeight.Normal, tracking: Float = 0f) = TextStyle(
+    fontFamily = FontFamily.Default,
+    fontSize = size.sp,
+    lineHeight = (size * LINE_HEIGHT).sp,
+    fontWeight = weight,
+    letterSpacing = (size * tracking).sp
+)
+
 private val Scale = TypeScale(
-    h1 = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontSize = 21.sp,
-        lineHeight = 30.45.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.42).sp,
+    h1 = text(LARGE_TITLE, FontWeight.Bold).copy(
+        lineHeight = (LARGE_TITLE * TITLE_LINE_HEIGHT).sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both)
     ),
-    h2 = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp, lineHeight = 23.2.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.16).sp),
-    body = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, lineHeight = 21.75.sp),
-    name = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, lineHeight = 21.75.sp, fontWeight = Medium),
-    brand = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, lineHeight = 21.75.sp, fontWeight = Semibold, letterSpacing = (-0.15).sp),
-    button = TextStyle(fontFamily = FontFamily.Default, fontSize = 14.sp, lineHeight = 20.3.sp, fontWeight = Medium),
-    buttonSmall = TextStyle(fontFamily = FontFamily.Default, fontSize = 13.sp, lineHeight = 18.85.sp, fontWeight = Medium),
-    pill = TextStyle(fontFamily = FontFamily.Default, fontSize = 13.sp, lineHeight = 18.85.sp, fontWeight = Medium),
-    muted = TextStyle(fontFamily = FontFamily.Default, fontSize = 13.sp, lineHeight = 18.85.sp),
-    tiny = TextStyle(fontFamily = FontFamily.Default, fontSize = 12.sp, lineHeight = 17.4.sp),
-    tab = TextStyle(fontFamily = FontFamily.Default, fontSize = 11.sp, lineHeight = 15.95.sp, fontWeight = Medium)
+    h2 = text(BODY, Semibold, TIGHT_TRACKING),
+    body = text(BODY),
+    name = text(BODY, Medium),
+    brand = text(BODY, Semibold, TIGHT_TRACKING),
+    button = text(BODY, Medium),
+    buttonSmall = text(SUBHEAD, Medium),
+    pill = text(FOOTNOTE, Medium),
+    muted = text(FOOTNOTE),
+    caption = text(CAPTION),
+    tab = text(TAB, Medium)
 )
 
 object Radius {
@@ -140,7 +144,6 @@ object Radius {
 }
 
 val ShapeCard = RoundedCornerShape(Radius.card)
-val ShapeSheet = RoundedCornerShape(topStart = Radius.card, topEnd = Radius.card)
 val ShapePill = RoundedCornerShape(percent = 50)
 val ShapeMark = RoundedCornerShape(
     object : CornerSize {
@@ -219,4 +222,13 @@ fun AppUpdaterTheme(
 }
 
 private const val SELECTION_ALPHA = 0.4f
+private const val LARGE_TITLE = 34f
+private const val BODY = 17f
+private const val SUBHEAD = 15f
+private const val FOOTNOTE = 13f
+private const val CAPTION = 12f
+private const val TAB = 10f
+private const val LINE_HEIGHT = 1.3f
+private const val TITLE_LINE_HEIGHT = 1.15f
+private const val TIGHT_TRACKING = -0.01f
 private const val MARK_CORNER = 0.2237f
