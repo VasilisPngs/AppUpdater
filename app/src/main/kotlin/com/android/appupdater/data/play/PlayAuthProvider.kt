@@ -1,21 +1,42 @@
 package com.android.appupdater.data.play
 
 import android.content.Context
+import android.os.Build
 import com.aurora.gplayapi.data.models.AuthData
 import com.aurora.gplayapi.helpers.AuthHelper
+import kotlinx.serialization.json.Json
 import org.json.JSONObject
+import java.io.File
 import java.net.UnknownHostException
 import java.util.Locale
 
 class PlayAuthProvider(private val context: Context, val httpClient: PlayHttpClient) {
 
+    private val store = File(context.noBackupFilesDir, SESSION_FILE)
     private var session: AuthData? = null
 
     @Synchronized
-    fun session(): AuthData = session ?: create()
+    fun session(): AuthData = session ?: restore() ?: create()
 
     @Synchronized
     fun renew(stale: AuthData): AuthData = session.takeIf { it !== stale } ?: create()
+
+    private fun restore(): AuthData? = runCatching {
+        val saved = JSONObject(store.readText())
+        if (saved.getString(KEY_FINGERPRINT) != Build.FINGERPRINT) return null
+        Json.decodeFromString(AuthData.serializer(), saved.getString(KEY_SESSION))
+    }.getOrNull()?.also { session = it }
+
+    private fun save(auth: AuthData) {
+        runCatching {
+            store.writeText(
+                JSONObject()
+                    .put(KEY_FINGERPRINT, Build.FINGERPRINT)
+                    .put(KEY_SESSION, Json.encodeToString(AuthData.serializer(), auth))
+                    .toString()
+            )
+        }
+    }
 
     private fun create(): AuthData {
         val properties = PlayDeviceProperties.build(context)
@@ -45,7 +66,10 @@ class PlayAuthProvider(private val context: Context, val httpClient: PlayHttpCli
             isAnonymous = true,
             properties = properties,
             locale = Locale.getDefault()
-        ).also { session = it }
+        ).also {
+            session = it
+            save(it)
+        }
     }
 
     private fun dispenserError(code: Int): String = when (code) {
@@ -59,5 +83,8 @@ class PlayAuthProvider(private val context: Context, val httpClient: PlayHttpCli
     private companion object {
         const val DISPENSER_HOST = "auroraoss.com"
         const val DISPENSER_URL = "https://auroraoss.com/api/auth/"
+        const val SESSION_FILE = "play_session.json"
+        const val KEY_FINGERPRINT = "fingerprint"
+        const val KEY_SESSION = "session"
     }
 }

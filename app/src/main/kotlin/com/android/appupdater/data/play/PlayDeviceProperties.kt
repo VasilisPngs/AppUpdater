@@ -2,25 +2,34 @@ package com.android.appupdater.data.play
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.opengl.EGL14
 import android.opengl.EGLConfig
 import android.opengl.EGLDisplay
 import android.opengl.GLES20
 import android.os.Build
+import android.telephony.TelephonyManager
 import java.util.Properties
+import java.util.TimeZone
 
 object PlayDeviceProperties {
 
     private const val SERVICES_VERSION = "203019037"
     private const val STORE_VERSION = "82151710"
     private const val STORE_VERSION_NAME = "21.5.17-21 [0] [PR] 326734551"
+    private const val SERVICES_PACKAGE = "com.google.android.gms"
+    private const val STORE_PACKAGE = "com.android.vending"
 
     fun build(context: Context): Properties {
         val configuration = context.resources.configuration
         val metrics = context.resources.displayMetrics
         val packageManager = context.packageManager
         val activityManager = context.getSystemService(ActivityManager::class.java)
+        val telephony = context.getSystemService(TelephonyManager::class.java)
+        val services = packageManager.installedPackage(SERVICES_PACKAGE)
+        val store = packageManager.installedPackage(STORE_PACKAGE)
 
         return Properties().apply {
             setProperty("UserReadableName", "${Build.MANUFACTURER} ${Build.MODEL}")
@@ -76,16 +85,31 @@ object PlayDeviceProperties {
             setProperty("GL.Extensions", glExtensions().joinToString(separator = ","))
 
             setProperty("Client", "android-google")
-            setProperty("GSF.version", SERVICES_VERSION)
-            setProperty("Vending.version", STORE_VERSION)
-            setProperty("Vending.versionString", STORE_VERSION_NAME)
+            setProperty("GSF.version", services?.longVersionCode?.toString() ?: SERVICES_VERSION)
+            setProperty("Vending.version", store?.longVersionCode?.toString() ?: STORE_VERSION)
+            setProperty("Vending.versionString", store?.versionName ?: STORE_VERSION_NAME)
 
             setProperty("Roaming", "mobile-notroaming")
-            setProperty("TimeZone", "UTC-10")
-            setProperty("CellOperator", "310")
-            setProperty("SimOperator", "38")
+            setProperty("TimeZone", TimeZone.getDefault().id)
+            setProperty(
+                "CellOperator",
+                telephony.operator(packageManager, PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS) { networkOperator }
+            )
+            setProperty(
+                "SimOperator",
+                telephony.operator(packageManager, PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION) { simOperator }
+            )
         }
     }
+
+    private fun PackageManager.installedPackage(packageName: String): PackageInfo? =
+        runCatching { getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0)) }.getOrNull()
+
+    private fun TelephonyManager?.operator(
+        packageManager: PackageManager,
+        feature: String,
+        read: TelephonyManager.() -> String?
+    ): String = if (this != null && packageManager.hasSystemFeature(feature)) read().orEmpty() else ""
 
     private fun locales(context: Context): List<String> {
         val configured = context.resources.configuration.locales
