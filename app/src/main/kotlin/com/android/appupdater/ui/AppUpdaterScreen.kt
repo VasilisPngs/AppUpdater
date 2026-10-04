@@ -305,7 +305,6 @@ fun AppUpdaterScreen(
     val tabLine = with(density) { Design.type.tab.lineHeight.toDp() }
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
-    val unavailableFormat = stringResource(R.string.update_unavailable)
     val failedFormat = stringResource(R.string.update_failed)
 
     LaunchedEffect(Unit) {
@@ -314,7 +313,6 @@ fun AppUpdaterScreen(
                 when (event) {
                     is InstallEvent.Finished -> installedFormat.format(event.appName)
                     is InstallEvent.FinishedFromPlay -> installedFromPlayFormat.format(event.appName, event.versionName)
-                    is InstallEvent.Unavailable -> unavailableFormat.format(event.appName)
                     is InstallEvent.Failed -> failedFormat.format(event.message)
                 }
             )
@@ -831,7 +829,7 @@ private fun UpdateCard(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                if (update.playAvailable) {
+                if (update.playUpdate != null) {
                     Button(
                         text = stringResource(R.string.update),
                         small = true,
@@ -842,6 +840,8 @@ private fun UpdateCard(
                         onClick = { onPlay(update) },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+                if (update.playAvailable) {
                     Button(
                         text = stringResource(R.string.manual),
                         small = true,

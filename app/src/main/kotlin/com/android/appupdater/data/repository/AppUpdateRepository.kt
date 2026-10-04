@@ -17,6 +17,7 @@ import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayVersion
 import com.android.appupdater.data.play.PlayCatalog
+import com.android.appupdater.data.play.playCertificateHash
 import com.aurora.gplayapi.data.models.App
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -93,7 +94,8 @@ class AppUpdateRepository(
         val confirmation = confirmPlayUpdates(
             playApps.filter { app -> installedByPackage[app.packageName]?.let { playUpdate(app, it) } != null }
         )
-        val updates = merge(appsToCheck, mirrorApps, playApps, confirmation.apps).sortedWith(NEWEST_FIRST)
+        val delivery = offerMirrorVersionsOnPlay(merge(appsToCheck, mirrorApps, playApps, confirmation.apps), playApps)
+        val updates = delivery.updates.sortedWith(NEWEST_FIRST)
 
         val failures = buildList {
             val failedBatches = mirrorResults.count(Result<List<ApkMirrorApp>>::isFailure)
@@ -103,9 +105,8 @@ class AppUpdateRepository(
                 failedBatches > 0 -> add("Some applications were not checked on APKMirror: $mirrorFailure")
             }
             playResult.exceptionOrNull()?.let { add("Google Play: ${reason(it)}") }
-            if (confirmation.unconfirmed > 0) {
-                add("Google Play: ${confirmation.unconfirmed} updates could not be confirmed as stable releases")
-            }
+            val unchecked = confirmation.unconfirmed + delivery.unchecked
+            if (unchecked > 0) add("Google Play: $unchecked updates could not be checked")
         }
 
         emit(
@@ -140,6 +141,38 @@ class AppUpdateRepository(
         )
     }
 
+    private suspend fun offerMirrorVersionsOnPlay(updates: List<AppUpdateInfo>, playApps: List<App>): PlayDelivery =
+        coroutineScope {
+            val offerTypes = playApps.associate { it.packageName to it.offerType }
+            val permits = Semaphore(PLAY_CONFIRMATIONS)
+            val checks = updates.map { update ->
+                async {
+                    val offerType = offerTypes[update.packageName]
+                    if (update.apkMirrorUrl == null || !update.playAvailable || offerType == null) return@async update to null
+                    update to permits.withPermit {
+                        attempt {
+                            playCatalog.delivers(
+                                update.packageName,
+                                update.newVersionCode,
+                                offerType,
+                                packageManager.playCertificateHash(update.packageName)
+                            )
+                        }
+                    }
+                }
+            }.awaitAll()
+            PlayDelivery(
+                updates = checks.map { (update, delivered) ->
+                    if (delivered?.getOrNull() == true) {
+                        update.copy(playUpdate = PlayVersion(update.newVersionName, update.newVersionCode))
+                    } else {
+                        update
+                    }
+                },
+                unchecked = checks.count { it.second?.isFailure == true }
+            )
+        }
+
     private val App.isTestBuild: Boolean
         get() = testingProgram?.isSubscribed == true || earlyAccess
 
@@ -173,7 +206,7 @@ class AppUpdateRepository(
                     publishedAt = mirror?.takeIf { it.apk.versionCode == playUpdate.versionCode }?.publishedAt,
                     apkMirrorUrl = null,
                     playAvailable = true,
-                    playVersion = PlayVersion(playUpdate.versionName, playUpdate.versionCode)
+                    playUpdate = PlayVersion(playUpdate.versionName, playUpdate.versionCode)
                 )
                 mirror != null -> AppUpdateInfo(
                     packageName = app.packageName,
@@ -183,7 +216,7 @@ class AppUpdateRepository(
                     publishedAt = mirror.publishedAt,
                     apkMirrorUrl = mirror.apk.link.toAbsoluteApkMirrorUrl(),
                     playAvailable = play != null,
-                    playVersion = playUpdate?.let { PlayVersion(it.versionName, it.versionCode) }
+                    playUpdate = playUpdate?.let { PlayVersion(it.versionName, it.versionCode) }
                 )
                 else -> null
             }
@@ -403,4 +436,6 @@ class AppUpdateRepository(
     private class MirrorCandidate(val apk: ApkMirrorApk, val versionName: String, val publishedAt: Long?)
 
     private class PlayConfirmation(val apps: Map<String, App>, val unconfirmed: Int)
+
+    private class PlayDelivery(val updates: List<AppUpdateInfo>, val unchecked: Int)
 }

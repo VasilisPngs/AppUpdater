@@ -7,7 +7,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.appupdater.data.installer.BundleInstaller
 import com.android.appupdater.data.installer.PlayInstaller
-import com.android.appupdater.data.installer.VersionUnavailableException
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
@@ -35,7 +34,6 @@ import java.util.concurrent.ConcurrentHashMap
 sealed interface InstallEvent {
     data class Finished(val appName: String) : InstallEvent
     data class FinishedFromPlay(val appName: String, val versionName: String) : InstallEvent
-    data class Unavailable(val appName: String) : InstallEvent
     data class Failed(val message: String) : InstallEvent
 }
 
@@ -121,17 +119,14 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun updateFromPlay(update: AppUpdateInfo) {
-        val fallback = update.playVersion?.takeIf {
-            update.apkMirrorUrl != null && it.code > installedVersionCode(update.packageName)
-        }
+        val target = update.playUpdate ?: return
         installFromPlay(update, manual = false) { onProgress ->
-            val result = playInstaller.install(update.packageName, update.newVersionCode, onProgress)
-            val unavailable = update.apkMirrorUrl != null && result.exceptionOrNull() is VersionUnavailableException
-            when {
-                !unavailable -> result.toEvent(update.appName)
-                fallback == null -> InstallEvent.Unavailable(update.appName)
-                else -> playInstaller.install(update.packageName, fallback.code, onProgress).fold(
-                    onSuccess = { InstallEvent.FinishedFromPlay(update.appName, fallback.name) },
+            val result = playInstaller.install(update.packageName, target.code, onProgress)
+            if (target.code == update.newVersionCode) {
+                result.toEvent(update.appName)
+            } else {
+                result.fold(
+                    onSuccess = { InstallEvent.FinishedFromPlay(update.appName, target.name) },
                     onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
                 )
             }
@@ -164,9 +159,6 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
             if (event is InstallEvent.Finished || event is InstallEvent.FinishedFromPlay) refreshInstalledApps()
         }
     }
-
-    private fun installedVersionCode(packageName: String): Long =
-        _uiState.value.installedApps.firstOrNull { it.packageName == packageName }?.versionCode ?: 0L
 
     private fun Result<Unit>.toEvent(appName: String): InstallEvent = fold(
         onSuccess = { InstallEvent.Finished(appName) },

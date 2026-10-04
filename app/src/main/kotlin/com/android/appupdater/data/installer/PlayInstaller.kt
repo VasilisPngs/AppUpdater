@@ -2,11 +2,11 @@ package com.android.appupdater.data.installer
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Base64
 import com.android.appupdater.data.api.SharedHttpClient
 import com.android.appupdater.data.isStableRelease
 import com.android.appupdater.data.play.PlayCatalog
 import com.android.appupdater.data.play.PlayHttpClient
+import com.android.appupdater.data.play.playCertificateHash
 import com.aurora.gplayapi.data.models.PlayFile
 import com.aurora.gplayapi.exceptions.GooglePlayException
 import com.aurora.gplayapi.helpers.PurchaseHelper
@@ -15,9 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.File
-import java.security.MessageDigest
-
-class VersionUnavailableException(message: String, cause: Throwable?) : Exception(message, cause)
 
 class PlayInstaller(
     private val context: Context,
@@ -42,7 +39,7 @@ class PlayInstaller(
 
             val (session, details) = catalog.details(packageName)
             val purchases = PurchaseHelper(session).using(httpClient)
-            val certificate = certificateHash(packageName)
+            val certificate = packageManager.playCertificateHash(packageName)
 
             val appFiles = deliver(purchases, packageName, versionCode, details.offerType, certificate)
             val libraryFiles = details.dependencies.dependentLibraries
@@ -88,10 +85,10 @@ class PlayInstaller(
                 certificateHash = certificate
             )
         } catch (exception: GooglePlayException) {
-            throw VersionUnavailableException("Google Play does not offer $packageName $versionCode.", exception)
+            throw IllegalStateException("Google Play does not offer $packageName $versionCode.", exception)
         }
         return files.filter { it.type == PlayFile.Type.BASE || it.type == PlayFile.Type.SPLIT }
-            .ifEmpty { throw VersionUnavailableException("Google Play returned no installable file.", null) }
+            .ifEmpty { throw IllegalStateException("Google Play returned no installable file.") }
     }
 
     private fun download(files: List<PlayFile>, directory: File, progress: Progress): List<Pair<PlayFile, File>> {
@@ -140,20 +137,6 @@ class PlayInstaller(
     private fun isSharedLibraryInstalled(packageName: String, versionCode: Long): Boolean =
         packageManager.getSharedLibraries(PackageManager.PackageInfoFlags.of(0))
             .any { it.name == packageName && it.longVersion == versionCode }
-
-    private fun certificateHash(packageName: String): String? = runCatching {
-        val signingInfo = packageManager.getPackageInfo(
-            packageName,
-            PackageManager.PackageInfoFlags.of(PackageManager.GET_SIGNING_CERTIFICATES.toLong())
-        ).signingInfo ?: return null
-        val certificates = if (signingInfo.hasMultipleSigners()) {
-            signingInfo.apkContentsSigners
-        } else {
-            signingInfo.signingCertificateHistory
-        }
-        val digest = MessageDigest.getInstance("SHA-1").digest(certificates.last().toByteArray())
-        Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
-    }.getOrNull()
 
     private class Progress(private val totalBytes: Long, private val onProgress: (Float?) -> Unit) {
         private var writtenBytes = 0L
