@@ -431,7 +431,7 @@ class AppUpdateRepository(
         const val MATCHING_DENSITY_RANK = 0
         const val UNIVERSAL_DENSITY_RANK = 1
         const val FOREIGN_DENSITY_RANK = 2
-        const val PACKAGE_FLAGS = PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.MATCH_DISABLED_COMPONENTS
+        const val PACKAGE_FLAGS = PackageManager.GET_SIGNING_CERTIFICATES
         val UNIVERSAL_ARCHITECTURES = setOf("universal", "noarch")
         const val WEAR_STANDALONE = "wear_standalone"
         const val LEANBACK = "leanback"
