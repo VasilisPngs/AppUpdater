@@ -66,6 +66,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     private val packageChanges = Channel<Unit>(Channel.CONFLATED)
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            intent.data?.schemeSpecificPart?.let(AppIconCache::evict)
             packageChanges.trySend(Unit)
         }
     }
@@ -126,20 +127,17 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         if (installJobs.containsKey(key)) return
 
         installJobs[key] = viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                bundleInstaller.install(uri) { state ->
-                    when (state) {
-                        is InstallState.Success -> _events.tryEmit(InstallEvent.Finished(state.appName))
-                        is InstallState.Error -> _events.tryEmit(InstallEvent.Failed(state.message))
-                        else -> Unit
-                    }
-                    _uiState.update { it.copy(installs = it.installs + (key to state)) }
+            bundleInstaller.install(uri) { state ->
+                when (state) {
+                    is InstallState.Success -> _events.tryEmit(InstallEvent.Finished(state.appName))
+                    is InstallState.Error -> _events.tryEmit(InstallEvent.Failed(state.message))
+                    else -> Unit
                 }
+                _uiState.update { it.copy(installs = it.installs + (key to state)) }
             }
 
             installJobs.remove(key)
             _uiState.update { it.copy(installs = it.installs - key) }
-            if (result.isSuccess) refreshInstalledApps()
         }
     }
 
@@ -181,7 +179,6 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
             installJobs.remove(packageName)
             _uiState.update { it.copy(playInstalls = it.playInstalls - packageName) }
             _events.tryEmit(event)
-            if (event is InstallEvent.Finished || event is InstallEvent.FinishedFromPlay) refreshInstalledApps()
         }
     }
 

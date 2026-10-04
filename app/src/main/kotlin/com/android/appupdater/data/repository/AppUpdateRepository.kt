@@ -80,8 +80,6 @@ class AppUpdateRepository(
             return@flow
         }
 
-        emit(ScanStatus.Scanning)
-
         val batches = appsToCheck.chunked(API_BATCH_SIZE)
         val (mirrorResults, playResult) = coroutineScope {
             val play = async { attempt { playCatalog.lookup(appsToCheck.map(InstalledApp::packageName)) } }

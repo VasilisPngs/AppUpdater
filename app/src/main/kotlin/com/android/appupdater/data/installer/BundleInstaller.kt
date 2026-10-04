@@ -17,7 +17,7 @@ class BundleInstaller(private val context: Context) {
 
     private val packageInstaller = PackageInstallerManager(context)
 
-    suspend fun install(uri: Uri, onState: (InstallState) -> Unit): Result<Unit> =
+    suspend fun install(uri: Uri, onState: (InstallState) -> Unit) {
         withContext(Dispatchers.IO) {
             val label = displayName(uri)
             val archive = File(context.cacheDir, "$ARCHIVE_PREFIX${System.nanoTime()}")
@@ -29,20 +29,17 @@ class BundleInstaller(private val context: Context) {
                     packageInstaller.install(sources(zip, archive)).getOrThrow()
                 }
                 onState(InstallState.Success(label))
-                Result.success(Unit)
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (exception: ZipException) {
-                val message = "This file is not an APK or an APK bundle."
-                onState(InstallState.Error(label, message))
-                Result.failure(IllegalArgumentException(message, exception))
+            } catch (_: ZipException) {
+                onState(InstallState.Error(label, "This file is not an APK or an APK bundle."))
             } catch (exception: Exception) {
                 onState(InstallState.Error(label, exception.message ?: "Installation failed"))
-                Result.failure(exception)
             } finally {
                 archive.delete()
             }
         }
+    }
 
     private fun sources(zip: ZipFile, archive: File): List<ApkSource> {
         val apkEntries = zip.entries()

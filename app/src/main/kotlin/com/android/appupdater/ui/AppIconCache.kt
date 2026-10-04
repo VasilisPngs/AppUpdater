@@ -20,6 +20,10 @@ internal object AppIconCache {
 
     fun peek(packageName: String): Bitmap? = cache[packageName]
 
+    fun evict(packageName: String) {
+        cache.remove(packageName)
+    }
+
     fun load(context: Context, packageName: String, sizePx: Int): Bitmap? =
         cache[packageName] ?: runCatching {
             context.packageManager.getApplicationIcon(packageName).toBitmap(sizePx, sizePx)
