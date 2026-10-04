@@ -224,11 +224,24 @@ class AppUpdateRepository(
         .filter { matchesSignature(it, installed) }
         .filter { abiRank(it) != UNSUPPORTED_ABI }
         .minWithOrNull(
-            compareBy<ApkMirrorApk>(::abiRank)
+            compareByDescending<ApkMirrorApk> { variantSuffix(it.versionCode, installed.versionCode) }
+                .thenBy(::abiRank)
                 .thenBy(::densityRank)
                 .thenByDescending(ApkMirrorApk::minimumApi)
                 .thenByDescending(ApkMirrorApk::versionCode)
         )
+
+    private fun variantSuffix(versionCode: Long, installedVersionCode: Long): Int {
+        var candidate = versionCode
+        var current = installedVersionCode
+        var matched = 0
+        while (candidate > 0 && current > 0 && candidate % 10 == current % 10) {
+            matched++
+            candidate /= 10
+            current /= 10
+        }
+        return if (matched >= MIN_VARIANT_SUFFIX) matched else 0
+    }
 
     private fun fullVersionName(apk: ApkMirrorApk, releaseVersion: String): String {
         val description = apk.description.trim().substringBefore('\n').trim()
@@ -373,6 +386,7 @@ class AppUpdateRepository(
         const val LEANBACK = "leanback"
         const val LEANBACK_STANDALONE = "leanback_standalone"
         const val PLAY_CONFIRMATIONS = 4
+        const val MIN_VARIANT_SUFFIX = 2
         val VERSION_SEPARATORS = charArrayOf('.', '-', ' ', '(', ')', '[', ']')
         val NEUTRAL_TOKENS = setOf("android", "apk", "bundle", "download", "arm", "armeabi", "universal", "noarch", "nodpi")
         val DENSITY_BUCKETS = listOf(
