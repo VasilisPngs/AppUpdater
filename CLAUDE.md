@@ -26,6 +26,7 @@
 - Navigation is always an Android app layout: the tabs stay in the floating tab bar at the bottom on every screen width, television included, with content across the width. Do not port Adblock's wide screen web layout, its side rail or its centred column.
 - Build the interface from Compose foundation primitives so it matches that system exactly, rather than inheriting the visual defaults of Material 3; Material 3 remains the plumbing, not the appearance.
 - Keep every value in the shared token set and apply it consistently across all screens and components; do not use dynamic color and do not introduce one-off colours, sizes, radii or durations.
+- Text always uses the device's own default font through `FontFamily.Default`, whatever the platform or the manufacturer sets; never bundle, download or name a font family, and let the platform render the type scale weights instead of forcing font variation axes.
 - Obtain values from the relevant official platform API whenever the system or the device can provide them at runtime, including device capabilities, application metadata such as icons, labels and package information, locales and configuration, instead of assuming manufacturer-specific behavior or duplicating them in resources and hardcoded mappings.
 - Keep expensive work away from the UI thread.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
