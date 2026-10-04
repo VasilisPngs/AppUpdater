@@ -14,10 +14,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.DeviceFontFamilyName
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Density
@@ -117,38 +114,25 @@ data class TypeScale(
 private val Medium = FontWeight(560)
 private val Semibold = FontWeight(650)
 
-private fun systemFont(weight: FontWeight): Font = Font(
-    familyName = DeviceFontFamilyName(SYSTEM_SANS),
-    weight = weight,
-    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight))
-)
-
-private val SystemSans = FontFamily(
-    systemFont(FontWeight.Normal),
-    systemFont(Medium),
-    systemFont(Semibold),
-    systemFont(FontWeight.Bold)
-)
-
 private val Scale = TypeScale(
     h1 = TextStyle(
-        fontFamily = SystemSans,
+        fontFamily = FontFamily.Default,
         fontSize = 21.sp,
         lineHeight = 30.45.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = (-0.42).sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both)
     ),
-    h2 = TextStyle(fontFamily = SystemSans, fontSize = 16.sp, lineHeight = 23.2.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.16).sp),
-    body = TextStyle(fontFamily = SystemSans, fontSize = 15.sp, lineHeight = 21.75.sp),
-    name = TextStyle(fontFamily = SystemSans, fontSize = 15.sp, lineHeight = 21.75.sp, fontWeight = Medium),
-    brand = TextStyle(fontFamily = SystemSans, fontSize = 15.sp, lineHeight = 21.75.sp, fontWeight = Semibold, letterSpacing = (-0.15).sp),
-    button = TextStyle(fontFamily = SystemSans, fontSize = 14.sp, lineHeight = 20.3.sp, fontWeight = Medium),
-    buttonSmall = TextStyle(fontFamily = SystemSans, fontSize = 13.sp, lineHeight = 18.85.sp, fontWeight = Medium),
-    pill = TextStyle(fontFamily = SystemSans, fontSize = 13.sp, lineHeight = 18.85.sp, fontWeight = Medium),
-    muted = TextStyle(fontFamily = SystemSans, fontSize = 13.sp, lineHeight = 18.85.sp),
-    tiny = TextStyle(fontFamily = SystemSans, fontSize = 12.sp, lineHeight = 17.4.sp),
-    tab = TextStyle(fontFamily = SystemSans, fontSize = 11.sp, lineHeight = 15.95.sp, fontWeight = Medium)
+    h2 = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp, lineHeight = 23.2.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.16).sp),
+    body = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, lineHeight = 21.75.sp),
+    name = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, lineHeight = 21.75.sp, fontWeight = Medium),
+    brand = TextStyle(fontFamily = FontFamily.Default, fontSize = 15.sp, lineHeight = 21.75.sp, fontWeight = Semibold, letterSpacing = (-0.15).sp),
+    button = TextStyle(fontFamily = FontFamily.Default, fontSize = 14.sp, lineHeight = 20.3.sp, fontWeight = Medium),
+    buttonSmall = TextStyle(fontFamily = FontFamily.Default, fontSize = 13.sp, lineHeight = 18.85.sp, fontWeight = Medium),
+    pill = TextStyle(fontFamily = FontFamily.Default, fontSize = 13.sp, lineHeight = 18.85.sp, fontWeight = Medium),
+    muted = TextStyle(fontFamily = FontFamily.Default, fontSize = 13.sp, lineHeight = 18.85.sp),
+    tiny = TextStyle(fontFamily = FontFamily.Default, fontSize = 12.sp, lineHeight = 17.4.sp),
+    tab = TextStyle(fontFamily = FontFamily.Default, fontSize = 11.sp, lineHeight = 15.95.sp, fontWeight = Medium)
 )
 
 object Radius {
@@ -236,4 +220,3 @@ fun AppUpdaterTheme(
 
 private const val SELECTION_ALPHA = 0.4f
 private const val MARK_CORNER = 0.2237f
-private const val SYSTEM_SANS = "sans-serif"
