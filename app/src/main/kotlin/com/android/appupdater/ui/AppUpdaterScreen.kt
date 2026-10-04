@@ -319,11 +319,6 @@ fun AppUpdaterScreen(
         }
     }
 
-    LaunchedEffect(uiState.scanStatus) {
-        val status = uiState.scanStatus
-        if (status is ScanStatus.Error) toasts.show(status.message)
-    }
-
     LaunchedEffect(pendingTheme, sheetShown) {
         val mode = pendingTheme ?: return@LaunchedEffect
         if (!sheetShown) {
@@ -420,6 +415,7 @@ fun AppUpdaterScreen(
                                 focus = updatesFocus,
                                 contentPadding = contentPadding,
                                 scanning = scanning,
+                                notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
                                 updates = updates,
                                 installs = uiState.installs,
                                 playInstalls = uiState.playInstalls,
@@ -519,6 +515,7 @@ private fun UpdatesView(
     focus: FocusRequester,
     contentPadding: PaddingValues,
     scanning: Boolean,
+    notice: String?,
     updates: List<Pair<InstalledApp, AppUpdateInfo>>,
     installs: Map<String, InstallState>,
     playInstalls: Map<String, PlayInstall>,
@@ -535,6 +532,20 @@ private fun UpdatesView(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Space.l)
     ) {
+        if (notice != null) {
+            item(key = "notice") {
+                Card(style = CardStyle.Tight, modifier = Modifier.animateItem()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Space.s)
+                    ) {
+                        StatusDot(color = Design.colors.danger, pulsing = false)
+                        Text(text = notice, style = Design.type.muted, color = Design.colors.text)
+                    }
+                }
+            }
+        }
+
         items(installs.entries.toList(), key = { it.key }) { (_, state) ->
             Card(style = CardStyle.Tight) {
                 Row(

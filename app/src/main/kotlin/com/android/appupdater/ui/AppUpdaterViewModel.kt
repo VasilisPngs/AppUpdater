@@ -2,6 +2,10 @@ package com.android.appupdater.ui
 
 import android.app.Application
 import android.app.UiModeManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,12 +24,14 @@ import com.android.appupdater.data.repository.AppUpdateRepository
 import com.android.appupdater.data.repository.ScanStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +63,12 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     private val _themeMode = MutableStateFlow(ThemeMode.System)
     private val _events = MutableSharedFlow<InstallEvent>(extraBufferCapacity = 16)
     private val installJobs = ConcurrentHashMap<String, Job>()
+    private val packageChanges = Channel<Unit>(Channel.CONFLATED)
+    private val packageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            packageChanges.trySend(Unit)
+        }
+    }
     private var scanJob: Job? = null
 
     val uiState: StateFlow<AppUpdaterUiState> = _uiState.asStateFlow()
@@ -64,6 +76,19 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     val events: SharedFlow<InstallEvent> = _events.asSharedFlow()
 
     init {
+        application.registerReceiver(
+            packageReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REPLACED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addDataScheme(PACKAGE_SCHEME)
+            },
+            Context.RECEIVER_NOT_EXPORTED
+        )
+        viewModelScope.launch {
+            packageChanges.receiveAsFlow().collect { refreshInstalledApps() }
+        }
         viewModelScope.launch {
             val (includeDisabledApps, themeMode) = withContext(Dispatchers.IO) {
                 preferences.includeDisabledApps to preferences.themeMode
@@ -194,9 +219,11 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     override fun onCleared() {
+        getApplication<Application>().unregisterReceiver(packageReceiver)
         scanJob?.cancel()
         installJobs.values.forEach(Job::cancel)
     }
 }
 
 private const val INSTALLATION_FAILED = "Installation failed"
+private const val PACKAGE_SCHEME = "package"

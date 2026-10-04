@@ -42,7 +42,6 @@
                 <data android:mimeType="application/vnd.apkm" />
                 <data android:mimeType="application/vnd.apkm+zip" />
                 <data android:mimeType="application/octet-stream" />
-                <data android:mimeType="application/zip" />
             </intent-filter>
         </activity>
     </application>
