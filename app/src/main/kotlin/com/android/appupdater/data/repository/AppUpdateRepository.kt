@@ -15,6 +15,7 @@ import com.android.appupdater.data.model.ApkMirrorApk
 import com.android.appupdater.data.model.ApkMirrorApp
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstalledApp
+import com.android.appupdater.data.model.PlayVersion
 import com.android.appupdater.data.play.PlayCatalog
 import com.aurora.gplayapi.data.models.App
 import kotlinx.coroutines.CancellationException
@@ -171,7 +172,8 @@ class AppUpdateRepository(
                     newVersionCode = playUpdate.versionCode,
                     publishedAt = mirror?.takeIf { it.apk.versionCode == playUpdate.versionCode }?.publishedAt,
                     apkMirrorUrl = null,
-                    playAvailable = true
+                    playAvailable = true,
+                    playVersion = PlayVersion(playUpdate.versionName, playUpdate.versionCode)
                 )
                 mirror != null -> AppUpdateInfo(
                     packageName = app.packageName,
@@ -180,7 +182,8 @@ class AppUpdateRepository(
                     newVersionCode = mirror.apk.versionCode,
                     publishedAt = mirror.publishedAt,
                     apkMirrorUrl = mirror.apk.link.toAbsoluteApkMirrorUrl(),
-                    playAvailable = play != null
+                    playAvailable = play != null,
+                    playVersion = playUpdate?.let { PlayVersion(it.versionName, it.versionCode) }
                 )
                 else -> null
             }

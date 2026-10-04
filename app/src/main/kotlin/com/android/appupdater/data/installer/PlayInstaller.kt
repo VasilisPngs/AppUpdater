@@ -8,6 +8,7 @@ import com.android.appupdater.data.isStableRelease
 import com.android.appupdater.data.play.PlayCatalog
 import com.android.appupdater.data.play.PlayHttpClient
 import com.aurora.gplayapi.data.models.PlayFile
+import com.aurora.gplayapi.exceptions.GooglePlayException
 import com.aurora.gplayapi.helpers.PurchaseHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.File
 import java.security.MessageDigest
+
+class VersionUnavailableException(message: String, cause: Throwable?) : Exception(message, cause)
 
 class PlayInstaller(
     private val context: Context,
@@ -27,7 +30,6 @@ class PlayInstaller(
     suspend fun install(
         packageName: String,
         versionCode: Long,
-        manual: Boolean,
         onProgress: (Float?) -> Unit
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val directory = File(context.cacheDir, "play_$packageName")
@@ -44,7 +46,9 @@ class PlayInstaller(
 
             val appFiles = deliver(purchases, packageName, versionCode, details.offerType, certificate)
             val libraryFiles = details.dependencies.dependentLibraries
-                .map { library -> library.packageName to if (manual) versionCode else library.versionCode }
+                .map { library ->
+                    library.packageName to if (versionCode == details.versionCode) library.versionCode else versionCode
+                }
                 .filter { (name, code) -> name.isNotBlank() && code > 0 && !isSharedLibraryInstalled(name, code) }
                 .map { (name, code) -> name to deliver(purchases, name, code, LIBRARY_OFFER_TYPE, certificate) }
 
@@ -75,13 +79,20 @@ class PlayInstaller(
         versionCode: Long,
         offerType: Int,
         certificate: String?
-    ): List<PlayFile> = purchases.purchase(
-        packageName = packageName,
-        versionCode = versionCode,
-        offerType = offerType,
-        certificateHash = certificate
-    ).filter { it.type == PlayFile.Type.BASE || it.type == PlayFile.Type.SPLIT }
-        .also { require(it.isNotEmpty()) { "Google Play returned no installable file." } }
+    ): List<PlayFile> {
+        val files = try {
+            purchases.purchase(
+                packageName = packageName,
+                versionCode = versionCode,
+                offerType = offerType,
+                certificateHash = certificate
+            )
+        } catch (exception: GooglePlayException) {
+            throw VersionUnavailableException("Google Play does not offer $packageName $versionCode.", exception)
+        }
+        return files.filter { it.type == PlayFile.Type.BASE || it.type == PlayFile.Type.SPLIT }
+            .ifEmpty { throw VersionUnavailableException("Google Play returned no installable file.", null) }
+    }
 
     private fun download(files: List<PlayFile>, directory: File, progress: Progress): List<Pair<PlayFile, File>> {
         directory.mkdirs()

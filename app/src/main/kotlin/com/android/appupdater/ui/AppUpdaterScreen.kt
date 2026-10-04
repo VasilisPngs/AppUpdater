@@ -304,6 +304,8 @@ fun AppUpdaterScreen(
     val pillLine = with(density) { Design.type.pill.lineHeight.toDp() }
     val tabLine = with(density) { Design.type.tab.lineHeight.toDp() }
     val installedFormat = stringResource(R.string.update_installed)
+    val installedFromPlayFormat = stringResource(R.string.update_installed_play)
+    val unavailableFormat = stringResource(R.string.update_unavailable)
     val failedFormat = stringResource(R.string.update_failed)
 
     LaunchedEffect(Unit) {
@@ -311,6 +313,8 @@ fun AppUpdaterScreen(
             toasts.show(
                 when (event) {
                     is InstallEvent.Finished -> installedFormat.format(event.appName)
+                    is InstallEvent.FinishedFromPlay -> installedFromPlayFormat.format(event.appName, event.versionName)
+                    is InstallEvent.Unavailable -> unavailableFormat.format(event.appName)
                     is InstallEvent.Failed -> failedFormat.format(event.message)
                 }
             )
@@ -421,14 +425,8 @@ fun AppUpdaterScreen(
                                 updates = updates,
                                 installs = uiState.installs,
                                 playInstalls = uiState.playInstalls,
-                                onUpdate = { update ->
-                                    val url = update.apkMirrorUrl
-                                    if (url == null) {
-                                        viewModel.installFromPlay(update, update.newVersionCode, manual = false)
-                                    } else {
-                                        openUrlInBrowser(context, url)
-                                    }
-                                },
+                                onApkMirror = { openUrlInBrowser(context, it) },
+                                onPlay = viewModel::updateFromPlay,
                                 onManual = { manualPackage = it.packageName }
                             )
                             AppTab.Settings -> SettingsView(
@@ -490,7 +488,7 @@ fun AppUpdaterScreen(
             onCancel = { manualPackage = null },
             onSubmit = { update, versionCode ->
                 manualPackage = null
-                viewModel.installFromPlay(update, versionCode, manual = true)
+                viewModel.installManually(update, versionCode)
             }
         )
 
@@ -526,7 +524,8 @@ private fun UpdatesView(
     updates: List<Pair<InstalledApp, AppUpdateInfo>>,
     installs: Map<String, InstallState>,
     playInstalls: Map<String, PlayInstall>,
-    onUpdate: (AppUpdateInfo) -> Unit,
+    onApkMirror: (String) -> Unit,
+    onPlay: (AppUpdateInfo) -> Unit,
     onManual: (AppUpdateInfo) -> Unit
 ) {
     LazyColumn(
@@ -565,7 +564,8 @@ private fun UpdatesView(
                 app = pair.first,
                 update = pair.second,
                 install = playInstalls[pair.first.packageName],
-                onUpdate = onUpdate,
+                onApkMirror = onApkMirror,
+                onPlay = onPlay,
                 onManual = onManual,
                 modifier = Modifier.animateItem()
             )
@@ -741,7 +741,8 @@ private fun UpdateCard(
     app: InstalledApp,
     update: AppUpdateInfo,
     install: PlayInstall?,
-    onUpdate: (AppUpdateInfo) -> Unit,
+    onApkMirror: (String) -> Unit,
+    onPlay: (AppUpdateInfo) -> Unit,
     onManual: (AppUpdateInfo) -> Unit,
     modifier: Modifier
 ) {
@@ -820,17 +821,27 @@ private fun UpdateCard(
                 modifier = Modifier.width(IntrinsicSize.Max),
                 verticalArrangement = Arrangement.spacedBy(Space.s)
             ) {
-                Button(
-                    text = stringResource(R.string.update),
-                    small = true,
-                    enabled = install == null,
-                    busy = install?.manual == false,
-                    progress = install?.progress,
-                    icon = if (update.apkMirrorUrl == null) R.drawable.ic_source_play else R.drawable.ic_source_apkmirror,
-                    onClick = { onUpdate(update) },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                update.apkMirrorUrl?.let { url ->
+                    Button(
+                        text = stringResource(R.string.update),
+                        small = true,
+                        enabled = install == null,
+                        icon = R.drawable.ic_source_apkmirror,
+                        onClick = { onApkMirror(url) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 if (update.playAvailable) {
+                    Button(
+                        text = stringResource(R.string.update),
+                        small = true,
+                        enabled = install == null,
+                        busy = install?.manual == false,
+                        progress = install?.progress,
+                        icon = R.drawable.ic_source_play,
+                        onClick = { onPlay(update) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     Button(
                         text = stringResource(R.string.manual),
                         small = true,

@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.appupdater.data.installer.BundleInstaller
 import com.android.appupdater.data.installer.PlayInstaller
+import com.android.appupdater.data.installer.VersionUnavailableException
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
@@ -33,6 +34,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 sealed interface InstallEvent {
     data class Finished(val appName: String) : InstallEvent
+    data class FinishedFromPlay(val appName: String, val versionName: String) : InstallEvent
+    data class Unavailable(val appName: String) : InstallEvent
     data class Failed(val message: String) : InstallEvent
 }
 
@@ -117,26 +120,58 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun installFromPlay(update: AppUpdateInfo, versionCode: Long, manual: Boolean) {
+    fun updateFromPlay(update: AppUpdateInfo) {
+        val fallback = update.playVersion?.takeIf {
+            update.apkMirrorUrl != null && it.code > installedVersionCode(update.packageName)
+        }
+        installFromPlay(update, manual = false) { onProgress ->
+            val result = playInstaller.install(update.packageName, update.newVersionCode, onProgress)
+            val unavailable = update.apkMirrorUrl != null && result.exceptionOrNull() is VersionUnavailableException
+            when {
+                !unavailable -> result.toEvent(update.appName)
+                fallback == null -> InstallEvent.Unavailable(update.appName)
+                else -> playInstaller.install(update.packageName, fallback.code, onProgress).fold(
+                    onSuccess = { InstallEvent.FinishedFromPlay(update.appName, fallback.name) },
+                    onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
+                )
+            }
+        }
+    }
+
+    fun installManually(update: AppUpdateInfo, versionCode: Long) {
+        installFromPlay(update, manual = true) { onProgress ->
+            playInstaller.install(update.packageName, versionCode, onProgress).toEvent(update.appName)
+        }
+    }
+
+    private fun installFromPlay(
+        update: AppUpdateInfo,
+        manual: Boolean,
+        install: suspend (onProgress: (Float?) -> Unit) -> InstallEvent
+    ) {
         val packageName = update.packageName
         if (installJobs.containsKey(packageName)) return
 
         _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(manual, null))) }
         installJobs[packageName] = viewModelScope.launch {
-            val result = playInstaller.install(packageName, versionCode, manual) { progress ->
+            val event = install { progress ->
                 _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(manual, progress))) }
             }
 
             installJobs.remove(packageName)
             _uiState.update { it.copy(playInstalls = it.playInstalls - packageName) }
-            result
-                .onSuccess {
-                    _events.tryEmit(InstallEvent.Finished(update.appName))
-                    refreshInstalledApps()
-                }
-                .onFailure { _events.tryEmit(InstallEvent.Failed(it.message ?: "Installation failed")) }
+            _events.tryEmit(event)
+            if (event is InstallEvent.Finished || event is InstallEvent.FinishedFromPlay) refreshInstalledApps()
         }
     }
+
+    private fun installedVersionCode(packageName: String): Long =
+        _uiState.value.installedApps.firstOrNull { it.packageName == packageName }?.versionCode ?: 0L
+
+    private fun Result<Unit>.toEvent(appName: String): InstallEvent = fold(
+        onSuccess = { InstallEvent.Finished(appName) },
+        onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
+    )
 
     fun setIncludeDisabledApps(include: Boolean) {
         if (_uiState.value.includeDisabledApps == include) return
@@ -171,3 +206,5 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         installJobs.values.forEach(Job::cancel)
     }
 }
+
+private const val INSTALLATION_FAILED = "Installation failed"

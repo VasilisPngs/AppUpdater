@@ -22,6 +22,8 @@
     <string name="status_up_to_date">Up to date</string>
     <string name="all_up_to_date">All apps are up to date</string>
     <string name="update_installed">%1$s was updated</string>
+    <string name="update_installed_play">%1$s was updated to v%2$s, the latest on Google Play</string>
+    <string name="update_unavailable">Google Play does not offer a newer version of %1$s yet</string>
     <string name="update_failed">Update failed: %1$s</string>
     <plurals name="status_updates">
         <item quantity="one">%1$d update</item>
