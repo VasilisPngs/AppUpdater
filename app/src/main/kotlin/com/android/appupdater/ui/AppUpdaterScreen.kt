@@ -124,8 +124,6 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.center
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.RectangleShape
@@ -186,10 +184,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
-import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.min
-import kotlin.math.sin
 
 private val TabPadding = 6.dp
 private val TabGap = 3.dp
@@ -206,6 +201,7 @@ private val BrandGap = 10.dp
 private val DotSize = 7.dp
 private val PillGap = 7.dp
 private val IconSize = 18.dp
+private val ChevronInset = 2.dp
 private val SwitchWidth = 51.dp
 private val SwitchHeight = 31.dp
 private val SwitchKnob = 27.dp
@@ -236,7 +232,6 @@ private const val TOAST_MILLIS = 2200L
 private const val PULSE_MILLIS = 550
 private const val FOCUSED_BORDER_ALPHA = 0.6f
 private const val SELECTED_RING_ALPHA = 0.5f
-private const val PRIMARY_GRADIENT_ANGLE = 140.0
 private const val MAX_VERSION_CODE_DIGITS = 19
 private const val TABULAR_FIGURES = "tnum"
 private const val TOP_BAR_EMS = 3.5f
@@ -579,7 +574,7 @@ private fun UpdatesView(
                     StatusDot(color = Design.colors.accent, pulsing = true)
                     Text(
                         text = state.appName,
-                        style = Design.type.name,
+                        style = Design.type.body,
                         color = Design.colors.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -650,7 +645,7 @@ private fun SettingsView(
                                 painter = painterResource(R.drawable.ic_chevron_down),
                                 contentDescription = null,
                                 tint = colors.muted,
-                                modifier = Modifier.size(IconSize)
+                                modifier = Modifier.padding(end = ChevronInset).size(IconSize)
                             )
                         }
                     }
@@ -664,12 +659,14 @@ private fun SettingsView(
             Group(note = stringResource(R.string.disabled_apps_description)) {
                 Card(style = CardStyle.Tight) {
                     Row(
-                        modifier = Modifier.toggleable(
-                            value = includeDisabledApps,
-                            interactionSource = interaction,
-                            indication = null,
-                            onValueChange = onIncludeDisabledAppsChange
-                        ),
+                        modifier = Modifier
+                            .defaultMinSize(minHeight = Space.row - Space.m * 2)
+                            .toggleable(
+                                value = includeDisabledApps,
+                                interactionSource = interaction,
+                                indication = null,
+                                onValueChange = onIncludeDisabledAppsChange
+                            ),
                         horizontalArrangement = Arrangement.spacedBy(Space.m),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -688,7 +685,7 @@ private fun SettingsView(
         item(key = "install-bundle") {
             Card(style = CardStyle.Flush) {
                 ListRow(onClick = onPickBundle) {
-                    Text(text = stringResource(R.string.install_bundle), style = Design.type.name, color = colors.accentText)
+                    Text(text = stringResource(R.string.install_bundle), style = Design.type.button, color = colors.accentText)
                 }
             }
         }
@@ -841,11 +838,10 @@ private fun UpdateCard(
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(Space.xs)
             ) {
                 Text(
                     text = update.appName,
-                    style = Design.type.name,
+                    style = Design.type.body,
                     color = colors.text,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -856,10 +852,10 @@ private fun UpdateCard(
                     } else {
                         stringResource(R.string.version_current, app.versionName, app.versionCode)
                     },
-                    style = Design.type.caption,
+                    style = Design.type.muted,
                     color = colors.text
                 )
-                Text(text = latest, style = Design.type.caption, color = colors.text)
+                Text(text = latest, style = Design.type.muted, color = colors.text)
             }
             Column(
                 modifier = Modifier.width(IntrinsicSize.Max),
@@ -930,7 +926,8 @@ private fun Button(
         targetValue = when (style) {
             ButtonStyle.Regular -> colors.surface2
             ButtonStyle.Selected -> colors.accentSoft
-            ButtonStyle.Primary, ButtonStyle.Ghost -> Color.Transparent
+            ButtonStyle.Primary -> colors.accent
+            ButtonStyle.Ghost -> Color.Transparent
         },
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "fill"
@@ -969,13 +966,7 @@ private fun Button(
                 }
             )
             .clip(ShapePill)
-            .then(
-                if (primary) {
-                    Modifier.drawBehind { drawRect(primaryGradient(size, colors.accent, colors.accentEnd)) }
-                } else {
-                    Modifier.background(fill)
-                }
-            )
+            .background(fill)
             .border(Space.hairline, edge, ShapePill)
             .clickable(
                 interactionSource = interaction,
@@ -1051,18 +1042,6 @@ private fun IconButton(
                 contentScale = ContentScale.Fit,
                 colorFilter = ColorFilter.tint(colors.text)
             )
-    )
-}
-
-private fun primaryGradient(size: Size, start: Color, end: Color): Brush {
-    val angle = Math.toRadians(PRIMARY_GRADIENT_ANGLE)
-    val direction = Offset(sin(angle).toFloat(), -cos(angle).toFloat())
-    val length = abs(size.width * direction.x) + abs(size.height * direction.y)
-    val center = size.center
-    return Brush.linearGradient(
-        colors = listOf(start, end),
-        start = center - direction * (length / 2),
-        end = center + direction * (length / 2)
     )
 }
 
@@ -1233,7 +1212,7 @@ private fun ThemeSheet(
         onDismiss = onCancel
     ) { initialFocus ->
         Text(text = stringResource(R.string.theme), style = Design.type.h2, color = Design.colors.text)
-        Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
             ThemeMode.entries.forEach { mode ->
                 val selected = mode == current
                 Button(

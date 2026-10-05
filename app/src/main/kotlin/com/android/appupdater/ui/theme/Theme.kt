@@ -32,7 +32,6 @@ data class Palette(
     val text: Color,
     val muted: Color,
     val accent: Color,
-    val accentEnd: Color,
     val accentSoft: Color,
     val accentText: Color,
     val success: Color,
@@ -43,6 +42,9 @@ data class Palette(
     val scrim: Color
 )
 
+private val DarkAccent = Color(0xFF018857)
+private val LightAccent = Color(0xFF01784D)
+
 private val DarkPalette = Palette(
     background = Color(0xFF0B0C0F),
     surface = Color(0xFF14161B),
@@ -51,9 +53,8 @@ private val DarkPalette = Palette(
     border = Color(0xFF272B35),
     text = Color(0xFFEEF1F6),
     muted = Color(0xFF97A0B2),
-    accent = Color(0xFF018857),
-    accentEnd = Color(0xFF018489),
-    accentSoft = Color(0x2E018857),
+    accent = DarkAccent,
+    accentSoft = DarkAccent.copy(alpha = ACCENT_SOFT_DARK),
     accentText = Color(0xFF02A66A),
     success = Color(0xFF23C56E),
     danger = Color(0xFFFF5470),
@@ -84,9 +85,8 @@ private val LightPalette = Palette(
     border = Color(0xFFDFE3EA),
     text = Color(0xFF131720),
     muted = Color(0xFF5F6878),
-    accent = Color(0xFF01784D),
-    accentEnd = Color(0xFF018489),
-    accentSoft = Color(0x2401784D),
+    accent = LightAccent,
+    accentSoft = LightAccent.copy(alpha = ACCENT_SOFT_LIGHT),
     accentText = Color(0xFF01784D),
     success = Color(0xFF23C56E),
     danger = Color(0xFFD10022),
@@ -101,13 +101,11 @@ data class TypeScale(
     val h1: TextStyle,
     val h2: TextStyle,
     val body: TextStyle,
-    val name: TextStyle,
     val brand: TextStyle,
     val button: TextStyle,
     val buttonSmall: TextStyle,
     val pill: TextStyle,
     val muted: TextStyle,
-    val caption: TextStyle,
     val tab: TextStyle
 )
 
@@ -129,13 +127,11 @@ private val Scale = TypeScale(
     ),
     h2 = text(BODY, Semibold, TIGHT_TRACKING),
     body = text(BODY),
-    name = text(BODY, Medium),
     brand = text(BODY, Semibold, TIGHT_TRACKING),
     button = text(BODY, Medium),
     buttonSmall = text(SUBHEAD, Medium),
     pill = text(FOOTNOTE, Medium),
     muted = text(FOOTNOTE),
-    caption = text(CAPTION),
     tab = text(TAB, Medium)
 )
 
@@ -161,7 +157,6 @@ object Motion {
 
 object Space {
     val hairline = 1.dp
-    val xs = 4.dp
     val s = 8.dp
     val m = 12.dp
     val l = 16.dp
@@ -222,11 +217,12 @@ fun AppUpdaterTheme(
 }
 
 private const val SELECTION_ALPHA = 0.4f
+private const val ACCENT_SOFT_DARK = 0.18f
+private const val ACCENT_SOFT_LIGHT = 0.14f
 private const val LARGE_TITLE = 34f
 private const val BODY = 17f
 private const val SUBHEAD = 15f
 private const val FOOTNOTE = 13f
-private const val CAPTION = 12f
 private const val TAB = 10f
 private const val LINE_HEIGHT = 1.3f
 private const val TITLE_LINE_HEIGHT = 1.15f
