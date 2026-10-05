@@ -7,11 +7,11 @@
     <path android:pathData="M0,0h320v180h-320z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:endColor="#FF106747"
-                android:endX="320"
+                android:endColor="#FF076D48"
+                android:endX="160"
                 android:endY="180"
-                android:startColor="#FF009E64"
-                android:startX="0"
+                android:startColor="#FF019861"
+                android:startX="160"
                 android:startY="0"
                 android:type="linear" />
         </aapt:attr>
