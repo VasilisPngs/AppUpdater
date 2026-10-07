@@ -682,7 +682,7 @@ private fun SettingsView(
         item(key = "install-bundle") {
             Card(style = CardStyle.Flush) {
                 ListRow(onClick = onPickBundle) {
-                    Text(text = stringResource(R.string.install_bundle), style = Design.type.button, color = colors.accentText)
+                    Text(text = stringResource(R.string.install_bundle), style = Design.type.button, color = colors.accent)
                 }
             }
         }
@@ -930,7 +930,7 @@ private fun Button(
     val content by animateColorAsState(
         targetValue = when (style) {
             ButtonStyle.Primary -> Color.White
-            ButtonStyle.Selected -> colors.accentText
+            ButtonStyle.Selected -> colors.accent
             ButtonStyle.Regular, ButtonStyle.Ghost -> colors.text
         },
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
@@ -1492,7 +1492,7 @@ private fun TabItem(
         label = "tab"
     )
     val tint by animateColorAsState(
-        targetValue = if (selected) colors.accentText else colors.text,
+        targetValue = if (selected) colors.accent else colors.text,
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "tint"
     )

@@ -34,7 +34,6 @@ data class Palette(
     val chevron: Color,
     val accent: Color,
     val accentSoft: Color,
-    val accentText: Color,
     val success: Color,
     val danger: Color,
     val tabLens: Color,
@@ -44,8 +43,8 @@ data class Palette(
     val scrim: Color
 )
 
-private val DarkAccent = Color(0xFF018857)
-private val LightAccent = Color(0xFF01784D)
+private val DarkAccent = Color(0xFF0091FF)
+private val LightAccent = Color(0xFF0088FF)
 
 private val DarkPalette = Palette(
     background = Color(0xFF000000),
@@ -58,7 +57,6 @@ private val DarkPalette = Palette(
     chevron = Color(0xFF98989D),
     accent = DarkAccent,
     accentSoft = DarkAccent.copy(alpha = ACCENT_SOFT_DARK),
-    accentText = Color(0xFF02A66A),
     success = Color(0xFF30D158),
     danger = Color(0xFFFF4245),
     tabLens = Color(0xB3000000),
@@ -79,7 +77,6 @@ private val LightPalette = Palette(
     chevron = Color(0xFF8A8A8E),
     accent = LightAccent,
     accentSoft = LightAccent.copy(alpha = ACCENT_SOFT_LIGHT),
-    accentText = LightAccent,
     success = Color(0xFF34C759),
     danger = Color(0xFFFF383C),
     tabLens = Color(0x13000000),
