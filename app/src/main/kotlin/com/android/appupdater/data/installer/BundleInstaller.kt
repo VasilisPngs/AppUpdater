@@ -34,7 +34,7 @@ class BundleInstaller(private val context: Context) {
             } catch (_: ZipException) {
                 onState(InstallState.Error(label, "This file is not an APK or an APK bundle."))
             } catch (exception: Exception) {
-                onState(InstallState.Error(label, exception.message ?: "Installation failed"))
+                onState(InstallState.Error(label, exception.message ?: INSTALLATION_FAILED))
             } finally {
                 archive.delete()
             }

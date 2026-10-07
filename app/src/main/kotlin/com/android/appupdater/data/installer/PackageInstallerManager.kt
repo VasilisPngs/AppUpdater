@@ -87,7 +87,7 @@ class PackageInstallerManager(private val context: Context) {
         return when {
             library != null -> "Requires the shared library $library, install it first."
             !message.isNullOrBlank() -> message
-            else -> "Installation failed"
+            else -> INSTALLATION_FAILED
         }
     }
 
@@ -96,3 +96,5 @@ class PackageInstallerManager(private val context: Context) {
         val MISSING_LIBRARY_PATTERN = Regex("shared library ([^\\s;]+)")
     }
 }
+
+internal const val INSTALLATION_FAILED = "Installation failed"

@@ -20,7 +20,7 @@
 
 ## Android
 - Use the latest appropriate official Kotlin, Jetpack Compose, AndroidX, Android SDK, Android Gradle Plugin, Gradle and supported JDK.
-- The product design standard is the shared design system used by the owner's other projects (Adblock, GymTracker): the same colour tokens, type scale, corner radii, spacing scale, motion curves, component shapes and interaction states, ported to Compose.
+- The product design standard is the shared design system used by the owner's other projects (Adblock, GymNotes): the same colour tokens, type scale, corner radii, spacing scale, motion curves, component shapes and interaction states, ported to Compose.
 - Every colour is shared with the siblings, the accent included: AppUpdater uses the same Apple system colours with systemBlue as the accent, and its launcher icon and TV banner carry a white glyph on the siblings' black gradient. It has no colour of its own.
 - AppUpdater keeps a dedicated refresh button beside the status pill, which stays a plain indicator; this is a deliberate departure from Adblock, where tapping the pill refreshes. Do not remove the button or make the pill the refresh control for the sake of parity.
 - The status pill always stays visible and shows checking, the number of updates or up to date; unlike Adblock and GymNotes, it does not hide when nothing needs attention.

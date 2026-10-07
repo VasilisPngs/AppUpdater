@@ -10,6 +10,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.appupdater.data.installer.BundleInstaller
+import com.android.appupdater.data.installer.INSTALLATION_FAILED
 import com.android.appupdater.data.installer.PlayInstaller
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
@@ -222,5 +223,4 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     }
 }
 
-private const val INSTALLATION_FAILED = "Installation failed"
 private const val PACKAGE_SCHEME = "package"

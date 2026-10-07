@@ -176,7 +176,7 @@ import com.android.appupdater.ui.theme.PressedOpacity
 import com.android.appupdater.ui.theme.PressedScale
 import com.android.appupdater.ui.theme.Radius
 import com.android.appupdater.ui.theme.ShapeCard
-import com.android.appupdater.ui.theme.ShapeMark
+import com.android.appupdater.ui.theme.ShapeIcon
 import com.android.appupdater.ui.theme.ShapePill
 import com.android.appupdater.ui.theme.Space
 import kotlinx.coroutines.Dispatchers
@@ -822,7 +822,7 @@ private fun UpdateCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.m)
         ) {
-            Box(modifier = Modifier.size(AppIconSize).clip(ShapeMark)) {
+            Box(modifier = Modifier.size(AppIconSize).clip(ShapeIcon)) {
                 iconBitmap?.let { bitmap ->
                     Image(
                         bitmap = bitmap.asImageBitmap(),
@@ -832,9 +832,7 @@ private fun UpdateCard(
                     )
                 }
             }
-            Column(
-                modifier = Modifier.weight(1f),
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = update.appName,
                     style = Design.type.body,

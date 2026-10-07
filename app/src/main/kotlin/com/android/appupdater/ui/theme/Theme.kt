@@ -131,9 +131,9 @@ object Radius {
 
 val ShapeCard = RoundedCornerShape(Radius.card)
 val ShapePill = RoundedCornerShape(percent = 50)
-val ShapeMark = RoundedCornerShape(
+val ShapeIcon = RoundedCornerShape(
     object : CornerSize {
-        override fun toPx(shapeSize: Size, density: Density): Float = shapeSize.minDimension * MARK_CORNER
+        override fun toPx(shapeSize: Size, density: Density): Float = shapeSize.minDimension * ICON_CORNER
     }
 )
 
@@ -230,4 +230,4 @@ private const val TAB = 10f
 private const val LINE_HEIGHT = 1.3f
 private const val TITLE_LINE_HEIGHT = 1.15f
 private const val TIGHT_TRACKING = -0.01f
-private const val MARK_CORNER = 0.2237f
+private const val ICON_CORNER = 0.2237f
