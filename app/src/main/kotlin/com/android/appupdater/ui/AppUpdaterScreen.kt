@@ -8,9 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
@@ -25,7 +23,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,7 +53,6 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -65,7 +61,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
@@ -113,9 +108,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
-import androidx.compose.ui.draw.paint
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -124,11 +119,14 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
@@ -136,6 +134,7 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -157,6 +156,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.core.net.toUri
@@ -186,18 +186,21 @@ import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import kotlin.math.min
 
-private val TabPadding = 6.dp
-private val TabGap = 3.dp
-private val TabIconSize = 21.dp
-private val TabBarGap = 2.dp
+private val TabBarInset = 21.dp
+private val TabBarPaddingVertical = 3.dp
+private val TabBarPaddingHorizontal = 1.dp
+private val TabTop = 8.dp
+private val TabBottom = 9.dp
+private val TabGap = 1.dp
+private val TabIconWidth = 32.dp
 private val TabBarBottom = 12.dp
-private val TabBarSafeOverlap = 8.dp
+private val TabBarSafeOverlap = 13.dp
+private val BarTopMin = 8.dp
+private val BarBottom = 6.dp
+private val BarIconSize = 22.dp
 private val ContentBottomGap = 28.dp
 private val WideSheetBreakpoint = 600.dp
 private val AppIconSize = 44.dp
-private val BrandMarkSize = 26.dp
-private val BrandMarkLayer = 39.dp
-private val BrandGap = 10.dp
 private val DotSize = 7.dp
 private val PillGap = 7.dp
 private val IconSize = 18.dp
@@ -216,13 +219,8 @@ private val ToastMaxWidth = 544.dp
 private val ToastGap = 20.dp
 private val ToastEnter = 10.dp
 private val ToastExit = 6.dp
-private val ViewEnter = 6.dp
 private val EmptyPadding = 32.dp
 private val GroupInset = 17.dp
-private val PrimaryShadowBlur = 26.dp
-private val PrimaryShadowOffset = 10.dp
-private val MarkShadowBlur = 18.dp
-private val MarkShadowOffset = 6.dp
 private val KnobShadowBlur = 6.dp
 private val KnobShadowOffset = 2.dp
 private val KnobShadow = Color(0x4D000000)
@@ -230,11 +228,11 @@ private val FocusRingWidth = 2.dp
 private val FocusRingOffset = 2.dp
 private const val TOAST_MILLIS = 2200L
 private const val PULSE_MILLIS = 550
-private const val FOCUSED_BORDER_ALPHA = 0.6f
-private const val SELECTED_RING_ALPHA = 0.5f
 private const val MAX_VERSION_CODE_DIGITS = 19
 private const val TABULAR_FIGURES = "tnum"
-private const val TOP_BAR_EMS = 3.5f
+private const val TOP_BAR_EMS = 3.125f
+private const val TAB_ICON_ASPECT = 1.2f
+private const val TITLE_KEY = "title"
 private const val SHEET_FLICK_DP_PER_SECOND = 500
 private const val SHEET_DRAG_FADE = 0.6f
 private const val GRABBER_ALPHA = 0.28f
@@ -264,7 +262,6 @@ private val ThemeMode.labelRes: Int
         ThemeMode.System -> R.string.theme_system
         ThemeMode.Light -> R.string.theme_light
         ThemeMode.Dark -> R.string.theme_dark
-        ThemeMode.Black -> R.string.theme_black
     }
 
 @Composable
@@ -308,8 +305,9 @@ fun AppUpdaterScreen(
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout).asPaddingValues()
-    val viewEnter = with(density) { ViewEnter.roundToPx() }
-    val barHeight = with(density) { (Design.type.body.fontSize * TOP_BAR_EMS).toDp() }
+    val barTop = max(insets.calculateTopPadding(), BarTopMin)
+    val barOffset = with(density) { (Design.type.body.fontSize * TOP_BAR_EMS).toDp() }
+    val barEdge = with(density) { (barTop + Space.control + BarBottom).roundToPx() }
     val tabLine = with(density) { Design.type.tab.lineHeight.toDp() }
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
@@ -344,18 +342,25 @@ fun AppUpdaterScreen(
 
     val activeListState = if (selectedTab == AppTab.Updates) updatesListState else settingsListState
     val activeFocus = if (selectedTab == AppTab.Updates) updatesFocus else settingsFocus
-    val scrolled by remember(activeListState) { derivedStateOf { activeListState.canScrollBackward } }
+    val titled by remember(activeListState, barEdge) {
+        derivedStateOf {
+            val info = activeListState.layoutInfo
+            val heading = info.visibleItemsInfo.firstOrNull { it.key == TITLE_KEY }
+            if (heading == null) {
+                activeListState.firstVisibleItemIndex > 0
+            } else {
+                activeListState.canScrollBackward && heading.offset + heading.size - info.viewportStartOffset <= barEdge
+            }
+        }
+    }
     val scanning = uiState.scanStatus == ScanStatus.Scanning
     val selectTab: (AppTab) -> Unit = { tab ->
-        when {
-            tab != selectedTab -> {
-                selectedTab = tab
-                coroutineScope.launch {
-                    (if (tab == AppTab.Updates) updatesListState else settingsListState).scrollToItem(0)
-                }
-            }
-            tab == AppTab.Updates && updatesListState.canScrollBackward ->
-                coroutineScope.launch { updatesListState.animateScrollToItem(0) }
+        val state = if (tab == AppTab.Updates) updatesListState else settingsListState
+        if (tab != selectedTab) {
+            selectedTab = tab
+            coroutineScope.launch { state.scrollToItem(0) }
+        } else if (state.canScrollBackward) {
+            coroutineScope.launch { state.animateScrollToItem(0) }
         }
     }
 
@@ -363,15 +368,18 @@ fun AppUpdaterScreen(
         val wideSheet = maxWidth >= WideSheetBreakpoint
         val topInset = insets.calculateTopPadding()
         val bottomInset = insets.calculateBottomPadding()
-        val startPadding = max(Space.l, insets.calculateStartPadding(layoutDirection))
-        val endPadding = max(Space.l, insets.calculateEndPadding(layoutDirection))
-        val topBarHeight = topInset + barHeight
+        val startInset = insets.calculateStartPadding(layoutDirection)
+        val endInset = insets.calculateEndPadding(layoutDirection)
+        val startPadding = max(Space.l, startInset)
+        val endPadding = max(Space.l, endInset)
+        val contentTop = barTop + barOffset + Space.l
         val tabBarBottom = max(TabBarBottom, bottomInset - TabBarSafeOverlap)
-        val tabBarHeight = (TabPadding + Space.hairline) * 2 + TabPadding * 2 + TabIconSize + TabGap + tabLine
+        val tabBarHeight = (TabBarPaddingVertical + Space.hairline) * 2 + TabTop + TabBottom +
+            TabIconWidth / TAB_ICON_ASPECT + TabGap + tabLine
         val contentPadding = PaddingValues(
             start = startPadding,
             end = endPadding,
-            top = topBarHeight + Space.l,
+            top = contentTop,
             bottom = tabBarBottom + tabBarHeight + ContentBottomGap
         )
         val toastBottom = tabBarBottom + tabBarHeight + ToastGap
@@ -399,7 +407,7 @@ fun AppUpdaterScreen(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
-                                .padding(top = topBarHeight + Space.l)
+                                .padding(top = contentTop)
                                 .alpha(pullState.distanceFraction.coerceIn(0f, 1f))
                                 .size(DotSize)
                                 .clip(CircleShape)
@@ -407,41 +415,30 @@ fun AppUpdaterScreen(
                         )
                     }
                 ) {
-                    AnimatedContent(
-                        targetState = selectedTab,
-                        transitionSpec = {
-                            (
-                                fadeIn(tween(Motion.NORMAL, easing = Motion.ease)) +
-                                    slideInVertically(tween(Motion.NORMAL, easing = Motion.ease)) { viewEnter }
-                                ) togetherWith ExitTransition.None
-                        },
-                        label = "view"
-                    ) { tab ->
-                        when (tab) {
-                            AppTab.Updates -> UpdatesView(
-                                listState = updatesListState,
-                                focus = updatesFocus,
-                                contentPadding = contentPadding,
-                                scanning = scanning,
-                                notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
-                                updates = updates,
-                                installs = uiState.installs,
-                                playInstalls = uiState.playInstalls,
-                                onApkMirror = { openUrlInBrowser(context, it) },
-                                onPlay = viewModel::updateFromPlay,
-                                onManual = { manualPackage = it.packageName }
-                            )
-                            AppTab.Settings -> SettingsView(
-                                listState = settingsListState,
-                                focus = settingsFocus,
-                                contentPadding = contentPadding,
-                                themeMode = themeMode,
-                                includeDisabledApps = uiState.includeDisabledApps,
-                                onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                                onTheme = { themeSheet = true },
-                                onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
-                            )
-                        }
+                    when (selectedTab) {
+                        AppTab.Updates -> UpdatesView(
+                            listState = updatesListState,
+                            focus = updatesFocus,
+                            contentPadding = contentPadding,
+                            scanning = scanning,
+                            notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
+                            updates = updates,
+                            installs = uiState.installs,
+                            playInstalls = uiState.playInstalls,
+                            onApkMirror = { openUrlInBrowser(context, it) },
+                            onPlay = viewModel::updateFromPlay,
+                            onManual = { manualPackage = it.packageName }
+                        )
+                        AppTab.Settings -> SettingsView(
+                            listState = settingsListState,
+                            focus = settingsFocus,
+                            contentPadding = contentPadding,
+                            themeMode = themeMode,
+                            includeDisabledApps = uiState.includeDisabledApps,
+                            onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
+                            onTheme = { themeSheet = true },
+                            onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
+                        )
                     }
                 }
             }
@@ -449,11 +446,11 @@ fun AppUpdaterScreen(
             TopBar(
                 backdrop = backdrop,
                 observe = { activeListState.firstVisibleItemScrollOffset },
-                height = topBarHeight,
-                topInset = topInset,
+                top = barTop,
                 startPadding = startPadding,
                 endPadding = endPadding,
-                scrolled = scrolled,
+                title = stringResource(selectedTab.labelRes),
+                titled = titled,
                 scanning = scanning,
                 failed = uiState.scanStatus is ScanStatus.Error,
                 count = updates.size,
@@ -468,7 +465,7 @@ fun AppUpdaterScreen(
                 selectedTab = selectedTab,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(start = startPadding, end = endPadding, bottom = tabBarBottom),
+                    .padding(start = max(TabBarInset, startInset), end = max(TabBarInset, endInset), bottom = tabBarBottom),
                 onSelect = selectTab
             )
         }
@@ -547,7 +544,7 @@ private fun UpdatesView(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Space.l)
     ) {
-        item(key = "title") {
+        item(key = TITLE_KEY) {
             Text(text = stringResource(R.string.updates), style = Design.type.h1, color = Design.colors.text)
         }
 
@@ -559,7 +556,7 @@ private fun UpdatesView(
                         horizontalArrangement = Arrangement.spacedBy(Space.s)
                     ) {
                         StatusDot(color = Design.colors.danger, pulsing = false)
-                        Text(text = notice, style = Design.type.muted, color = Design.colors.text)
+                        Text(text = notice, style = Design.type.muted, color = Design.colors.muted)
                     }
                 }
             }
@@ -622,7 +619,7 @@ private fun SettingsView(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Space.l)
     ) {
-        item(key = "title") {
+        item(key = TITLE_KEY) {
             Text(text = stringResource(R.string.settings), style = Design.type.h1, color = colors.text)
         }
 
@@ -644,7 +641,7 @@ private fun SettingsView(
                             Icon(
                                 painter = painterResource(R.drawable.ic_chevron_down),
                                 contentDescription = null,
-                                tint = colors.muted,
+                                tint = colors.chevron,
                                 modifier = Modifier.padding(end = ChevronInset).size(IconSize)
                             )
                         }
@@ -704,7 +701,7 @@ private fun Group(
             Text(
                 text = heading,
                 style = Design.type.h2,
-                color = colors.text,
+                color = colors.muted,
                 modifier = Modifier.padding(horizontal = GroupInset)
             )
         }
@@ -713,7 +710,7 @@ private fun Group(
             Text(
                 text = note,
                 style = Design.type.muted,
-                color = colors.text,
+                color = colors.muted,
                 modifier = Modifier.padding(horizontal = GroupInset)
             )
         }
@@ -732,7 +729,6 @@ private fun Card(
             .fillMaxWidth()
             .clip(ShapeCard)
             .background(colors.surface)
-            .border(Space.hairline, colors.border, ShapeCard)
             .padding(horizontal = style.horizontal, vertical = style.vertical),
         verticalArrangement = Arrangement.spacedBy(style.gap),
         content = content
@@ -853,9 +849,9 @@ private fun UpdateCard(
                         stringResource(R.string.version_current, app.versionName, app.versionCode)
                     },
                     style = Design.type.muted,
-                    color = colors.text
+                    color = colors.muted
                 )
-                Text(text = latest, style = Design.type.muted, color = colors.text)
+                Text(text = latest, style = Design.type.muted, color = colors.muted)
             }
             Column(
                 modifier = Modifier.width(IntrinsicSize.Max),
@@ -913,7 +909,6 @@ private fun Button(
     @DrawableRes icon: Int? = null
 ) {
     val colors = Design.colors
-    val primary = style == ButtonStyle.Primary
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val focused by interaction.collectIsFocusedAsState()
@@ -924,7 +919,7 @@ private fun Button(
     )
     val fill by animateColorAsState(
         targetValue = when (style) {
-            ButtonStyle.Regular -> colors.surface2
+            ButtonStyle.Regular -> colors.fill
             ButtonStyle.Selected -> colors.accentSoft
             ButtonStyle.Primary -> colors.accent
             ButtonStyle.Ghost -> Color.Transparent
@@ -932,14 +927,14 @@ private fun Button(
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "fill"
     )
-    val edge by animateColorAsState(
+    val content by animateColorAsState(
         targetValue = when (style) {
-            ButtonStyle.Primary -> Color.Transparent
-            ButtonStyle.Selected -> colors.accent.copy(alpha = SELECTED_RING_ALPHA)
-            ButtonStyle.Regular, ButtonStyle.Ghost -> colors.border
+            ButtonStyle.Primary -> Color.White
+            ButtonStyle.Selected -> colors.accentText
+            ButtonStyle.Regular, ButtonStyle.Ghost -> colors.text
         },
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "edge"
+        label = "content"
     )
     val percent = remember { NumberFormat.getPercentInstance() }
     val progressShown by animateFloatAsState(
@@ -954,20 +949,8 @@ private fun Button(
             .scale(scale)
             .alpha(if (enabled || busy) 1f else DisabledOpacity)
             .focusRing(focused, colors.accent, Dp.Infinity)
-            .then(
-                if (primary) {
-                    Modifier.dropShadow(ShapePill) {
-                        radius = PrimaryShadowBlur.toPx()
-                        offset = Offset(0f, PrimaryShadowOffset.toPx())
-                        color = colors.accentSoft
-                    }
-                } else {
-                    Modifier
-                }
-            )
             .clip(ShapePill)
             .background(fill)
-            .border(Space.hairline, edge, ShapePill)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -982,13 +965,12 @@ private fun Button(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val textStyle = if (small) Design.type.buttonSmall else Design.type.button
-            val color = if (primary) Color.White else colors.text
-            if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, tint = color)
+            if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, tint = content)
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = text,
                     style = textStyle,
-                    color = color,
+                    color = content,
                     maxLines = 1,
                     modifier = Modifier.graphicsLayer { alpha = 1f - progressShown }
                 )
@@ -996,7 +978,7 @@ private fun Button(
                     Text(
                         text = percent.format(progress),
                         style = textStyle.copy(fontFeatureSettings = TABULAR_FIGURES),
-                        color = color,
+                        color = content,
                         maxLines = 1,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.matchParentSize().graphicsLayer { alpha = progressShown }
@@ -1008,8 +990,10 @@ private fun Button(
 }
 
 @Composable
-private fun IconButton(
+private fun BarButton(
     @DrawableRes icon: Int,
+    backdrop: GraphicsLayer,
+    observe: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1017,32 +1001,37 @@ private fun IconButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val focused by interaction.collectIsFocusedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) PressedScale else 1f,
+    val fade by animateFloatAsState(
+        targetValue = if (pressed) PressedOpacity else 1f,
         animationSpec = tween(Motion.FAST, easing = Motion.ease),
         label = "press"
     )
 
-    Box(
+    BackdropSurface(
+        backdrop = backdrop,
+        tint = colors.surface2.copy(alpha = Glass.MATERIAL).compositeOver(colors.background.copy(alpha = Glass.BAR)),
+        shape = CircleShape,
+        blurRadius = Glass.blur,
+        highlight = colors.glassEdge,
+        observe = observe,
         modifier = modifier
-            .scale(scale)
+            .size(Space.control)
+            .alpha(fade)
             .focusRing(focused, colors.accent, Dp.Infinity)
-            .clip(CircleShape)
-            .background(colors.surface2)
-            .border(Space.hairline, colors.border, CircleShape)
+            .border(Space.hairline, colors.glassRim, CircleShape)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick
             )
-            .padding(Space.s)
-            .paint(
-                painter = painterResource(icon),
-                sizeToIntrinsics = false,
-                contentScale = ContentScale.Fit,
-                colorFilter = ColorFilter.tint(colors.text)
-            )
-    )
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = null,
+            tint = colors.text,
+            modifier = Modifier.align(Alignment.Center).size(BarIconSize)
+        )
+    }
 }
 
 @Composable
@@ -1237,18 +1226,6 @@ private fun ThemeSheet(
 @Composable
 private fun VersionCodeField(state: TextFieldState, focus: FocusRequester, onDone: () -> Unit) {
     val colors = Design.colors
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val background by animateColorAsState(
-        targetValue = if (focused) colors.surface else colors.surface2,
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "fieldBackground"
-    )
-    val border by animateColorAsState(
-        targetValue = if (focused) colors.accent.copy(alpha = FOCUSED_BORDER_ALPHA) else colors.border,
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "fieldBorder"
-    )
     val placeholder = stringResource(R.string.version_code)
 
     BasicTextField(
@@ -1259,7 +1236,6 @@ private fun VersionCodeField(state: TextFieldState, focus: FocusRequester, onDon
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
         onKeyboardAction = { onDone() },
         lineLimits = TextFieldLineLimits.SingleLine,
-        interactionSource = interaction,
         cursorBrush = SolidColor(colors.text),
         decorator = { field ->
             Box(
@@ -1267,8 +1243,7 @@ private fun VersionCodeField(state: TextFieldState, focus: FocusRequester, onDon
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = Space.control)
                     .clip(ShapePill)
-                    .background(background)
-                    .border(Space.hairline, border, ShapePill)
+                    .background(colors.fill)
                     .padding(horizontal = Space.m, vertical = 10.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -1305,11 +1280,11 @@ private fun EmptyState(text: String) {
 private fun TopBar(
     backdrop: GraphicsLayer,
     observe: () -> Unit,
-    height: Dp,
-    topInset: Dp,
+    top: Dp,
     startPadding: Dp,
     endPadding: Dp,
-    scrolled: Boolean,
+    title: String,
+    titled: Boolean,
     scanning: Boolean,
     failed: Boolean,
     count: Int,
@@ -1317,83 +1292,63 @@ private fun TopBar(
     onRefresh: () -> Unit
 ) {
     val colors = Design.colors
-    val divider by animateColorAsState(
-        targetValue = if (scrolled) colors.border else Color.Transparent,
+    val titleAlpha by animateFloatAsState(
+        targetValue = if (titled) 1f else 0f,
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "divider"
+        label = "title"
     )
-    BackdropSurface(
-        backdrop = backdrop,
-        tint = colors.background.copy(alpha = Glass.BAR),
-        shape = RectangleShape,
-        blurRadius = Glass.blur,
-        observe = observe,
-        modifier = Modifier.fillMaxWidth().height(height)
-    ) {
-        Row(
+    Box(modifier = Modifier.fillMaxWidth()) {
+        BackdropSurface(
+            backdrop = backdrop,
+            tint = colors.background.copy(alpha = Glass.BAR),
+            shape = RectangleShape,
+            blurRadius = Glass.blur,
+            observe = observe,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(top = topInset, start = startPadding, end = endPadding),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(BrandGap),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BrandMark()
-                Text(text = stringResource(R.string.app_name), style = Design.type.brand, color = colors.text)
-            }
-            Row(
-                modifier = Modifier.height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(Space.s),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                StatusPill(scanning = scanning, failed = failed, count = count)
-                IconButton(
-                    icon = R.drawable.ic_refresh,
-                    onClick = onRefresh,
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(1f)
-                        .focusProperties { down = listFocus }
+                .fillMaxWidth()
+                .height(top + Space.control + BarBottom + Glass.edgeFade)
+                .fadeBottom(Glass.edgeFade)
+        )
+        Layout(
+            content = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Space.s),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StatusPill(scanning = scanning, failed = failed, count = count)
+                    BarButton(
+                        icon = R.drawable.ic_refresh,
+                        backdrop = backdrop,
+                        observe = observe,
+                        onClick = onRefresh,
+                        modifier = Modifier.focusProperties { down = listFocus }
+                    )
+                }
+                Text(
+                    text = title,
+                    style = Design.type.barTitle,
+                    color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.graphicsLayer { alpha = titleAlpha }
                 )
+            },
+            modifier = Modifier
+                .padding(top = top, start = startPadding, end = endPadding, bottom = BarBottom)
+                .fillMaxWidth()
+                .height(Space.control)
+        ) { measurables, constraints ->
+            val gap = Space.m.roundToPx()
+            val loose = constraints.copy(minWidth = 0, minHeight = 0)
+            val start = measurables[0].measure(loose)
+            val available = (constraints.maxWidth - gap * 2).coerceAtLeast(0)
+            val heading = measurables[1].measure(loose.copy(maxWidth = (available - start.width).coerceAtLeast(0)))
+            val column = maxOf((available - heading.width) / 2, start.width)
+            layout(constraints.maxWidth, constraints.maxHeight) {
+                start.placeRelative(0, (constraints.maxHeight - start.height) / 2)
+                heading.placeRelative(column + gap, (constraints.maxHeight - heading.height) / 2)
             }
         }
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(Space.hairline)
-                .background(divider)
-        )
-    }
-}
-
-@Composable
-private fun BrandMark() {
-    val colors = Design.colors
-    Box(
-        modifier = Modifier
-            .size(BrandMarkSize)
-            .dropShadow(ShapeMark) {
-                radius = MarkShadowBlur.toPx()
-                offset = Offset(0f, MarkShadowOffset.toPx())
-                color = colors.accentSoft
-            }
-            .clip(ShapeMark),
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            painter = painterResource(R.drawable.ic_launcher_background),
-            contentDescription = null,
-            modifier = Modifier.requiredSize(BrandMarkLayer)
-        )
-        Image(
-            painter = painterResource(R.drawable.ic_launcher_foreground),
-            contentDescription = null,
-            modifier = Modifier.requiredSize(BrandMarkLayer)
-        )
     }
 }
 
@@ -1409,8 +1364,7 @@ private fun StatusPill(scanning: Boolean, failed: Boolean, count: Int) {
         modifier = Modifier
             .defaultMinSize(minHeight = Space.controlSmall)
             .clip(ShapePill)
-            .background(colors.surface)
-            .border(Space.hairline, colors.border, ShapePill)
+            .background(colors.fill)
             .padding(horizontal = Space.m),
         horizontalArrangement = Arrangement.spacedBy(PillGap),
         verticalAlignment = Alignment.CenterVertically
@@ -1468,9 +1422,14 @@ private fun TabBar(
     onSelect: (AppTab) -> Unit
 ) {
     val colors = Design.colors
+    val lens = animateFloatAsState(
+        targetValue = selectedTab.ordinal.toFloat(),
+        animationSpec = tween(Motion.SPRING, easing = Motion.easeSpring),
+        label = "lens"
+    )
     BackdropSurface(
         backdrop = backdrop,
-        tint = colors.surface2.copy(alpha = Glass.TAB_BAR),
+        tint = colors.surface2.copy(alpha = Glass.MATERIAL),
         shape = ShapePill,
         blurRadius = Glass.blur,
         highlight = colors.glassEdge,
@@ -1487,8 +1446,20 @@ private fun TabBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(Space.hairline, colors.glassRim, ShapePill)
-                .padding(TabPadding + Space.hairline),
-            horizontalArrangement = Arrangement.spacedBy(TabBarGap)
+                .padding(
+                    horizontal = Space.hairline + TabBarPaddingHorizontal,
+                    vertical = Space.hairline + TabBarPaddingVertical
+                )
+                .drawBehind {
+                    val width = size.width / AppTab.entries.size
+                    val index = if (layoutDirection == LayoutDirection.Rtl) AppTab.entries.lastIndex - lens.value else lens.value
+                    drawRoundRect(
+                        color = colors.tabLens,
+                        topLeft = Offset(width * index, 0f),
+                        size = Size(width, size.height),
+                        cornerRadius = CornerRadius(size.height / 2)
+                    )
+                }
         ) {
             AppTab.entries.forEach { tab ->
                 TabItem(
@@ -1520,40 +1491,32 @@ private fun TabItem(
         animationSpec = tween(Motion.FAST, easing = Motion.ease),
         label = "tab"
     )
-    val fill by animateColorAsState(
-        targetValue = if (selected) colors.accentSoft else Color.Transparent,
+    val tint by animateColorAsState(
+        targetValue = if (selected) colors.accentText else colors.text,
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "fill"
-    )
-    val ring by animateColorAsState(
-        targetValue = if (selected) colors.accent.copy(alpha = SELECTED_RING_ALPHA) else Color.Transparent,
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "ring"
+        label = "tint"
     )
     Column(
         modifier = modifier
             .alpha(fade)
             .focusRing(focused, colors.accent, Dp.Infinity)
-            .clip(ShapePill)
-            .background(fill)
-            .border(Space.hairline, ring, ShapePill)
             .selectable(
                 selected = selected,
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick
             )
-            .padding(vertical = TabPadding),
+            .padding(top = TabTop, bottom = TabBottom),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(TabGap)
     ) {
         Icon(
             painter = painterResource(tab.iconRes),
             contentDescription = null,
-            tint = colors.text,
-            modifier = Modifier.size(TabIconSize)
+            tint = tint,
+            modifier = Modifier.width(TabIconWidth).aspectRatio(TAB_ICON_ASPECT)
         )
-        Text(text = stringResource(tab.labelRes), style = Design.type.tab, color = colors.text)
+        Text(text = stringResource(tab.labelRes), style = Design.type.tab, color = tint)
     }
 }
 
@@ -1561,7 +1524,7 @@ private fun TabItem(
 private fun SwitchTrack(checked: Boolean, focused: Boolean) {
     val colors = Design.colors
     val track by animateColorAsState(
-        targetValue = if (checked) colors.accent else colors.surface3,
+        targetValue = if (checked) colors.success else colors.surface3,
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "track"
     )
@@ -1629,8 +1592,8 @@ private fun ToastItem(message: String, backdrop: GraphicsLayer, onGone: () -> Un
 
     AnimatedVisibility(
         visibleState = visibility,
-        enter = fadeIn(tween(Motion.NORMAL, easing = Motion.ease)) +
-            slideInVertically(tween(Motion.NORMAL, easing = Motion.ease)) { with(density) { ToastEnter.roundToPx() } },
+        enter = fadeIn(tween(Motion.SPRING, easing = Motion.easeSpring)) +
+            slideInVertically(tween(Motion.SPRING, easing = Motion.easeSpring)) { with(density) { ToastEnter.roundToPx() } },
         exit = fadeOut(tween(Motion.NORMAL, easing = Motion.ease)) +
             slideOutVertically(tween(Motion.NORMAL, easing = Motion.ease)) { with(density) { ToastExit.roundToPx() } }
     ) {
@@ -1658,6 +1621,20 @@ private fun ToastItem(message: String, backdrop: GraphicsLayer, onGone: () -> Un
         }
     }
 }
+
+private fun Modifier.fadeBottom(length: Dp): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithCache {
+            val mask = Brush.verticalGradient(
+                0f to Color.Black,
+                (1f - length.toPx() / size.height).coerceIn(0f, 1f) to Color.Black,
+                1f to Color.Transparent
+            )
+            onDrawWithContent {
+                drawContent()
+                drawRect(mask, blendMode = BlendMode.DstIn)
+            }
+        }
 
 private fun Modifier.focusRing(
     focused: Boolean,

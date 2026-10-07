@@ -11,7 +11,6 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
-    <string name="theme_black">Black</string>
     <string name="install_bundle">Install APK bundle</string>
     <string name="disabled_apps">Disabled apps</string>
     <string name="disabled_apps_description">Include disabled applications when checking for updates</string>
