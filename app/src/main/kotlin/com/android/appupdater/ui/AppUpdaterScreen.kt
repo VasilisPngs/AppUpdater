@@ -124,6 +124,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -142,6 +143,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -243,6 +249,7 @@ private const val PULSE_MILLIS = 550
 private const val PULSE_SHRINK = 0.14f
 private const val PULSE_FADE = 0.55f
 private const val MAX_VERSION_CODE_DIGITS = 19
+private const val BUTTON_SLOTS = 3
 private const val TABULAR_FIGURES = "tnum"
 private const val TOP_BAR_EMS = 3.125f
 private const val TAB_ICON_ASPECT = 1.2f
@@ -861,28 +868,41 @@ private fun UpdateCard(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
+    val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
+    val toCode = if (LocalLayoutDirection.current == LayoutDirection.Ltr) Key.DirectionLeft else Key.DirectionRight
+    val codeFocus = remember { FocusRequester() }
+    val buttonFocus = remember { List(BUTTON_SLOTS) { FocusRequester() } }
+    var codeFocused by remember(keyboard) { mutableStateOf(false) }
+    var lastButton by remember { mutableIntStateOf(0) }
+    val button: (Int) -> Modifier = { slot ->
+        Modifier
+            .fillMaxWidth()
+            .focusRequester(buttonFocus[slot])
+            .onFocusChanged { if (it.isFocused) lastButton = slot }
+    }
+    val code = update.newVersionCode.toString()
+    val copyCode: () -> Unit = {
+        coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, code))) }
+    }
     val latestText = stringResource(R.string.version_latest, displayVersion(update.newVersionName), update.newVersionCode)
-    val latest = remember(latestText, update.newVersionCode, colors) {
-        val code = update.newVersionCode.toString()
+    val latest = remember(latestText, code, colors, keyboard, codeFocused) {
         val start = latestText.lastIndexOf(code)
+        val highlight = SpanStyle(color = Color.White, background = colors.accent)
         buildAnnotatedString {
             append(latestText)
             if (start >= 0) {
-                addLink(
-                    LinkAnnotation.Clickable(
-                        tag = code,
-                        styles = TextLinkStyles(
-                            focusedStyle = SpanStyle(color = Color.White, background = colors.accent),
-                            pressedStyle = SpanStyle(color = Color.White, background = colors.accent)
-                        )
-                    ) {
-                        coroutineScope.launch {
-                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, code)))
-                        }
-                    },
-                    start,
-                    start + code.length
-                )
+                if (!keyboard) {
+                    addLink(
+                        LinkAnnotation.Clickable(
+                            tag = code,
+                            styles = TextLinkStyles(focusedStyle = highlight, pressedStyle = highlight)
+                        ) { copyCode() },
+                        start,
+                        start + code.length
+                    )
+                } else if (codeFocused) {
+                    addStyle(highlight, start, start + code.length)
+                }
             }
         }
     }
@@ -927,10 +947,34 @@ private fun UpdateCard(
                     style = Design.type.muted,
                     color = colors.muted
                 )
-                Text(text = latest, style = Design.type.muted, color = colors.muted)
+                Text(
+                    text = latest,
+                    style = Design.type.muted,
+                    color = colors.muted,
+                    modifier = if (keyboard) {
+                        Modifier
+                            .focusRequester(codeFocus)
+                            .focusProperties {
+                                canFocus = codeFocused
+                                end = buttonFocus[lastButton]
+                            }
+                            .onFocusChanged { codeFocused = it.isFocused }
+                            .clickable(interactionSource = null, indication = null, onClick = copyCode)
+                    } else {
+                        Modifier
+                    }
+                )
             }
             Column(
-                modifier = Modifier.width(IntrinsicSize.Max),
+                modifier = Modifier
+                    .width(IntrinsicSize.Max)
+                    .onKeyEvent { event ->
+                        if (!keyboard || event.key != toCode || event.type != KeyEventType.KeyDown) {
+                            return@onKeyEvent false
+                        }
+                        codeFocused = true
+                        codeFocus.requestFocus().also { codeFocused = it }
+                    },
                 verticalArrangement = Arrangement.spacedBy(Space.s)
             ) {
                 update.apkMirrorUrl?.let { url ->
@@ -940,7 +984,7 @@ private fun UpdateCard(
                         enabled = install == null,
                         icon = R.drawable.ic_source_apkmirror,
                         onClick = { onApkMirror(url) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = button(0)
                     )
                 }
                 if (update.playUpdate != null) {
@@ -952,7 +996,7 @@ private fun UpdateCard(
                         progress = install?.progress,
                         icon = R.drawable.ic_source_play,
                         onClick = { onPlay(update) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = button(1)
                     )
                 }
                 if (update.playAvailable) {
@@ -964,7 +1008,7 @@ private fun UpdateCard(
                         progress = install?.progress,
                         icon = R.drawable.ic_source_play,
                         onClick = { onManual(update) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = button(2)
                     )
                 }
             }
