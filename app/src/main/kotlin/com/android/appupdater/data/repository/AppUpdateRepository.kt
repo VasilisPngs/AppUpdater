@@ -27,6 +27,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -82,8 +83,12 @@ class AppUpdateRepository(
 
         val batches = appsToCheck.chunked(API_BATCH_SIZE)
         val (mirrorResults, playResult) = coroutineScope {
-            val play = async { attempt { playCatalog.lookup(appsToCheck.map(InstalledApp::packageName)) } }
-            val mirror = batches.map { batch -> async { attempt { client.appExists(batch.map(InstalledApp::packageName)) } } }
+            val play = async {
+                attempt { runInterruptible { playCatalog.lookup(appsToCheck.map(InstalledApp::packageName)) } }
+            }
+            val mirror = batches.map { batch ->
+                async { attempt { runInterruptible { client.appExists(batch.map(InstalledApp::packageName)) } } }
+            }
             mirror.awaitAll() to play.await()
         }
 
@@ -129,7 +134,9 @@ class AppUpdateRepository(
         val permits = Semaphore(PLAY_CONFIRMATIONS)
         val results = candidates.filterNot { it.isTestBuild }.map { app ->
             async {
-                app.packageName to permits.withPermit { attempt { playCatalog.details(app.packageName).second } }
+                app.packageName to permits.withPermit {
+                    attempt { runInterruptible { playCatalog.details(app.packageName).second } }
+                }
             }
         }.awaitAll()
         PlayConfirmation(
@@ -150,12 +157,14 @@ class AppUpdateRepository(
                     if (update.apkMirrorUrl == null || !update.playAvailable || offerType == null) return@async update to null
                     update to permits.withPermit {
                         attempt {
-                            playCatalog.delivers(
-                                update.packageName,
-                                update.newVersionCode,
-                                offerType,
-                                packageManager.playCertificateHash(update.packageName)
-                            )
+                            runInterruptible {
+                                playCatalog.delivers(
+                                    update.packageName,
+                                    update.newVersionCode,
+                                    offerType,
+                                    packageManager.playCertificateHash(update.packageName)
+                                )
+                            }
                         }
                     }
                 }

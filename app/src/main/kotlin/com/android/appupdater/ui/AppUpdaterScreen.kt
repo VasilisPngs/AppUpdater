@@ -223,6 +223,7 @@ private val ToastGap = 20.dp
 private val ToastEnter = 10.dp
 private val ToastExit = 6.dp
 private val EmptyPadding = 32.dp
+private val FieldPadding = 10.dp
 private val GroupInset = 17.dp
 private val KnobShadowBlur = 6.dp
 private val KnobShadowOffset = 2.dp
@@ -232,6 +233,8 @@ private val FocusRingOffset = 2.dp
 private const val TOAST_MILLIS = 2200L
 private const val LOADING_DELAY_MILLIS = 2000L
 private const val PULSE_MILLIS = 550
+private const val PULSE_SHRINK = 0.14f
+private const val PULSE_FADE = 0.55f
 private const val MAX_VERSION_CODE_DIGITS = 19
 private const val TABULAR_FIGURES = "tnum"
 private const val TOP_BAR_EMS = 3.125f
@@ -298,6 +301,9 @@ fun AppUpdaterScreen(
     var themeSheet by rememberSaveable { mutableStateOf(false) }
     var pendingTheme by remember { mutableStateOf<ThemeMode?>(null) }
     val manualTarget = uiState.updates.firstOrNull { it.packageName == manualPackage }
+    LaunchedEffect(manualTarget == null) {
+        if (manualTarget == null) manualPackage = null
+    }
     val sheetOpen = manualTarget != null || themeSheet
     val closeSheets = {
         manualPackage = null
@@ -329,7 +335,7 @@ fun AppUpdaterScreen(
             toasts.show(
                 when (event) {
                     is InstallEvent.Finished -> installedFormat.format(event.appName)
-                    is InstallEvent.FinishedFromPlay -> installedFromPlayFormat.format(event.appName, event.versionName)
+                    is InstallEvent.FinishedFromPlay -> installedFromPlayFormat.format(event.appName, displayVersion(event.versionName))
                     is InstallEvent.Failed -> failedFormat.format(event.message)
                 }
             )
@@ -607,7 +613,7 @@ private fun UpdatesView(
         }
 
         items(installs.entries.toList(), key = { it.key }) { (_, state) ->
-            Card(style = CardStyle.Tight) {
+            Card(style = CardStyle.Tight, modifier = Modifier.animateItem()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Space.s)
@@ -827,7 +833,7 @@ private fun UpdateCard(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
-    val latestText = stringResource(R.string.version_latest, update.newVersionName, update.newVersionCode)
+    val latestText = stringResource(R.string.version_latest, displayVersion(update.newVersionName), update.newVersionCode)
     val latest = remember(latestText, update.newVersionCode, colors) {
         val code = update.newVersionCode.toString()
         val start = latestText.lastIndexOf(code)
@@ -888,7 +894,7 @@ private fun UpdateCard(
                     text = if (app.versionName.isEmpty()) {
                         stringResource(R.string.version_current_code, app.versionCode)
                     } else {
-                        stringResource(R.string.version_current, app.versionName, app.versionCode)
+                        stringResource(R.string.version_current, displayVersion(app.versionName), app.versionCode)
                     },
                     style = Design.type.muted,
                     color = colors.muted
@@ -1287,7 +1293,7 @@ private fun VersionCodeField(state: TextFieldState, focus: FocusRequester, onDon
                     .defaultMinSize(minHeight = Space.control)
                     .clip(ShapePill)
                     .background(colors.fill)
-                    .padding(horizontal = Space.m, vertical = 10.dp),
+                    .padding(horizontal = Space.m, vertical = FieldPadding),
                 contentAlignment = Alignment.CenterStart
             ) {
                 if (state.text.isEmpty()) {
@@ -1436,29 +1442,30 @@ private fun StatusPill(scanning: Boolean, failed: Boolean, count: Int) {
 }
 
 @Composable
-private fun pulseFactor(): Float {
-    val transition = rememberInfiniteTransition(label = "pulse")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(PULSE_MILLIS, easing = Motion.ease),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-    return progress
-}
-
-@Composable
 private fun StatusDot(color: Color, pulsing: Boolean) {
-    val factor = if (pulsing) pulseFactor() else 0f
+    val pulse = if (pulsing) {
+        rememberInfiniteTransition(label = "pulse").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(PULSE_MILLIS, easing = Motion.ease),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse"
+        )
+    } else {
+        null
+    }
 
     Box(
         modifier = Modifier
             .size(DotSize)
-            .scale(1f - 0.14f * factor)
-            .alpha(1f - 0.55f * factor)
+            .graphicsLayer {
+                val factor = pulse?.value ?: 0f
+                scaleX = 1f - PULSE_SHRINK * factor
+                scaleY = scaleX
+                alpha = 1f - PULSE_FADE * factor
+            }
             .clip(CircleShape)
             .background(color)
     )
@@ -1711,6 +1718,9 @@ private fun Modifier.focusRing(
             )
         }
     }
+
+private fun displayVersion(name: String): String =
+    if (name.length > 1 && name[0].lowercaseChar() == 'v' && name[1].isDigit()) name.substring(1) else name
 
 private fun openUrlInBrowser(context: Context, url: String) {
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }

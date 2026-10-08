@@ -26,11 +26,9 @@ import com.android.appupdater.data.repository.ScanStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -63,7 +61,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     private val playInstaller = PlayInstaller(application.applicationContext, playCatalog, playHttpClient)
     private val _uiState = MutableStateFlow(AppUpdaterUiState())
     private val _themeMode = MutableStateFlow(ThemeMode.System)
-    private val _events = MutableSharedFlow<InstallEvent>(extraBufferCapacity = 16)
+    private val _events = Channel<InstallEvent>(Channel.BUFFERED)
     private val installJobs = ConcurrentHashMap<String, Job>()
     private val packageChanges = Channel<Unit>(Channel.CONFLATED)
     private val packageReceiver = object : BroadcastReceiver() {
@@ -76,7 +74,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
 
     val uiState: StateFlow<AppUpdaterUiState> = _uiState.asStateFlow()
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
-    val events: SharedFlow<InstallEvent> = _events.asSharedFlow()
+    val events: Flow<InstallEvent> = _events.receiveAsFlow()
 
     init {
         application.registerReceiver(
@@ -131,8 +129,8 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         installJobs[key] = viewModelScope.launch {
             bundleInstaller.install(uri) { state ->
                 when (state) {
-                    is InstallState.Success -> _events.tryEmit(InstallEvent.Finished(state.appName))
-                    is InstallState.Error -> _events.tryEmit(InstallEvent.Failed(state.message))
+                    is InstallState.Success -> _events.trySend(InstallEvent.Finished(state.appName))
+                    is InstallState.Error -> _events.trySend(InstallEvent.Failed(state.message))
                     else -> Unit
                 }
                 _uiState.update { it.copy(installs = it.installs + (key to state)) }
@@ -180,7 +178,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
 
             installJobs.remove(packageName)
             _uiState.update { it.copy(playInstalls = it.playInstalls - packageName) }
-            _events.tryEmit(event)
+            _events.trySend(event)
         }
     }
 

@@ -12,6 +12,7 @@ import com.aurora.gplayapi.exceptions.GooglePlayException
 import com.aurora.gplayapi.helpers.PurchaseHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.File
@@ -37,25 +38,28 @@ class PlayInstaller(
             onProgress(null)
             directory.deleteRecursively()
 
-            val (session, details) = catalog.details(packageName)
-            val purchases = PurchaseHelper(session).using(httpClient)
-            val certificate = packageManager.playCertificateHash(packageName)
+            val (libraries, app) = runInterruptible {
+                val (session, details) = catalog.details(packageName)
+                val purchases = PurchaseHelper(session).using(httpClient)
+                val certificate = packageManager.playCertificateHash(packageName)
 
-            val appFiles = deliver(purchases, packageName, versionCode, details.offerType, certificate)
-            val libraryFiles = details.dependencies.dependentLibraries
-                .map { library ->
-                    library.packageName to if (versionCode == details.versionCode) library.versionCode else versionCode
-                }
-                .filter { (name, code) -> name.isNotBlank() && code > 0 && !isSharedLibraryInstalled(name, code) }
-                .map { (name, code) -> name to deliver(purchases, name, code, LIBRARY_OFFER_TYPE, certificate) }
+                val appFiles = deliver(purchases, packageName, versionCode, details.offerType, certificate)
+                val libraryFiles = details.dependencies.dependentLibraries
+                    .map { library ->
+                        library.packageName to if (versionCode == details.versionCode) library.versionCode else versionCode
+                    }
+                    .filter { (name, code) -> name.isNotBlank() && code > 0 && !isSharedLibraryInstalled(name, code) }
+                    .map { (name, code) -> name to deliver(purchases, name, code, LIBRARY_OFFER_TYPE, certificate) }
 
-            val progress = Progress(
-                (appFiles + libraryFiles.flatMap { it.second }).sumOf { it.size }.coerceAtLeast(1),
-                onProgress
-            )
-            val libraries = libraryFiles.map { (name, files) -> download(files, File(directory, name), progress) }
-            val app = download(appFiles, File(directory, packageName), progress)
-            verify(app, packageName, versionCode)
+                val progress = Progress(
+                    (appFiles + libraryFiles.flatMap { it.second }).sumOf { it.size }.coerceAtLeast(1),
+                    onProgress
+                )
+                val libraries = libraryFiles.map { (name, files) -> download(files, File(directory, name), progress) }
+                val app = download(appFiles, File(directory, packageName), progress)
+                verify(app, packageName, versionCode)
+                libraries to app
+            }
 
             onProgress(null)
             libraries.forEach { packageInstaller.install(it.map(::source)).getOrThrow() }
