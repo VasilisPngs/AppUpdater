@@ -464,7 +464,7 @@ fun AppUpdaterScreen(
                     exit = fadeOut(tween(Motion.FAST, easing = LinearEasing)),
                     modifier = Modifier.align(Alignment.Center)
                 ) {
-                    LoadingState()
+                    LoadingIndicator(color = colors.muted, modifier = Modifier.size(LoadingSpinnerSize))
                 }
                 RefreshIndicator(
                     color = colors.muted,
@@ -1302,17 +1302,6 @@ private fun VersionCodeField(state: TextFieldState, focus: FocusRequester, onDon
 private val DigitsOnly = InputTransformation {
     val digits = asCharSequence().filter(Char::isDigit)
     if (digits.length != length) replace(0, length, digits)
-}
-
-@Composable
-private fun LoadingState() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Space.s)
-    ) {
-        LoadingIndicator(color = Design.colors.muted, modifier = Modifier.size(LoadingSpinnerSize))
-        Text(text = stringResource(R.string.loading), style = Design.type.subhead, color = Design.colors.muted)
-    }
 }
 
 @Composable
