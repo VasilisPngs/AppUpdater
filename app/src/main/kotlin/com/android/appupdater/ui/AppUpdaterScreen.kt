@@ -31,6 +31,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
@@ -74,6 +76,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -87,6 +91,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
@@ -104,6 +109,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -118,8 +124,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -181,6 +189,7 @@ import com.android.appupdater.ui.theme.ShapeCard
 import com.android.appupdater.ui.theme.ShapeIcon
 import com.android.appupdater.ui.theme.ShapePill
 import com.android.appupdater.ui.theme.Space
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -238,10 +247,12 @@ private const val TABULAR_FIGURES = "tnum"
 private const val TOP_BAR_EMS = 3.125f
 private const val TAB_ICON_ASPECT = 1.2f
 private const val TITLE_KEY = "title"
+private const val APPEARANCE_KEY = "appearance"
 private const val SHEET_FLICK_DP_PER_SECOND = 500
 private const val SHEET_DRAG_FADE = 0.6f
 private const val GRABBER_ALPHA = 0.28f
 private const val BAR_ITEM_HIDDEN_SCALE = 0.9f
+private const val FOCUS_PIVOT = 0.3f
 
 private enum class AppTab(@StringRes val labelRes: Int, @DrawableRes val iconRes: Int) {
     Updates(R.string.updates, R.drawable.ic_updates),
@@ -417,6 +428,11 @@ fun AppUpdaterScreen(
             bottom = tabBarBottom + tabBarHeight + ContentBottomGap
         )
         val toastBottom = tabBarBottom + tabBarHeight + ToastGap
+        val focusScroll = remember(contentPadding, density) {
+            with(density) {
+                FocusScroll(contentPadding.calculateTopPadding().toPx(), contentPadding.calculateBottomPadding().toPx())
+            }
+        }
 
         Box(
             modifier = Modifier
@@ -431,36 +447,38 @@ fun AppUpdaterScreen(
                 }
         ) {
             Box(modifier = Modifier.fillMaxSize().captureBackdrop(backdrop, colors.background)) {
-                when (selectedTab) {
-                    AppTab.Updates -> {
-                        DisposableEffect(pull) { onDispose(pull::release) }
-                        UpdatesView(
-                            listState = updatesListState,
-                            focus = updatesFocus,
+                CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
+                    when (selectedTab) {
+                        AppTab.Updates -> {
+                            DisposableEffect(pull) { onDispose(pull::release) }
+                            UpdatesView(
+                                listState = updatesListState,
+                                focus = updatesFocus,
+                                contentPadding = contentPadding,
+                                loaded = uiState.loaded,
+                                notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
+                                updates = updates,
+                                installs = uiState.installs,
+                                playInstalls = uiState.playInstalls,
+                                onApkMirror = { openUrlInBrowser(context, it) },
+                                onPlay = viewModel::updateFromPlay,
+                                onManual = { manualPackage = it.packageName },
+                                modifier = Modifier
+                                    .nestedScroll(pull)
+                                    .graphicsLayer { translationY = pull.offset }
+                            )
+                        }
+                        AppTab.Settings -> SettingsView(
+                            listState = settingsListState,
+                            focus = settingsFocus,
                             contentPadding = contentPadding,
-                            loaded = uiState.loaded,
-                            notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
-                            updates = updates,
-                            installs = uiState.installs,
-                            playInstalls = uiState.playInstalls,
-                            onApkMirror = { openUrlInBrowser(context, it) },
-                            onPlay = viewModel::updateFromPlay,
-                            onManual = { manualPackage = it.packageName },
-                            modifier = Modifier
-                                .nestedScroll(pull)
-                                .graphicsLayer { translationY = pull.offset }
+                            themeMode = themeMode,
+                            includeDisabledApps = uiState.includeDisabledApps,
+                            onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
+                            onTheme = { themeSheet = true },
+                            onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
                         )
                     }
-                    AppTab.Settings -> SettingsView(
-                        listState = settingsListState,
-                        focus = settingsFocus,
-                        contentPadding = contentPadding,
-                        themeMode = themeMode,
-                        includeDisabledApps = uiState.includeDisabledApps,
-                        onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                        onTheme = { themeSheet = true },
-                        onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
-                    )
                 }
                 AnimatedVisibility(
                     visible = loadingShown && selectedTab == AppTab.Updates,
@@ -584,6 +602,9 @@ private fun UpdatesView(
     onManual: (AppUpdateInfo) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val firstKey = updates.firstOrNull()?.first?.packageName
+    val reveal = rememberTitleReveal(listState, firstKey)
+
     LazyColumn(
         state = listState,
         modifier = modifier
@@ -645,7 +666,9 @@ private fun UpdatesView(
                 onApkMirror = onApkMirror,
                 onPlay = onPlay,
                 onManual = onManual,
-                modifier = Modifier.animateItem()
+                modifier = Modifier
+                    .animateItem()
+                    .then(if (pair.first.packageName == firstKey) Modifier.revealTitle(reveal) else Modifier)
             )
         }
     }
@@ -663,6 +686,7 @@ private fun SettingsView(
     onPickBundle: () -> Unit
 ) {
     val colors = Design.colors
+    val reveal = rememberTitleReveal(listState, APPEARANCE_KEY)
     LazyColumn(
         state = listState,
         modifier = Modifier
@@ -676,8 +700,8 @@ private fun SettingsView(
             Text(text = stringResource(R.string.settings), style = Design.type.h1, color = colors.text)
         }
 
-        item(key = "appearance") {
-            Group(heading = stringResource(R.string.appearance)) {
+        item(key = APPEARANCE_KEY) {
+            Group(heading = stringResource(R.string.appearance), modifier = Modifier.revealTitle(reveal)) {
                 Card(style = CardStyle.Flush) {
                     ListRow(onClick = onTheme) {
                         Text(
@@ -744,12 +768,13 @@ private fun SettingsView(
 
 @Composable
 private fun Group(
+    modifier: Modifier = Modifier,
     heading: String? = null,
     note: String? = null,
     content: @Composable () -> Unit
 ) {
     val colors = Design.colors
-    Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Space.s)) {
         if (heading != null) {
             Text(
                 text = heading,
@@ -1679,6 +1704,48 @@ private fun Modifier.focusRing(
             )
         }
     }
+
+private class TitleReveal(val requester: BringIntoViewRequester, val scope: CoroutineScope) {
+    var reach = 0
+    var height = 0
+}
+
+@Composable
+private fun rememberTitleReveal(listState: LazyListState, key: Any?): TitleReveal {
+    val scope = rememberCoroutineScope()
+    val reveal = remember(scope) { TitleReveal(BringIntoViewRequester(), scope) }
+    val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
+
+    LaunchedEffect(listState, key, keyboard) {
+        if (!keyboard) return@LaunchedEffect
+        snapshotFlow {
+            val items = listState.layoutInfo.visibleItemsInfo
+            val title = items.firstOrNull { it.key == TITLE_KEY }
+            val item = items.firstOrNull { it.key == key }
+            if (title != null && item != null) item.offset - title.offset else null
+        }.collect { distance -> if (distance != null) reveal.reach = distance }
+    }
+    return reveal
+}
+
+private fun Modifier.revealTitle(reveal: TitleReveal): Modifier =
+    bringIntoViewRequester(reveal.requester)
+        .onSizeChanged { reveal.height = it.height }
+        .onFocusEvent { state ->
+            if (state.hasFocus) {
+                reveal.scope.launch {
+                    reveal.requester.bringIntoView(Rect(0f, -reveal.reach.toFloat(), 1f, reveal.height.toFloat()))
+                }
+            }
+        }
+
+private class FocusScroll(private val top: Float, private val bottom: Float) : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        val end = containerSize - bottom
+        if (offset >= top && offset + size <= end) return 0f
+        return offset - (containerSize * FOCUS_PIVOT).coerceIn(top, maxOf(top, end - size))
+    }
+}
 
 private fun displayVersion(name: String): String =
     if (name.length > 1 && name[0].lowercaseChar() == 'v' && name[1].isDigit()) name.substring(1) else name
