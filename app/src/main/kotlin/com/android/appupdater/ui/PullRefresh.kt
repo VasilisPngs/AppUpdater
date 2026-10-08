@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -34,6 +36,7 @@ import kotlin.math.min
 
 internal val PullBand = 60.dp
 internal val PullSpinnerSize = 30.dp
+internal val LoadingSpinnerSize = 32.dp
 private val PullStart = 40.dp
 private val PullTrigger = 150.dp
 private const val RUBBER = 0.55f
@@ -45,6 +48,9 @@ private const val FORM_STEP = 0.25f
 private const val HALF_TURN = 180f
 private const val FULL_TURN = 360f
 private const val SPIN_STEP = Motion.SPIN / SPOKES
+private const val LOADING_STEP_MILLIS = 100L
+private const val LOADING_TAIL = 4
+private const val LOADING_FLOOR = 0.41f
 
 internal class PullRefreshState(
     private val scope: CoroutineScope,
@@ -184,7 +190,7 @@ internal fun rememberPullRefreshState(atTop: () -> Boolean, onRefresh: () -> Uni
 }
 
 @Composable
-internal fun ActivityIndicator(
+internal fun RefreshIndicator(
     color: Color,
     spinning: Boolean,
     progress: () -> Float,
@@ -205,8 +211,6 @@ internal fun ActivityIndicator(
     }
 
     Canvas(modifier = modifier) {
-        val radius = size.minDimension / 2
-        val width = radius * SPOKE_WIDTH
         val time = clock.longValue
         val turn = min(1f, time.toFloat() / Motion.SPIN)
         val settle = turn * (2f - turn)
@@ -215,23 +219,50 @@ internal fun ActivityIndicator(
         val lead = 1f - (1f - formed) * (1f - formed)
         val step = FORM_STEP * min(1f, 2f * (1f - formed))
         rotate(HALF_TURN * settle) {
-            repeat(SPOKES) { index ->
-                val alpha = if (spinning) {
+            spokes(color) { index ->
+                if (spinning) {
                     1f - (head - index).mod(SPOKES) * SPOKE_FADE * settle
                 } else {
                     (lead - index * step).coerceIn(0f, 1f)
                 }
-                if (alpha > 0f) {
-                    rotate(index * FULL_TURN / SPOKES) {
-                        drawLine(
-                            color = color.copy(alpha = color.alpha * alpha),
-                            start = Offset(center.x, center.y - radius * SPOKE_INNER - width / 2),
-                            end = Offset(center.x, center.y - radius + width / 2),
-                            strokeWidth = width,
-                            cap = StrokeCap.Round
-                        )
-                    }
-                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun LoadingIndicator(color: Color, modifier: Modifier = Modifier) {
+    val head = remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(LOADING_STEP_MILLIS)
+            head.intValue = (head.intValue + 1) % SPOKES
+        }
+    }
+
+    Canvas(modifier = modifier) {
+        spokes(color) { index ->
+            val trail = (head.intValue - index).mod(SPOKES)
+            if (trail < LOADING_TAIL) 1f - trail * SPOKE_FADE else LOADING_FLOOR
+        }
+    }
+}
+
+private inline fun DrawScope.spokes(color: Color, alpha: (Int) -> Float) {
+    val radius = size.minDimension / 2
+    val width = radius * SPOKE_WIDTH
+    repeat(SPOKES) { index ->
+        val value = alpha(index)
+        if (value > 0f) {
+            rotate(index * FULL_TURN / SPOKES) {
+                drawLine(
+                    color = color.copy(alpha = color.alpha * value),
+                    start = Offset(center.x, center.y - radius * SPOKE_INNER - width / 2),
+                    end = Offset(center.x, center.y - radius + width / 2),
+                    strokeWidth = width,
+                    cap = StrokeCap.Round
+                )
             }
         }
     }

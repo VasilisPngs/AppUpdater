@@ -46,6 +46,7 @@ sealed interface InstallEvent {
 
 data class AppUpdaterUiState(
     val scanStatus: ScanStatus = ScanStatus.Scanning,
+    val loaded: Boolean = false,
     val installedApps: List<InstalledApp> = emptyList(),
     val updates: List<AppUpdateInfo> = emptyList(),
     val includeDisabledApps: Boolean = false,
@@ -114,9 +115,9 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
                     when (status) {
                         ScanStatus.Scanning -> current.copy(scanStatus = status)
                         is ScanStatus.Success ->
-                            current.copy(scanStatus = status, updates = status.updates)
+                            current.copy(scanStatus = status, loaded = true, updates = status.updates)
                         is ScanStatus.Error ->
-                            current.copy(scanStatus = status, updates = status.partialUpdates)
+                            current.copy(scanStatus = status, loaded = true, updates = status.partialUpdates)
                     }
                 }
             }

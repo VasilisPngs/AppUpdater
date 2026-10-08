@@ -10,6 +10,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animate
@@ -229,6 +230,7 @@ private val KnobShadow = Color(0x4D000000)
 private val FocusRingWidth = 2.dp
 private val FocusRingOffset = 2.dp
 private const val TOAST_MILLIS = 2200L
+private const val LOADING_DELAY_MILLIS = 2000L
 private const val PULSE_MILLIS = 550
 private const val MAX_VERSION_CODE_DIGITS = 19
 private const val TABULAR_FIGURES = "tnum"
@@ -363,7 +365,17 @@ fun AppUpdaterScreen(
         }
     }
     val scanning = uiState.scanStatus == ScanStatus.Scanning
-    val refreshing = scanning && selectedTab == AppTab.Updates
+    val loading = scanning && !uiState.loaded
+    val refreshing = scanning && uiState.loaded && selectedTab == AppTab.Updates
+    var loadingShown by remember { mutableStateOf(false) }
+
+    LaunchedEffect(loading) {
+        loadingShown = false
+        if (loading) {
+            delay(LOADING_DELAY_MILLIS)
+            loadingShown = true
+        }
+    }
     val selectTab: (AppTab) -> Unit = { tab ->
         val state = if (tab == AppTab.Updates) updatesListState else settingsListState
         if (tab != selectedTab) {
@@ -379,7 +391,7 @@ fun AppUpdaterScreen(
             if (inputModeManager.inputMode == InputMode.Keyboard) tabFocus.requestFocus()
         }
         SideEffect {
-            pull.enabled = selectedTab == AppTab.Updates && inputModeManager.inputMode == InputMode.Touch
+            pull.enabled = selectedTab == AppTab.Updates && uiState.loaded && inputModeManager.inputMode == InputMode.Touch
             pull.extent = constraints.maxHeight.toFloat()
             pull.update(refreshing)
         }
@@ -422,7 +434,7 @@ fun AppUpdaterScreen(
                             listState = updatesListState,
                             focus = updatesFocus,
                             contentPadding = contentPadding,
-                            scanning = scanning,
+                            loaded = uiState.loaded,
                             notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
                             updates = updates,
                             installs = uiState.installs,
@@ -446,7 +458,15 @@ fun AppUpdaterScreen(
                         onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
                     )
                 }
-                ActivityIndicator(
+                AnimatedVisibility(
+                    visible = loadingShown && selectedTab == AppTab.Updates,
+                    enter = fadeIn(tween(Motion.FAST, easing = LinearEasing)),
+                    exit = fadeOut(tween(Motion.FAST, easing = LinearEasing)),
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    LoadingState()
+                }
+                RefreshIndicator(
                     color = colors.muted,
                     spinning = refreshing,
                     progress = { pull.progress },
@@ -549,7 +569,7 @@ private fun UpdatesView(
     listState: LazyListState,
     focus: FocusRequester,
     contentPadding: PaddingValues,
-    scanning: Boolean,
+    loaded: Boolean,
     notice: String?,
     updates: List<Pair<InstalledApp, AppUpdateInfo>>,
     installs: Map<String, InstallState>,
@@ -604,8 +624,8 @@ private fun UpdatesView(
             }
         }
 
-        if (updates.isEmpty() && !scanning) {
-            item(key = "empty") { EmptyState(stringResource(R.string.all_up_to_date)) }
+        if (updates.isEmpty() && loaded) {
+            item(key = "empty") { EmptyState(stringResource(R.string.all_up_to_date), Modifier.animateItem()) }
         }
 
         items(items = updates, key = { it.first.packageName }) { pair ->
@@ -1285,8 +1305,19 @@ private val DigitsOnly = InputTransformation {
 }
 
 @Composable
-private fun EmptyState(text: String) {
-    Card(style = CardStyle.Flush) {
+private fun LoadingState() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Space.s)
+    ) {
+        LoadingIndicator(color = Design.colors.muted, modifier = Modifier.size(LoadingSpinnerSize))
+        Text(text = stringResource(R.string.loading), style = Design.type.subhead, color = Design.colors.muted)
+    }
+}
+
+@Composable
+private fun EmptyState(text: String, modifier: Modifier = Modifier) {
+    Card(style = CardStyle.Flush, modifier = modifier) {
         Text(
             text = text,
             style = Design.type.muted,
