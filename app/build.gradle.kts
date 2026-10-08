@@ -55,4 +55,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.aurora.gplayapi)
+    androidLintTool(platform(libs.asm.bom))
 }

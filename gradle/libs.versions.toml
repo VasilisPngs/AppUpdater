@@ -8,6 +8,7 @@ okhttp = "5.5.0"
 kotlinxCoroutines = "1.11.0"
 kotlinxSerialization = "1.12.0-RC"
 gplayapi = "3.6.4"
+asm = "9.10.1"
 
 [libraries]
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -20,6 +21,7 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 aurora-gplayapi = { group = "com.auroraoss", name = "gplayapi", version.ref = "gplayapi" }
+asm-bom = { group = "org.ow2.asm", name = "asm-bom", version.ref = "asm" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
