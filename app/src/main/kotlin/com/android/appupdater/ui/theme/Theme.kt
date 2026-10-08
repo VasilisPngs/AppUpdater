@@ -163,6 +163,7 @@ object Motion {
     const val NORMAL = 240
     const val SPRING = 400
     const val SHEET = 480
+    const val SPIN = 1000
 }
 
 object Space {

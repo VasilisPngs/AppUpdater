@@ -10,6 +10,8 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animate
@@ -17,6 +19,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -186,7 +189,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
+import kotlin.math.ceil
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 private val TabBarInset = 21.dp
 private val TabBarPaddingVertical = 3.dp
@@ -239,6 +244,8 @@ private const val SHEET_FLICK_DP_PER_SECOND = 500
 private const val SHEET_DRAG_FADE = 0.6f
 private const val GRABBER_ALPHA = 0.28f
 private const val PILL_HIDDEN_SCALE = 0.9f
+private const val FULL_TURN = 360f
+private const val SETTLE_TURN = 120f
 
 private enum class AppTab(@StringRes val labelRes: Int, @DrawableRes val iconRes: Int) {
     Updates(R.string.updates, R.drawable.ic_updates),
@@ -1002,7 +1009,8 @@ private fun BarButton(
     backdrop: GraphicsLayer,
     observe: () -> Unit,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    spinning: Boolean = false
 ) {
     val colors = Design.colors
     val interaction = remember { MutableInteractionSource() }
@@ -1013,6 +1021,29 @@ private fun BarButton(
         animationSpec = tween(Motion.FAST, easing = Motion.ease),
         label = "press"
     )
+    val rotation = remember { Animatable(0f) }
+
+    LaunchedEffect(spinning) {
+        if (spinning) {
+            while (true) {
+                val remaining = FULL_TURN - rotation.value
+                rotation.animateTo(FULL_TURN, tween((remaining / FULL_TURN * Motion.SPIN).roundToInt(), easing = LinearEasing))
+                rotation.snapTo(0f)
+            }
+        } else if (rotation.value != 0f) {
+            val target = ceil((rotation.value + SETTLE_TURN) / FULL_TURN) * FULL_TURN
+            val settle = target - SETTLE_TURN
+            val cruise = ((settle - rotation.value) / FULL_TURN * Motion.SPIN).roundToInt()
+            rotation.animateTo(
+                target,
+                keyframes {
+                    durationMillis = cruise + Motion.SHEET
+                    settle at cruise using Motion.easeSheet
+                }
+            )
+            rotation.snapTo(0f)
+        }
+    }
 
     BackdropSurface(
         backdrop = backdrop,
@@ -1036,7 +1067,10 @@ private fun BarButton(
             painter = painterResource(icon),
             contentDescription = null,
             tint = colors.text,
-            modifier = Modifier.align(Alignment.Center).size(BarIconSize)
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(BarIconSize)
+                .graphicsLayer { rotationZ = rotation.value }
         )
     }
 }
@@ -1345,7 +1379,8 @@ private fun TopBar(
                     backdrop = backdrop,
                     observe = observe,
                     onClick = onRefresh,
-                    modifier = Modifier.focusProperties { down = listFocus }
+                    modifier = Modifier.focusProperties { down = listFocus },
+                    spinning = scanning
                 )
             },
             modifier = Modifier
