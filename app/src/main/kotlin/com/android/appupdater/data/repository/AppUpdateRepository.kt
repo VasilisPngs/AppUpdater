@@ -239,7 +239,7 @@ class AppUpdateRepository(
         if (!isStableRelease(app.versionName)) return null
         val releaseNumbers = versionNumbers(app.versionName)
         if (isInstalledVersion(releaseNumbers, installed)) return null
-        val apk = bestApk(app.apks, installed, releaseNumbers, requiresTelevisionBuild) ?: return null
+        val apk = bestApk(app.apks, installed, releaseNumbers, requiresTelevisionBuild, variantDigits(app, installed)) ?: return null
         return MirrorCandidate(
             apk = apk,
             versionName = fullVersionName(apk, app.versionName),
@@ -263,10 +263,12 @@ class AppUpdateRepository(
         apks: List<ApkMirrorApk>,
         installed: InstalledApp,
         releaseNumbers: List<String>,
-        requiresTelevisionBuild: Boolean
+        requiresTelevisionBuild: Boolean,
+        variantDigits: Int
     ): ApkMirrorApk? = apks
         .asSequence()
         .filter { it.versionCode > installed.versionCode }
+        .filter { variantSuffix(it.versionCode, installed.versionCode, variantDigits) >= variantDigits }
         .filter { it.minimumApi <= Build.VERSION.SDK_INT }
         .filter { isStableLink(it.link, releaseNumbers) }
         .filter { matchesFlavour(it, installed, releaseNumbers) }
@@ -274,14 +276,14 @@ class AppUpdateRepository(
         .filter { matchesSignature(it, installed) }
         .filter { abiRank(it) != UNSUPPORTED_ABI }
         .minWithOrNull(
-            compareByDescending<ApkMirrorApk> { variantSuffix(it.versionCode, installed.versionCode) }
+            compareByDescending<ApkMirrorApk> { variantSuffix(it.versionCode, installed.versionCode, MIN_VARIANT_SUFFIX) }
                 .thenBy(::abiRank)
                 .thenBy(::densityRank)
                 .thenByDescending(ApkMirrorApk::minimumApi)
                 .thenByDescending(ApkMirrorApk::versionCode)
         )
 
-    private fun variantSuffix(versionCode: Long, installedVersionCode: Long): Int {
+    private fun variantSuffix(versionCode: Long, installedVersionCode: Long, minimum: Int): Int {
         var candidate = versionCode
         var current = installedVersionCode
         var matched = 0
@@ -290,8 +292,51 @@ class AppUpdateRepository(
             candidate /= 10
             current /= 10
         }
-        return if (matched >= MIN_VARIANT_SUFFIX) matched else 0
+        return if (matched >= minimum) matched else 0
     }
+
+    private fun variantDigits(app: ApkMirrorApp, installed: InstalledApp): Int {
+        var digits = 0
+        app.apks.forEachIndexed { index, apk ->
+            for (other in app.apks.subList(index + 1, app.apks.size)) {
+                val width = differingDigits(apk.versionCode, other.versionCode)
+                if (width in 1..MAX_VARIANT_DIGITS && !apk.sameTarget(other)) digits = maxOf(digits, width)
+            }
+        }
+        if (digits == 0) return 0
+        val named = codeSuffix(app.versionName, app.apks.maxOf(ApkMirrorApk::versionCode))
+        return if (named != null && named <= MAX_VARIANT_DIGITS && named == codeSuffix(installed.versionName, installed.versionCode)) {
+            maxOf(digits, named)
+        } else {
+            digits
+        }
+    }
+
+    private fun codeSuffix(versionName: String, versionCode: Long): Int? {
+        val prefix = LEADING_VERSION.find(versionName.trim())?.value?.replace(".", "") ?: return null
+        val code = versionCode.toString()
+        return (code.length - prefix.length).takeIf { it > 0 && code.startsWith(prefix) }
+    }
+
+    private fun differingDigits(first: Long, second: Long): Int {
+        var a = first
+        var b = second
+        var position = 0
+        var width = 0
+        while (a > 0 || b > 0) {
+            position++
+            if (a % 10 != b % 10) width = position
+            a /= 10
+            b /= 10
+        }
+        return width
+    }
+
+    private fun ApkMirrorApk.sameTarget(other: ApkMirrorApk): Boolean =
+        architectures.toSet() == other.architectures.toSet() &&
+            densities.toSet() == other.densities.toSet() &&
+            minimumApi == other.minimumApi &&
+            capabilities.toSet() == other.capabilities.toSet()
 
     private fun fullVersionName(apk: ApkMirrorApk, releaseVersion: String): String {
         val description = apk.description.trim().substringBefore('\n').trim()
@@ -448,6 +493,8 @@ class AppUpdateRepository(
         const val AUTOMOTIVE = "automotive"
         const val PLAY_CONFIRMATIONS = 4
         const val MIN_VARIANT_SUFFIX = 2
+        const val MAX_VARIANT_DIGITS = 3
+        val LEADING_VERSION = Regex("^\\d+(?:\\.\\d+)*")
         val VERSION_SEPARATORS = charArrayOf('.', '-', ' ', '(', ')', '[', ']')
         val NEUTRAL_TOKENS = setOf("android", "apk", "bundle", "download", "arm", "armeabi", "universal", "noarch", "nodpi")
         val DENSITY_BUCKETS = listOf(
