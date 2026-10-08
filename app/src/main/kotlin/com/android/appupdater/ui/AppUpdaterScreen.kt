@@ -280,6 +280,8 @@ fun AppUpdaterScreen(
     val settingsListState = rememberLazyListState()
     val updatesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
+    val tabFocus = remember { FocusRequester() }
+    val inputModeManager = LocalInputModeManager.current
     val coroutineScope = rememberCoroutineScope()
     val toasts = remember { mutableStateListOf<Toast>() }
     val backdrop = rememberGraphicsLayer()
@@ -368,6 +370,9 @@ fun AppUpdaterScreen(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        LaunchedEffect(Unit) {
+            if (inputModeManager.inputMode == InputMode.Keyboard) tabFocus.requestFocus()
+        }
         val wideSheet = maxWidth >= WideSheetBreakpoint
         val topInset = insets.calculateTopPadding()
         val bottomInset = insets.calculateBottomPadding()
@@ -405,7 +410,7 @@ fun AppUpdaterScreen(
                     isRefreshing = false,
                     onRefresh = viewModel::scanForUpdates,
                     state = pullState,
-                    enabled = selectedTab == AppTab.Updates && LocalInputModeManager.current.inputMode == InputMode.Touch,
+                    enabled = selectedTab == AppTab.Updates && inputModeManager.inputMode == InputMode.Touch,
                     indicator = {
                         Box(
                             modifier = Modifier
@@ -463,6 +468,7 @@ fun AppUpdaterScreen(
 
             TabBar(
                 backdrop = backdrop,
+                focus = tabFocus,
                 listFocus = activeFocus,
                 observe = { activeListState.firstVisibleItemScrollOffset },
                 selectedTab = selectedTab,
@@ -1422,6 +1428,7 @@ private fun StatusDot(color: Color, pulsing: Boolean) {
 @Composable
 private fun TabBar(
     backdrop: GraphicsLayer,
+    focus: FocusRequester,
     listFocus: FocusRequester,
     observe: () -> Unit,
     selectedTab: AppTab,
@@ -1474,6 +1481,7 @@ private fun TabBar(
                     selected = tab == selectedTab,
                     modifier = Modifier
                         .weight(1f)
+                        .then(if (tab == selectedTab) Modifier.focusRequester(focus) else Modifier)
                         .focusProperties { up = listFocus },
                     onClick = { onSelect(tab) }
                 )
