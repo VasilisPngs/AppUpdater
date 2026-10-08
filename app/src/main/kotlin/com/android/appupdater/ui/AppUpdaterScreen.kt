@@ -21,6 +21,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
@@ -236,6 +238,7 @@ private const val TITLE_KEY = "title"
 private const val SHEET_FLICK_DP_PER_SECOND = 500
 private const val SHEET_DRAG_FADE = 0.6f
 private const val GRABBER_ALPHA = 0.28f
+private const val PILL_HIDDEN_SCALE = 0.9f
 
 private enum class AppTab(@StringRes val labelRes: Int, @DrawableRes val iconRes: Int) {
     Updates(R.string.updates, R.drawable.ic_updates),
@@ -1295,6 +1298,9 @@ private fun TopBar(
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "title"
     )
+    val pillCount = remember { IntArray(1) }
+    if (count > 0) pillCount[0] = count
+    val shownCount = pillCount[0]
     Box(modifier = Modifier.fillMaxWidth()) {
         BackdropSurface(
             backdrop = backdrop,
@@ -1309,18 +1315,16 @@ private fun TopBar(
         )
         Layout(
             content = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Space.s),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StatusPill(scanning = scanning, failed = failed, count = count)
-                    BarButton(
-                        icon = R.drawable.ic_refresh,
-                        backdrop = backdrop,
-                        observe = observe,
-                        onClick = onRefresh,
-                        modifier = Modifier.focusProperties { down = listFocus }
-                    )
+                Box {
+                    AnimatedVisibility(
+                        visible = count > 0,
+                        enter = fadeIn(tween(Motion.NORMAL, easing = Motion.ease)) +
+                            scaleIn(tween(Motion.SPRING, easing = Motion.easeSpring), initialScale = PILL_HIDDEN_SCALE),
+                        exit = fadeOut(tween(Motion.FAST, easing = Motion.ease)) +
+                            scaleOut(tween(Motion.FAST, easing = Motion.ease), targetScale = PILL_HIDDEN_SCALE)
+                    ) {
+                        StatusPill(scanning = scanning, failed = failed, count = shownCount)
+                    }
                 }
                 Text(
                     text = title,
@@ -1329,6 +1333,13 @@ private fun TopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.graphicsLayer { alpha = titleAlpha }
+                )
+                BarButton(
+                    icon = R.drawable.ic_refresh,
+                    backdrop = backdrop,
+                    observe = observe,
+                    onClick = onRefresh,
+                    modifier = Modifier.focusProperties { down = listFocus }
                 )
             },
             modifier = Modifier
@@ -1339,12 +1350,19 @@ private fun TopBar(
             val gap = Space.m.roundToPx()
             val loose = constraints.copy(minWidth = 0, minHeight = 0)
             val start = measurables[0].measure(loose)
+            val end = measurables[2].measure(loose)
             val available = (constraints.maxWidth - gap * 2).coerceAtLeast(0)
-            val heading = measurables[1].measure(loose.copy(maxWidth = (available - start.width).coerceAtLeast(0)))
-            val column = maxOf((available - heading.width) / 2, start.width)
+            val heading = measurables[1].measure(loose.copy(maxWidth = (available - start.width - end.width).coerceAtLeast(0)))
+            val free = available - heading.width
+            val column = when {
+                start.width > free / 2 -> start.width
+                end.width > free / 2 -> free - end.width
+                else -> free / 2
+            }
             layout(constraints.maxWidth, constraints.maxHeight) {
                 start.placeRelative(0, (constraints.maxHeight - start.height) / 2)
                 heading.placeRelative(column + gap, (constraints.maxHeight - heading.height) / 2)
+                end.placeRelative(constraints.maxWidth - end.width, (constraints.maxHeight - end.height) / 2)
             }
         }
     }
@@ -1353,11 +1371,6 @@ private fun TopBar(
 @Composable
 private fun StatusPill(scanning: Boolean, failed: Boolean, count: Int) {
     val colors = Design.colors
-    val dotColor = when {
-        failed -> colors.danger
-        scanning -> colors.accent
-        else -> colors.success
-    }
     Row(
         modifier = Modifier
             .defaultMinSize(minHeight = Space.controlSmall)
@@ -1367,13 +1380,9 @@ private fun StatusPill(scanning: Boolean, failed: Boolean, count: Int) {
         horizontalArrangement = Arrangement.spacedBy(PillGap),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        StatusDot(color = dotColor, pulsing = scanning)
+        StatusDot(color = if (failed) colors.danger else colors.warning, pulsing = scanning)
         Text(
-            text = when {
-                scanning -> stringResource(R.string.status_checking)
-                count == 0 -> stringResource(R.string.status_up_to_date)
-                else -> pluralStringResource(R.plurals.status_updates, count, count)
-            },
+            text = pluralStringResource(R.plurals.status_updates, count, count),
             style = Design.type.pill,
             color = colors.text,
             maxLines = 1
