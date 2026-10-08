@@ -75,6 +75,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -148,7 +149,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -249,6 +249,9 @@ private const val PULSE_MILLIS = 550
 private const val PULSE_SHRINK = 0.14f
 private const val PULSE_FADE = 0.55f
 private const val MAX_VERSION_CODE_DIGITS = 19
+private const val APKMIRROR_SLOT = 0
+private const val PLAY_SLOT = 1
+private const val MANUAL_SLOT = 2
 private const val BUTTON_SLOTS = 3
 private const val TABULAR_FIGURES = "tnum"
 private const val TOP_BAR_EMS = 3.125f
@@ -471,7 +474,7 @@ fun AppUpdaterScreen(
                                 onPlay = viewModel::updateFromPlay,
                                 onManual = { manualPackage = it.packageName },
                                 modifier = Modifier
-                                    .nestedScroll(pull)
+                                    .pullRefresh(pull)
                                     .graphicsLayer { translationY = pull.offset }
                             )
                         }
@@ -611,13 +614,16 @@ private fun UpdatesView(
 ) {
     val firstKey = updates.firstOrNull()?.first?.packageName
     val reveal = rememberTitleReveal(listState, firstKey)
+    val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
+    val codes = remember(keyboard) { CodeFocus() }
 
     LazyColumn(
         state = listState,
         modifier = modifier
             .fillMaxSize()
             .focusRequester(focus)
-            .focusRestorer(),
+            .focusRestorer()
+            .onFocusChanged { if (!it.hasFocus) codes.active = false },
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Space.l)
     ) {
@@ -665,11 +671,15 @@ private fun UpdatesView(
             item(key = "empty") { EmptyState(stringResource(R.string.all_up_to_date), Modifier.animateItem()) }
         }
 
-        items(items = updates, key = { it.first.packageName }) { pair ->
+        itemsIndexed(items = updates, key = { _, pair -> pair.first.packageName }) { index, pair ->
             UpdateCard(
                 app = pair.first,
                 update = pair.second,
                 install = playInstalls[pair.first.packageName],
+                keyboard = keyboard,
+                codes = codes,
+                first = index == 0,
+                last = index == updates.lastIndex,
                 onApkMirror = onApkMirror,
                 onPlay = onPlay,
                 onManual = onManual,
@@ -859,6 +869,10 @@ private fun UpdateCard(
     app: InstalledApp,
     update: AppUpdateInfo,
     install: PlayInstall?,
+    keyboard: Boolean,
+    codes: CodeFocus,
+    first: Boolean,
+    last: Boolean,
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
     onManual: (AppUpdateInfo) -> Unit,
@@ -868,17 +882,29 @@ private fun UpdateCard(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
-    val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
-    val toCode = if (LocalLayoutDirection.current == LayoutDirection.Ltr) Key.DirectionLeft else Key.DirectionRight
+    val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
+    val toCode = if (ltr) Key.DirectionLeft else Key.DirectionRight
+    val toButtons = if (ltr) Key.DirectionRight else Key.DirectionLeft
     val codeFocus = remember { FocusRequester() }
     val buttonFocus = remember { List(BUTTON_SLOTS) { FocusRequester() } }
     var codeFocused by remember(keyboard) { mutableStateOf(false) }
-    var lastButton by remember { mutableIntStateOf(0) }
+    var lastButton by remember { mutableIntStateOf(-1) }
+    val slots = remember(update) {
+        listOfNotNull(
+            APKMIRROR_SLOT.takeIf { update.apkMirrorUrl != null },
+            PLAY_SLOT.takeIf { update.playUpdate != null },
+            MANUAL_SLOT.takeIf { update.playAvailable }
+        )
+    }
     val button: (Int) -> Modifier = { slot ->
         Modifier
             .fillMaxWidth()
             .focusRequester(buttonFocus[slot])
+            .focusProperties { if (codes.active) canFocus = false }
             .onFocusChanged { if (it.isFocused) lastButton = slot }
+    }
+    DisposableEffect(codes) {
+        onDispose { if (codeFocused) codes.active = false }
     }
     val code = update.newVersionCode.toString()
     val copyCode: () -> Unit = {
@@ -955,8 +981,17 @@ private fun UpdateCard(
                         Modifier
                             .focusRequester(codeFocus)
                             .focusProperties {
-                                canFocus = codeFocused
-                                end = buttonFocus[lastButton]
+                                if (!codes.active) canFocus = false
+                                up = if (first) FocusRequester.Cancel else FocusRequester.Default
+                                down = if (last) FocusRequester.Cancel else FocusRequester.Default
+                                start = FocusRequester.Cancel
+                            }
+                            .onKeyEvent { event ->
+                                if (event.key != toButtons || event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                                val slot = lastButton.takeIf { it in slots } ?: slots.firstOrNull() ?: return@onKeyEvent true
+                                codes.active = false
+                                buttonFocus[slot].requestFocus()
+                                true
                             }
                             .onFocusChanged { codeFocused = it.isFocused }
                             .clickable(interactionSource = null, indication = null, onClick = copyCode)
@@ -972,8 +1007,8 @@ private fun UpdateCard(
                         if (!keyboard || event.key != toCode || event.type != KeyEventType.KeyDown) {
                             return@onKeyEvent false
                         }
-                        codeFocused = true
-                        codeFocus.requestFocus().also { codeFocused = it }
+                        codes.active = true
+                        codeFocus.requestFocus().also { if (!it) codes.active = false }
                     },
                 verticalArrangement = Arrangement.spacedBy(Space.s)
             ) {
@@ -984,7 +1019,7 @@ private fun UpdateCard(
                         enabled = install == null,
                         icon = R.drawable.ic_source_apkmirror,
                         onClick = { onApkMirror(url) },
-                        modifier = button(0)
+                        modifier = button(APKMIRROR_SLOT)
                     )
                 }
                 if (update.playUpdate != null) {
@@ -996,7 +1031,7 @@ private fun UpdateCard(
                         progress = install?.progress,
                         icon = R.drawable.ic_source_play,
                         onClick = { onPlay(update) },
-                        modifier = button(1)
+                        modifier = button(PLAY_SLOT)
                     )
                 }
                 if (update.playAvailable) {
@@ -1008,7 +1043,7 @@ private fun UpdateCard(
                         progress = install?.progress,
                         icon = R.drawable.ic_source_play,
                         onClick = { onManual(update) },
-                        modifier = button(2)
+                        modifier = button(MANUAL_SLOT)
                     )
                 }
             }
@@ -1782,6 +1817,10 @@ private fun Modifier.revealTitle(reveal: TitleReveal): Modifier =
                 }
             }
         }
+
+private class CodeFocus {
+    var active by mutableStateOf(false)
+}
 
 private class FocusScroll(private val top: Float, private val bottom: Float) : BringIntoViewSpec {
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {

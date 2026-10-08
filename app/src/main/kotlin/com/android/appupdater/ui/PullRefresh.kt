@@ -22,10 +22,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastAny
 import com.android.appupdater.ui.theme.Motion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -61,6 +65,7 @@ internal class PullRefreshState(
     private val band = with(density) { PullBand.toPx() }
     private val start = with(density) { PullStart.toPx() }
     private val trigger = with(density) { PullTrigger.toPx() }
+    var touching = false
     private var dragging = false
     private var fired = false
     private var pull = 0f
@@ -95,7 +100,7 @@ internal class PullRefreshState(
     }
 
     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-        if (source == NestedScrollSource.UserInput) grab()
+        if (source == NestedScrollSource.UserInput && touching) grab()
         if (available.y >= 0f || offset <= 0f) return Offset.Zero
         var remaining = available.y
         var value = offset
@@ -181,6 +186,15 @@ internal class PullRefreshState(
 
     private fun unstretch(value: Float) = extent * (1f / (1f - value / extent) - 1f) / RUBBER
 }
+
+internal fun Modifier.pullRefresh(state: PullRefreshState): Modifier =
+    pointerInput(state) {
+        awaitPointerEventScope {
+            while (true) {
+                state.touching = awaitPointerEvent(PointerEventPass.Initial).changes.fastAny { it.pressed }
+            }
+        }
+    }.nestedScroll(state)
 
 @Composable
 internal fun rememberPullRefreshState(atTop: () -> Boolean, onRefresh: () -> Unit): PullRefreshState {
