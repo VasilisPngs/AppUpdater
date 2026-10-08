@@ -36,6 +36,8 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Base64
 import java.util.Locale
 
@@ -98,7 +100,7 @@ class AppUpdateRepository(
         val confirmation = confirmPlayUpdates(
             playApps.filter { app -> installedByPackage[app.packageName]?.let { playUpdate(app, it) } != null }
         )
-        val delivery = offerMirrorVersionsOnPlay(merge(appsToCheck, mirrorApps, playApps, confirmation.apps), playApps)
+        val delivery = offerMirrorVersionsOnPlay(merge(appsToCheck, mirrorApps, playApps, confirmation), playApps)
         val updates = delivery.updates.sortedWith(NEWEST_FIRST)
 
         val failures = buildList {
@@ -135,13 +137,17 @@ class AppUpdateRepository(
         val results = candidates.filterNot { it.isTestBuild }.map { app ->
             async {
                 app.packageName to permits.withPermit {
-                    attempt { runInterruptible { playCatalog.details(app.packageName).second } }
+                    attempt { runInterruptible { playCatalog.details(app.packageName) } }
                 }
             }
         }.awaitAll()
+        val confirmed = results.mapNotNull { (packageName, result) ->
+            result.getOrNull()?.takeUnless { it.second.isTestBuild }?.let { packageName to it }
+        }
         PlayConfirmation(
-            apps = results.mapNotNull { (packageName, result) ->
-                result.getOrNull()?.takeUnless { it.isTestBuild }?.let { packageName to it }
+            apps = confirmed.associate { (packageName, details) -> packageName to details.second },
+            dates = confirmed.mapNotNull { (packageName, details) ->
+                playDate(details.second.updatedOn, details.first.locale)?.let { packageName to it }
             }.toMap(),
             unconfirmed = results.count { it.second.isFailure }
         )
@@ -192,7 +198,7 @@ class AppUpdateRepository(
         installed: List<InstalledApp>,
         mirrorApps: List<ApkMirrorApp>,
         playApps: List<App>,
-        confirmedPlayApps: Map<String, App>
+        confirmation: PlayConfirmation
     ): List<AppUpdateInfo> {
         val mirrorByPackage = mirrorApps.groupBy(ApkMirrorApp::packageName)
         val playByPackage = playApps.associateBy(App::packageName)
@@ -203,7 +209,7 @@ class AppUpdateRepository(
             val mirror = mirrorByPackage[app.packageName]
                 ?.mapNotNull { mirrorCandidate(it, app, requiresTelevisionBuild) }
                 ?.maxByOrNull { it.apk.versionCode }
-            val playUpdate = confirmedPlayApps[app.packageName]?.let { playUpdate(it, app) }
+            val playUpdate = confirmation.apps[app.packageName]?.let { playUpdate(it, app) }
 
             when {
                 playUpdate != null && (mirror == null || playUpdate.versionCode >= mirror.apk.versionCode) -> AppUpdateInfo(
@@ -211,7 +217,8 @@ class AppUpdateRepository(
                     appName = packageManager.appLabel(app.packageName),
                     newVersionName = playUpdate.versionName,
                     newVersionCode = playUpdate.versionCode,
-                    publishedAt = mirror?.takeIf { it.apk.versionCode == playUpdate.versionCode }?.publishedAt,
+                    publishedAt = mirror?.takeIf { it.apk.versionCode == playUpdate.versionCode }?.publishedAt
+                        ?: confirmation.dates[app.packageName],
                     apkMirrorUrl = null,
                     playAvailable = true,
                     playUpdate = PlayVersion(playUpdate.versionName, playUpdate.versionCode)
@@ -426,6 +433,13 @@ class AppUpdateRepository(
             ?.toEpochMilli()
     }
 
+    private fun playDate(value: String, locale: Locale): Long? = runCatching {
+        LocalDate.parse(value.trim(), DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
+            .atStartOfDay(ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
+    }.getOrNull()
+
     private fun isStableLink(link: String, releaseNumbers: List<String>): Boolean = link
         .substringAfter(APKMIRROR_PATH_PREFIX, "")
         .split('/')
@@ -479,7 +493,7 @@ class AppUpdateRepository(
         const val NO_DENSITY = "nodpi"
         const val DPI_SUFFIX = "dpi"
         const val MAX_VERSION_NAME = 60
-        val NEWEST_FIRST = compareByDescending<AppUpdateInfo> { it.publishedAt ?: Long.MAX_VALUE }
+        val NEWEST_FIRST = compareByDescending<AppUpdateInfo> { it.publishedAt ?: Long.MIN_VALUE }
             .thenBy { it.appName.lowercase(Locale.ROOT) }
         const val UNSUPPORTED_ABI = Int.MAX_VALUE
         const val MATCHING_DENSITY_RANK = 0
@@ -510,7 +524,7 @@ class AppUpdateRepository(
 
     private class MirrorCandidate(val apk: ApkMirrorApk, val versionName: String, val publishedAt: Long?)
 
-    private class PlayConfirmation(val apps: Map<String, App>, val unconfirmed: Int)
+    private class PlayConfirmation(val apps: Map<String, App>, val dates: Map<String, Long>, val unconfirmed: Int)
 
     private class PlayDelivery(val updates: List<AppUpdateInfo>, val unchecked: Int)
 }
