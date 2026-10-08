@@ -147,7 +147,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -205,7 +204,6 @@ private val ContentBottomGap = 28.dp
 private val WideSheetBreakpoint = 600.dp
 private val AppIconSize = 44.dp
 private val DotSize = 7.dp
-private val PillGap = 7.dp
 private val IconSize = 18.dp
 private val ChevronInset = 2.dp
 private val SwitchWidth = 51.dp
@@ -496,11 +494,12 @@ fun AppUpdaterScreen(
                 top = barTop,
                 startPadding = startPadding,
                 endPadding = endPadding,
-                title = stringResource(selectedTab.labelRes),
+                title = if (selectedTab == AppTab.Updates && updates.isNotEmpty()) {
+                    stringResource(R.string.updates_count, updates.size)
+                } else {
+                    stringResource(selectedTab.labelRes)
+                },
                 titled = titled,
-                scanning = scanning,
-                failed = uiState.scanStatus is ScanStatus.Error,
-                count = updates.size,
                 actions = selectedTab == AppTab.Updates,
                 listFocus = activeFocus,
                 onRefresh = viewModel::scanForUpdates
@@ -595,7 +594,11 @@ private fun UpdatesView(
         verticalArrangement = Arrangement.spacedBy(Space.l)
     ) {
         item(key = TITLE_KEY) {
-            Text(text = stringResource(R.string.updates), style = Design.type.h1, color = Design.colors.text)
+            Text(
+                text = if (updates.isEmpty()) stringResource(R.string.updates) else stringResource(R.string.updates_count, updates.size),
+                style = Design.type.h1,
+                color = Design.colors.text
+            )
         }
 
         if (notice != null) {
@@ -751,7 +754,7 @@ private fun Group(
             Text(
                 text = heading,
                 style = Design.type.h2,
-                color = colors.muted,
+                color = colors.text,
                 modifier = Modifier.padding(horizontal = GroupInset)
             )
         }
@@ -1334,9 +1337,6 @@ private fun TopBar(
     endPadding: Dp,
     title: String,
     titled: Boolean,
-    scanning: Boolean,
-    failed: Boolean,
-    count: Int,
     actions: Boolean,
     listFocus: FocusRequester,
     onRefresh: () -> Unit
@@ -1351,9 +1351,6 @@ private fun TopBar(
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "title"
     )
-    val pillCount = remember { IntArray(1) }
-    if (count > 0) pillCount[0] = count
-    val shownCount = pillCount[0]
     Box(modifier = Modifier.fillMaxWidth()) {
         BackdropSurface(
             backdrop = backdrop,
@@ -1368,11 +1365,6 @@ private fun TopBar(
         )
         Layout(
             content = {
-                Box {
-                    AnimatedVisibility(visible = actions && count > 0, enter = itemEnter, exit = itemExit) {
-                        StatusPill(scanning = scanning, failed = failed, count = shownCount)
-                    }
-                }
                 Text(
                     text = title,
                     style = Design.type.barTitle,
@@ -1398,46 +1390,15 @@ private fun TopBar(
                 .fillMaxWidth()
                 .height(Space.control)
         ) { measurables, constraints ->
-            val gap = Space.m.roundToPx()
             val loose = constraints.copy(minWidth = 0, minHeight = 0)
-            val start = measurables[0].measure(loose)
-            val end = measurables[2].measure(loose)
-            val available = (constraints.maxWidth - gap * 2).coerceAtLeast(0)
-            val heading = measurables[1].measure(loose.copy(maxWidth = (available - start.width - end.width).coerceAtLeast(0)))
-            val free = available - heading.width
-            val column = when {
-                start.width > free / 2 -> start.width
-                end.width > free / 2 -> free - end.width
-                else -> free / 2
-            }
+            val end = measurables[1].measure(loose)
+            val side = end.width + Space.m.roundToPx()
+            val heading = measurables[0].measure(loose.copy(maxWidth = (constraints.maxWidth - side * 2).coerceAtLeast(0)))
             layout(constraints.maxWidth, constraints.maxHeight) {
-                start.placeRelative(0, (constraints.maxHeight - start.height) / 2)
-                heading.placeRelative(column + gap, (constraints.maxHeight - heading.height) / 2)
+                heading.placeRelative((constraints.maxWidth - heading.width) / 2, (constraints.maxHeight - heading.height) / 2)
                 end.placeRelative(constraints.maxWidth - end.width, (constraints.maxHeight - end.height) / 2)
             }
         }
-    }
-}
-
-@Composable
-private fun StatusPill(scanning: Boolean, failed: Boolean, count: Int) {
-    val colors = Design.colors
-    Row(
-        modifier = Modifier
-            .defaultMinSize(minHeight = Space.controlSmall)
-            .clip(ShapePill)
-            .background(colors.fill)
-            .padding(horizontal = Space.m),
-        horizontalArrangement = Arrangement.spacedBy(PillGap),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        StatusDot(color = if (failed) colors.danger else colors.warning, pulsing = scanning)
-        Text(
-            text = pluralStringResource(R.plurals.status_updates, count, count),
-            style = Design.type.pill,
-            color = colors.text,
-            maxLines = 1
-        )
     }
 }
 

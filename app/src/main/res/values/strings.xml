@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">AppUpdater</string>
     <string name="updates">Updates</string>
+    <string name="updates_count">Updates (%1$d)</string>
     <string name="settings">Settings</string>
     <string name="update">Update</string>
     <string name="manual">Manual</string>
@@ -21,8 +22,4 @@
     <string name="update_installed">%1$s was updated</string>
     <string name="update_installed_play">%1$s was updated to v%2$s, the latest on Google Play</string>
     <string name="update_failed">Update failed: %1$s</string>
-    <plurals name="status_updates">
-        <item quantity="one">%1$d update</item>
-        <item quantity="other">%1$d updates</item>
-    </plurals>
 </resources>

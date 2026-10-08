@@ -35,7 +35,6 @@ data class Palette(
     val accent: Color,
     val accentSoft: Color,
     val success: Color,
-    val warning: Color,
     val danger: Color,
     val tabLens: Color,
     val glassEdge: Color,
@@ -59,7 +58,6 @@ private val DarkPalette = Palette(
     accent = DarkAccent,
     accentSoft = DarkAccent.copy(alpha = ACCENT_SOFT_DARK),
     success = Color(0xFF30D158),
-    warning = Color(0xFFFF9230),
     danger = Color(0xFFFF4245),
     tabLens = Color(0xB3000000),
     glassEdge = Color(0x2EFFFFFF),
@@ -80,7 +78,6 @@ private val LightPalette = Palette(
     accent = LightAccent,
     accentSoft = LightAccent.copy(alpha = ACCENT_SOFT_LIGHT),
     success = Color(0xFF34C759),
-    warning = Color(0xFFFF8D28),
     danger = Color(0xFFFF383C),
     tabLens = Color(0x13000000),
     glassEdge = Color(0xD9FFFFFF),
@@ -97,7 +94,6 @@ data class TypeScale(
     val barTitle: TextStyle,
     val button: TextStyle,
     val buttonSmall: TextStyle,
-    val pill: TextStyle,
     val muted: TextStyle,
     val tab: TextStyle
 )
@@ -123,7 +119,6 @@ private val Scale = TypeScale(
     barTitle = text(BODY, Semibold),
     button = text(BODY, Medium),
     buttonSmall = text(SUBHEAD, Medium),
-    pill = text(FOOTNOTE, Medium),
     muted = text(FOOTNOTE),
     tab = text(TAB, Medium).copy(lineHeight = TAB.sp)
 )
