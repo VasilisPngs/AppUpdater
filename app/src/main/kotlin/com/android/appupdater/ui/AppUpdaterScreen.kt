@@ -10,7 +10,6 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animate
@@ -26,7 +25,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -87,12 +85,11 @@ import androidx.compose.foundation.text.input.maxLengthTrim
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.pullToRefresh
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -106,7 +103,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -130,15 +126,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -188,12 +183,10 @@ import com.android.appupdater.ui.theme.ShapePill
 import com.android.appupdater.ui.theme.Space
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 private val TabBarInset = 21.dp
 private val TabBarPaddingVertical = 3.dp
@@ -207,8 +200,6 @@ private val TabBarSafeOverlap = 13.dp
 private val BarTopMin = 8.dp
 private val BarBottom = 6.dp
 private val BarIconSize = 22.dp
-private val PullSpinnerSize = 30.dp
-private val PullThreshold = 80.dp
 private val ContentBottomGap = 28.dp
 private val WideSheetBreakpoint = 600.dp
 private val AppIconSize = 44.dp
@@ -248,10 +239,6 @@ private const val SHEET_FLICK_DP_PER_SECOND = 500
 private const val SHEET_DRAG_FADE = 0.6f
 private const val GRABBER_ALPHA = 0.28f
 private const val BAR_ITEM_HIDDEN_SCALE = 0.9f
-private const val SPOKES = 8
-private const val SPOKE_INNER = 0.36f
-private const val SPOKE_WIDTH = 0.23f
-private const val SPOKE_FADE = 0.135f
 
 private enum class AppTab(@StringRes val labelRes: Int, @DrawableRes val iconRes: Int) {
     Updates(R.string.updates, R.drawable.ic_updates),
@@ -294,8 +281,10 @@ fun AppUpdaterScreen(
     val updatesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val tabFocus = remember { FocusRequester() }
-    val pullState = rememberPullToRefreshState()
-    var settling by remember { mutableStateOf(false) }
+    val pull = rememberPullRefreshState(
+        atTop = { !updatesListState.canScrollBackward },
+        onRefresh = { viewModel.scanForUpdates() }
+    )
     val inputModeManager = LocalInputModeManager.current
     val coroutineScope = rememberCoroutineScope()
     val toasts = remember { mutableStateListOf<Toast>() }
@@ -375,15 +364,6 @@ fun AppUpdaterScreen(
     }
     val scanning = uiState.scanStatus == ScanStatus.Scanning
     val refreshing = scanning && selectedTab == AppTab.Updates
-
-    LaunchedEffect(refreshing) {
-        if (refreshing) {
-            settling = true
-        } else if (settling) {
-            snapshotFlow { pullState.distanceFraction }.first { it == 0f }
-            settling = false
-        }
-    }
     val selectTab: (AppTab) -> Unit = { tab ->
         val state = if (tab == AppTab.Updates) updatesListState else settingsListState
         if (tab != selectedTab) {
@@ -397,6 +377,11 @@ fun AppUpdaterScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         LaunchedEffect(Unit) {
             if (inputModeManager.inputMode == InputMode.Keyboard) tabFocus.requestFocus()
+        }
+        SideEffect {
+            pull.enabled = selectedTab == AppTab.Updates && inputModeManager.inputMode == InputMode.Touch
+            pull.extent = constraints.maxHeight.toFloat()
+            pull.update(refreshing)
         }
         val wideSheet = maxWidth >= WideSheetBreakpoint
         val topInset = insets.calculateTopPadding()
@@ -430,70 +415,57 @@ fun AppUpdaterScreen(
                 }
         ) {
             Box(modifier = Modifier.fillMaxSize().captureBackdrop(backdrop, colors.background)) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pullToRefresh(
-                            isRefreshing = refreshing,
-                            state = pullState,
-                            enabled = selectedTab == AppTab.Updates && inputModeManager.inputMode == InputMode.Touch,
-                            threshold = PullThreshold,
-                            onRefresh = viewModel::scanForUpdates
+                when (selectedTab) {
+                    AppTab.Updates -> {
+                        DisposableEffect(pull) { onDispose(pull::release) }
+                        UpdatesView(
+                            listState = updatesListState,
+                            focus = updatesFocus,
+                            contentPadding = contentPadding,
+                            scanning = scanning,
+                            notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
+                            updates = updates,
+                            installs = uiState.installs,
+                            playInstalls = uiState.playInstalls,
+                            onApkMirror = { openUrlInBrowser(context, it) },
+                            onPlay = viewModel::updateFromPlay,
+                            onManual = { manualPackage = it.packageName },
+                            modifier = Modifier
+                                .nestedScroll(pull)
+                                .graphicsLayer { translationY = pull.offset }
                         )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { translationY = pullState.distanceFraction * PullThreshold.toPx() }
-                    ) {
-                        when (selectedTab) {
-                            AppTab.Updates -> UpdatesView(
-                                listState = updatesListState,
-                                focus = updatesFocus,
-                                contentPadding = contentPadding,
-                                scanning = scanning,
-                                notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
-                                updates = updates,
-                                installs = uiState.installs,
-                                playInstalls = uiState.playInstalls,
-                                onApkMirror = { openUrlInBrowser(context, it) },
-                                onPlay = viewModel::updateFromPlay,
-                                onManual = { manualPackage = it.packageName }
-                            )
-                            AppTab.Settings -> SettingsView(
-                                listState = settingsListState,
-                                focus = settingsFocus,
-                                contentPadding = contentPadding,
-                                themeMode = themeMode,
-                                includeDisabledApps = uiState.includeDisabledApps,
-                                onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                                onTheme = { themeSheet = true },
-                                onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
-                            )
-                        }
                     }
-                    ActivityIndicator(
-                        color = colors.muted,
-                        spinning = refreshing || settling,
-                        progress = { if (refreshing || settling) 1f else pullState.distanceFraction },
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .offset {
-                                val barBottom = (barTop + Space.control + BarBottom).toPx()
-                                val gap = contentTop.toPx() - barBottom + pullState.distanceFraction * PullThreshold.toPx()
-                                IntOffset(0, (barBottom + (gap - PullSpinnerSize.toPx()) / 2).roundToInt())
-                            }
-                            .size(PullSpinnerSize)
-                            .graphicsLayer { alpha = if (settling && !refreshing) pullState.distanceFraction.coerceIn(0f, 1f) else 1f }
+                    AppTab.Settings -> SettingsView(
+                        listState = settingsListState,
+                        focus = settingsFocus,
+                        contentPadding = contentPadding,
+                        themeMode = themeMode,
+                        includeDisabledApps = uiState.includeDisabledApps,
+                        onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
+                        onTheme = { themeSheet = true },
+                        onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
                     )
                 }
+                ActivityIndicator(
+                    color = colors.muted,
+                    spinning = refreshing,
+                    progress = { pull.progress },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = barTop + Space.control + BarBottom + (PullBand - PullSpinnerSize) / 2)
+                        .size(PullSpinnerSize)
+                        .graphicsLayer {
+                            translationY = pull.lift
+                            alpha = if (pull.refreshing && pull.offset <= 0f) 0f else 1f
+                        }
+                )
             }
 
             TopBar(
                 backdrop = backdrop,
                 observe = {
                     activeListState.firstVisibleItemScrollOffset
-                    pullState.distanceFraction
+                    pull.offset
                 },
                 top = barTop,
                 startPadding = startPadding,
@@ -584,11 +556,12 @@ private fun UpdatesView(
     playInstalls: Map<String, PlayInstall>,
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
-    onManual: (AppUpdateInfo) -> Unit
+    onManual: (AppUpdateInfo) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     LazyColumn(
         state = listState,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .focusRequester(focus)
             .focusRestorer(),
@@ -1081,45 +1054,6 @@ private fun BarButton(
                 .align(Alignment.Center)
                 .size(BarIconSize)
         )
-    }
-}
-
-@Composable
-private fun ActivityIndicator(
-    color: Color,
-    spinning: Boolean,
-    progress: () -> Float,
-    modifier: Modifier = Modifier
-) {
-    val step = if (spinning) {
-        rememberInfiniteTransition(label = "spinner").animateFloat(
-            initialValue = 0f,
-            targetValue = SPOKES.toFloat(),
-            animationSpec = infiniteRepeatable(tween(Motion.SPIN, easing = LinearEasing)),
-            label = "step"
-        )
-    } else {
-        null
-    }
-    Canvas(modifier = modifier) {
-        val radius = size.minDimension / 2
-        val width = radius * SPOKE_WIDTH
-        val head = step?.value?.toInt()
-        val formed = progress().coerceIn(0f, 1f) * SPOKES
-        repeat(SPOKES) { index ->
-            val alpha = if (head == null) (formed - index).coerceIn(0f, 1f) else 1f - (head - index).mod(SPOKES) * SPOKE_FADE
-            if (alpha > 0f) {
-                rotate(index * 360f / SPOKES) {
-                    drawLine(
-                        color = color.copy(alpha = color.alpha * alpha),
-                        start = Offset(center.x, center.y - radius * SPOKE_INNER - width / 2),
-                        end = Offset(center.x, center.y - radius + width / 2),
-                        strokeWidth = width,
-                        cap = StrokeCap.Round
-                    )
-                }
-            }
-        }
     }
 }
 
