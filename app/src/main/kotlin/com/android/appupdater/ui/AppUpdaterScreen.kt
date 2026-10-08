@@ -243,7 +243,7 @@ private const val TITLE_KEY = "title"
 private const val SHEET_FLICK_DP_PER_SECOND = 500
 private const val SHEET_DRAG_FADE = 0.6f
 private const val GRABBER_ALPHA = 0.28f
-private const val PILL_HIDDEN_SCALE = 0.9f
+private const val BAR_ITEM_HIDDEN_SCALE = 0.9f
 private const val FULL_TURN = 360f
 private const val SETTLE_TURN = 120f
 
@@ -469,6 +469,7 @@ fun AppUpdaterScreen(
                 scanning = scanning,
                 failed = uiState.scanStatus is ScanStatus.Error,
                 count = updates.size,
+                actions = selectedTab == AppTab.Updates,
                 listFocus = activeFocus,
                 onRefresh = viewModel::scanForUpdates
             )
@@ -1329,10 +1330,15 @@ private fun TopBar(
     scanning: Boolean,
     failed: Boolean,
     count: Int,
+    actions: Boolean,
     listFocus: FocusRequester,
     onRefresh: () -> Unit
 ) {
     val colors = Design.colors
+    val itemEnter = fadeIn(tween(Motion.NORMAL, easing = Motion.ease)) +
+        scaleIn(tween(Motion.SPRING, easing = Motion.easeSpring), initialScale = BAR_ITEM_HIDDEN_SCALE)
+    val itemExit = fadeOut(tween(Motion.FAST, easing = Motion.ease)) +
+        scaleOut(tween(Motion.FAST, easing = Motion.ease), targetScale = BAR_ITEM_HIDDEN_SCALE)
     val titleAlpha by animateFloatAsState(
         targetValue = if (titled) 1f else 0f,
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
@@ -1356,13 +1362,7 @@ private fun TopBar(
         Layout(
             content = {
                 Box {
-                    AnimatedVisibility(
-                        visible = count > 0,
-                        enter = fadeIn(tween(Motion.NORMAL, easing = Motion.ease)) +
-                            scaleIn(tween(Motion.SPRING, easing = Motion.easeSpring), initialScale = PILL_HIDDEN_SCALE),
-                        exit = fadeOut(tween(Motion.FAST, easing = Motion.ease)) +
-                            scaleOut(tween(Motion.FAST, easing = Motion.ease), targetScale = PILL_HIDDEN_SCALE)
-                    ) {
+                    AnimatedVisibility(visible = actions && count > 0, enter = itemEnter, exit = itemExit) {
                         StatusPill(scanning = scanning, failed = failed, count = shownCount)
                     }
                 }
@@ -1374,14 +1374,18 @@ private fun TopBar(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.graphicsLayer { alpha = titleAlpha }
                 )
-                BarButton(
-                    icon = R.drawable.ic_refresh,
-                    backdrop = backdrop,
-                    observe = observe,
-                    onClick = onRefresh,
-                    modifier = Modifier.focusProperties { down = listFocus },
-                    spinning = scanning
-                )
+                Box {
+                    AnimatedVisibility(visible = actions, enter = itemEnter, exit = itemExit) {
+                        BarButton(
+                            icon = R.drawable.ic_refresh,
+                            backdrop = backdrop,
+                            observe = observe,
+                            onClick = onRefresh,
+                            modifier = Modifier.focusProperties { down = listFocus },
+                            spinning = scanning
+                        )
+                    }
+                }
             },
             modifier = Modifier
                 .padding(top = top, start = startPadding, end = endPadding, bottom = BarBottom)
