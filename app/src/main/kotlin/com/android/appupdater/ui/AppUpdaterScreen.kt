@@ -1593,7 +1593,11 @@ private fun TabBar(
                     modifier = Modifier
                         .weight(1f)
                         .then(if (tab == selectedTab) Modifier.focusRequester(focus) else Modifier)
-                        .focusProperties { up = listFocus },
+                        .focusProperties {
+                            up = listFocus
+                            if (tab == AppTab.entries.first()) start = FocusRequester.Cancel
+                            if (tab == AppTab.entries.last()) end = FocusRequester.Cancel
+                        },
                     onClick = { onSelect(tab) }
                 )
             }
