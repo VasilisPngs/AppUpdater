@@ -402,12 +402,10 @@ fun AppUpdaterScreen(
         }
     }
     val selectTab: (AppTab) -> Unit = { tab ->
-        val state = if (tab == AppTab.Updates) updatesListState else settingsListState
         if (tab != selectedTab) {
             selectedTab = tab
-            coroutineScope.launch { state.scrollToItem(0) }
-        } else if (state.canScrollBackward) {
-            coroutineScope.launch { state.animateScrollToItem(0) }
+        } else if (activeListState.canScrollBackward) {
+            coroutineScope.launch { activeListState.animateScrollToItem(0) }
         }
     }
 
@@ -746,16 +744,17 @@ private fun SettingsView(
             val interaction = remember { MutableInteractionSource() }
             val focused by interaction.collectIsFocusedAsState()
             Group(note = stringResource(R.string.disabled_apps_description)) {
-                Card(style = CardStyle.Tight) {
+                Card(style = CardStyle.Flush) {
                     Row(
                         modifier = Modifier
-                            .defaultMinSize(minHeight = Space.row - Space.m * 2)
+                            .defaultMinSize(minHeight = Space.row)
                             .toggleable(
                                 value = includeDisabledApps,
                                 interactionSource = interaction,
                                 indication = null,
                                 onValueChange = onIncludeDisabledAppsChange
-                            ),
+                            )
+                            .padding(horizontal = Space.l),
                         horizontalArrangement = Arrangement.spacedBy(Space.m),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1453,11 +1452,6 @@ private fun TopBar(
         scaleIn(tween(Motion.SPRING, easing = Motion.easeSpring), initialScale = BAR_ITEM_HIDDEN_SCALE)
     val itemExit = fadeOut(tween(Motion.FAST, easing = Motion.ease)) +
         scaleOut(tween(Motion.FAST, easing = Motion.ease), targetScale = BAR_ITEM_HIDDEN_SCALE)
-    val titleAlpha by animateFloatAsState(
-        targetValue = if (titled) 1f else 0f,
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "title"
-    )
     Box(modifier = Modifier.fillMaxWidth()) {
         BackdropSurface(
             backdrop = backdrop,
@@ -1472,14 +1466,21 @@ private fun TopBar(
         )
         Layout(
             content = {
-                Text(
-                    text = title,
-                    style = Design.type.barTitle,
-                    color = colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.graphicsLayer { alpha = titleAlpha }
-                )
+                key(title) {
+                    val titleAlpha by animateFloatAsState(
+                        targetValue = if (titled) 1f else 0f,
+                        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
+                        label = "title"
+                    )
+                    Text(
+                        text = title,
+                        style = Design.type.barTitle,
+                        color = colors.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.graphicsLayer { alpha = titleAlpha }
+                    )
+                }
                 Box {
                     AnimatedVisibility(visible = actions, enter = itemEnter, exit = itemExit) {
                         BarButton(
