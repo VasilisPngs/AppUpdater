@@ -162,6 +162,8 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -1069,8 +1071,9 @@ private fun Button(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val focused by interaction.collectIsFocusedAsState()
+    val active = enabled && !busy
     val scale by animateFloatAsState(
-        targetValue = if (pressed) PressedScale else 1f,
+        targetValue = if (pressed && active) PressedScale else 1f,
         animationSpec = tween(Motion.FAST, easing = Motion.ease),
         label = "press"
     )
@@ -1108,11 +1111,12 @@ private fun Button(
             .focusRing(focused, colors.accent, Dp.Infinity)
             .clip(ShapePill)
             .background(fill)
+            .semantics { if (busy) disabled() }
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                enabled = enabled && !busy,
-                onClick = onClick
+                enabled = enabled || busy,
+                onClick = { if (active) onClick() }
             )
             .padding(horizontal = if (small) Space.m else Space.l),
         contentAlignment = Alignment.Center
