@@ -112,6 +112,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -464,6 +465,7 @@ fun AppUpdaterScreen(
                             UpdatesView(
                                 listState = updatesListState,
                                 focus = updatesFocus,
+                                exitFocus = tabFocus,
                                 contentPadding = contentPadding,
                                 loaded = uiState.loaded,
                                 notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
@@ -599,6 +601,7 @@ fun AppUpdaterScreen(
 private fun UpdatesView(
     listState: LazyListState,
     focus: FocusRequester,
+    exitFocus: FocusRequester,
     contentPadding: PaddingValues,
     loaded: Boolean,
     notice: String?,
@@ -613,7 +616,24 @@ private fun UpdatesView(
     val firstKey = updates.firstOrNull()?.first?.packageName
     val reveal = rememberTitleReveal(listState, firstKey)
     val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
-    val codes = remember(keyboard) { CodeFocus() }
+    val cards = remember(keyboard) { CardFocus() }
+
+    val previous = cards.keys
+    val lost = cards.focused?.takeIf { key -> updates.none { it.first.packageName == key } }
+
+    LaunchedEffect(cards, updates) {
+        if (!keyboard) return@LaunchedEffect
+        val keys = updates.map { it.first.packageName }
+        cards.keys = keys
+        if (lost == null) return@LaunchedEffect
+        val present = keys.toHashSet()
+        val index = previous.indexOf(lost)
+        val target = previous.subList(index + 1, previous.size).firstOrNull { it in present }
+            ?: previous.subList(0, index.coerceAtLeast(0)).lastOrNull { it in present }
+        cards.codes = false
+        val entry = target?.let(cards.entries::get) ?: target?.let { withFrameNanos { }; cards.entries[it] }
+        if (entry?.requestFocus() != true) exitFocus.requestFocus()
+    }
 
     LazyColumn(
         state = listState,
@@ -621,7 +641,7 @@ private fun UpdatesView(
             .fillMaxSize()
             .focusRequester(focus)
             .focusRestorer()
-            .onFocusChanged { if (!it.hasFocus) codes.active = false },
+            .onFocusChanged { if (!it.hasFocus) cards.codes = false },
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Space.l)
     ) {
@@ -675,7 +695,7 @@ private fun UpdatesView(
                 update = pair.second,
                 install = playInstalls[pair.first.packageName],
                 keyboard = keyboard,
-                codes = codes,
+                cards = cards,
                 first = index == 0,
                 last = index == updates.lastIndex,
                 onApkMirror = onApkMirror,
@@ -869,7 +889,7 @@ private fun UpdateCard(
     update: AppUpdateInfo,
     install: PlayInstall?,
     keyboard: Boolean,
-    codes: CodeFocus,
+    cards: CardFocus,
     first: Boolean,
     last: Boolean,
     onApkMirror: (String) -> Unit,
@@ -881,6 +901,7 @@ private fun UpdateCard(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
+    val packageName = app.packageName
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val toCode = if (ltr) Key.DirectionLeft else Key.DirectionRight
     val toButtons = if (ltr) Key.DirectionRight else Key.DirectionLeft
@@ -895,28 +916,46 @@ private fun UpdateCard(
             MANUAL_SLOT.takeIf { update.playAvailable }
         )
     }
-    val buttonModifiers = remember(codes) {
+    val buttonModifiers = remember(cards) {
         List(BUTTON_SLOTS) { slot ->
             Modifier
                 .fillMaxWidth()
                 .focusRequester(buttonFocus[slot])
-                .focusProperties { if (codes.active) canFocus = false }
+                .focusProperties { if (cards.codes) canFocus = false }
                 .onFocusChanged { if (it.isFocused) lastButton = slot }
         }
     }
-    DisposableEffect(codes) {
-        onDispose { if (codeFocused) codes.active = false }
+    val entry = when {
+        install == null -> slots.firstOrNull()
+        install.manual -> MANUAL_SLOT
+        else -> PLAY_SLOT
+    }?.let(buttonFocus::get)
+    val cardModifier = remember(cards, packageName) {
+        Modifier.onFocusChanged {
+            if (it.hasFocus) {
+                cards.focused = packageName
+            } else if (cards.focused == packageName) {
+                cards.focused = null
+            }
+        }
+    }
+    DisposableEffect(cards) {
+        onDispose { if (codeFocused) cards.codes = false }
+    }
+    DisposableEffect(cards, packageName, entry) {
+        if (entry != null) cards.entries[packageName] = entry
+        onDispose { cards.entries.remove(packageName) }
     }
     val code = update.newVersionCode.toString()
     val copyCode: () -> Unit = {
         coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, code))) }
     }
-    val codeModifier = remember(keyboard, codes, first, last, toButtons, slots, copyCode) {
+    val codeModifier = remember(keyboard, cards, first, last, toButtons, slots, copyCode) {
         if (keyboard) {
             Modifier
                 .focusRequester(codeFocus)
                 .focusProperties {
-                    if (!codes.active) canFocus = false
+                    if (!cards.codes) canFocus = false
                     up = if (first) FocusRequester.Cancel else FocusRequester.Default
                     down = if (last) FocusRequester.Cancel else FocusRequester.Default
                     start = FocusRequester.Cancel
@@ -924,7 +963,7 @@ private fun UpdateCard(
                 .onKeyEvent { event ->
                     if (event.key != toButtons || event.type != KeyEventType.KeyDown) return@onKeyEvent false
                     val slot = lastButton.takeIf { it in slots } ?: slots.firstOrNull() ?: return@onKeyEvent true
-                    codes.active = false
+                    cards.codes = false
                     buttonFocus[slot].requestFocus()
                     true
                 }
@@ -965,7 +1004,7 @@ private fun UpdateCard(
         }
     }
 
-    Card(modifier = modifier) {
+    Card(modifier = modifier.then(cardModifier)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.m)
@@ -1011,8 +1050,8 @@ private fun UpdateCard(
                         if (!keyboard || event.key != toCode || event.type != KeyEventType.KeyDown) {
                             return@onKeyEvent false
                         }
-                        codes.active = true
-                        codeFocus.requestFocus().also { if (!it) codes.active = false }
+                        cards.codes = true
+                        codeFocus.requestFocus().also { if (!it) cards.codes = false }
                     },
                 verticalArrangement = Arrangement.spacedBy(Space.s)
             ) {
@@ -1828,8 +1867,11 @@ private fun rememberTitleReveal(listState: LazyListState, key: Any?): TitleRevea
     return reveal
 }
 
-private class CodeFocus {
-    var active by mutableStateOf(false)
+private class CardFocus {
+    var codes by mutableStateOf(false)
+    var focused: String? = null
+    var keys: List<String> = emptyList()
+    val entries = HashMap<String, FocusRequester>()
 }
 
 private class FocusScroll(private val top: Float, private val bottom: Float) : BringIntoViewSpec {
