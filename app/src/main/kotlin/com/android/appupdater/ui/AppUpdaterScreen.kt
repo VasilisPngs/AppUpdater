@@ -473,9 +473,7 @@ fun AppUpdaterScreen(
                                 onApkMirror = { openUrlInBrowser(context, it) },
                                 onPlay = viewModel::updateFromPlay,
                                 onManual = { manualPackage = it.packageName },
-                                modifier = Modifier
-                                    .pullRefresh(pull)
-                                    .graphicsLayer { translationY = pull.offset }
+                                modifier = pull.modifier.graphicsLayer { translationY = pull.offset }
                             )
                         }
                         AppTab.Settings -> SettingsView(
@@ -685,7 +683,7 @@ private fun UpdatesView(
                 onManual = onManual,
                 modifier = Modifier
                     .animateItem()
-                    .then(if (pair.first.packageName == firstKey) Modifier.revealTitle(reveal) else Modifier)
+                    .then(if (pair.first.packageName == firstKey) reveal.modifier else Modifier)
             )
         }
     }
@@ -718,7 +716,7 @@ private fun SettingsView(
         }
 
         item(key = APPEARANCE_KEY) {
-            Group(heading = stringResource(R.string.appearance), modifier = Modifier.revealTitle(reveal)) {
+            Group(heading = stringResource(R.string.appearance), modifier = reveal.modifier) {
                 Card(style = CardStyle.Flush) {
                     ListRow(onClick = onTheme) {
                         Text(
@@ -896,12 +894,14 @@ private fun UpdateCard(
             MANUAL_SLOT.takeIf { update.playAvailable }
         )
     }
-    val button: (Int) -> Modifier = { slot ->
-        Modifier
-            .fillMaxWidth()
-            .focusRequester(buttonFocus[slot])
-            .focusProperties { if (codes.active) canFocus = false }
-            .onFocusChanged { if (it.isFocused) lastButton = slot }
+    val buttonModifiers = remember(codes) {
+        List(BUTTON_SLOTS) { slot ->
+            Modifier
+                .fillMaxWidth()
+                .focusRequester(buttonFocus[slot])
+                .focusProperties { if (codes.active) canFocus = false }
+                .onFocusChanged { if (it.isFocused) lastButton = slot }
+        }
     }
     DisposableEffect(codes) {
         onDispose { if (codeFocused) codes.active = false }
@@ -909,6 +909,29 @@ private fun UpdateCard(
     val code = update.newVersionCode.toString()
     val copyCode: () -> Unit = {
         coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, code))) }
+    }
+    val codeModifier = remember(keyboard, codes, first, last, toButtons, slots, copyCode) {
+        if (keyboard) {
+            Modifier
+                .focusRequester(codeFocus)
+                .focusProperties {
+                    if (!codes.active) canFocus = false
+                    up = if (first) FocusRequester.Cancel else FocusRequester.Default
+                    down = if (last) FocusRequester.Cancel else FocusRequester.Default
+                    start = FocusRequester.Cancel
+                }
+                .onKeyEvent { event ->
+                    if (event.key != toButtons || event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    val slot = lastButton.takeIf { it in slots } ?: slots.firstOrNull() ?: return@onKeyEvent true
+                    codes.active = false
+                    buttonFocus[slot].requestFocus()
+                    true
+                }
+                .onFocusChanged { codeFocused = it.isFocused }
+                .clickable(interactionSource = null, indication = null, onClick = copyCode)
+        } else {
+            Modifier
+        }
     }
     val latestText = stringResource(R.string.version_latest, displayVersion(update.newVersionName), update.newVersionCode)
     val latest = remember(latestText, code, colors, keyboard, codeFocused) {
@@ -977,27 +1000,7 @@ private fun UpdateCard(
                     text = latest,
                     style = Design.type.muted,
                     color = colors.muted,
-                    modifier = if (keyboard) {
-                        Modifier
-                            .focusRequester(codeFocus)
-                            .focusProperties {
-                                if (!codes.active) canFocus = false
-                                up = if (first) FocusRequester.Cancel else FocusRequester.Default
-                                down = if (last) FocusRequester.Cancel else FocusRequester.Default
-                                start = FocusRequester.Cancel
-                            }
-                            .onKeyEvent { event ->
-                                if (event.key != toButtons || event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                                val slot = lastButton.takeIf { it in slots } ?: slots.firstOrNull() ?: return@onKeyEvent true
-                                codes.active = false
-                                buttonFocus[slot].requestFocus()
-                                true
-                            }
-                            .onFocusChanged { codeFocused = it.isFocused }
-                            .clickable(interactionSource = null, indication = null, onClick = copyCode)
-                    } else {
-                        Modifier
-                    }
+                    modifier = codeModifier
                 )
             }
             Column(
@@ -1019,7 +1022,7 @@ private fun UpdateCard(
                         enabled = install == null,
                         icon = R.drawable.ic_source_apkmirror,
                         onClick = { onApkMirror(url) },
-                        modifier = button(APKMIRROR_SLOT)
+                        modifier = buttonModifiers[APKMIRROR_SLOT]
                     )
                 }
                 if (update.playUpdate != null) {
@@ -1031,7 +1034,7 @@ private fun UpdateCard(
                         progress = install?.progress,
                         icon = R.drawable.ic_source_play,
                         onClick = { onPlay(update) },
-                        modifier = button(PLAY_SLOT)
+                        modifier = buttonModifiers[PLAY_SLOT]
                     )
                 }
                 if (update.playAvailable) {
@@ -1043,7 +1046,7 @@ private fun UpdateCard(
                         progress = install?.progress,
                         icon = R.drawable.ic_source_play,
                         onClick = { onManual(update) },
-                        modifier = button(MANUAL_SLOT)
+                        modifier = buttonModifiers[MANUAL_SLOT]
                     )
                 }
             }
@@ -1788,15 +1791,24 @@ private fun Modifier.focusRing(
         }
     }
 
-private class TitleReveal(val requester: BringIntoViewRequester, val scope: CoroutineScope) {
+private class TitleReveal(scope: CoroutineScope) {
+    private val requester = BringIntoViewRequester()
+    private var height = 0
     var reach = 0
-    var height = 0
+    val modifier = Modifier
+        .bringIntoViewRequester(requester)
+        .onSizeChanged { height = it.height }
+        .onFocusEvent { state ->
+            if (state.hasFocus) {
+                scope.launch { requester.bringIntoView(Rect(0f, -reach.toFloat(), 1f, height.toFloat())) }
+            }
+        }
 }
 
 @Composable
 private fun rememberTitleReveal(listState: LazyListState, key: Any?): TitleReveal {
     val scope = rememberCoroutineScope()
-    val reveal = remember(scope) { TitleReveal(BringIntoViewRequester(), scope) }
+    val reveal = remember(scope) { TitleReveal(scope) }
     val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
 
     LaunchedEffect(listState, key, keyboard) {
@@ -1810,17 +1822,6 @@ private fun rememberTitleReveal(listState: LazyListState, key: Any?): TitleRevea
     }
     return reveal
 }
-
-private fun Modifier.revealTitle(reveal: TitleReveal): Modifier =
-    bringIntoViewRequester(reveal.requester)
-        .onSizeChanged { reveal.height = it.height }
-        .onFocusEvent { state ->
-            if (state.hasFocus) {
-                reveal.scope.launch {
-                    reveal.requester.bringIntoView(Rect(0f, -reveal.reach.toFloat(), 1f, reveal.height.toFloat()))
-                }
-            }
-        }
 
 private class CodeFocus {
     var active by mutableStateOf(false)

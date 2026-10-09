@@ -65,7 +65,7 @@ internal class PullRefreshState(
     private val band = with(density) { PullBand.toPx() }
     private val start = with(density) { PullStart.toPx() }
     private val trigger = with(density) { PullTrigger.toPx() }
-    var touching = false
+    private var touching = false
     private var dragging = false
     private var fired = false
     private var pull = 0f
@@ -78,6 +78,16 @@ internal class PullRefreshState(
     private var forming by mutableStateOf(false)
     var enabled = false
     var extent = 1f
+
+    val modifier: Modifier = Modifier
+        .pointerInput(this) {
+            awaitPointerEventScope {
+                while (true) {
+                    touching = awaitPointerEvent(PointerEventPass.Initial).changes.fastAny { it.pressed }
+                }
+            }
+        }
+        .nestedScroll(this)
 
     val progress: Float
         get() = if (forming) ((offset - start) / (trigger - start)).coerceIn(0f, 1f) else 0f
@@ -186,15 +196,6 @@ internal class PullRefreshState(
 
     private fun unstretch(value: Float) = extent * (1f / (1f - value / extent) - 1f) / RUBBER
 }
-
-internal fun Modifier.pullRefresh(state: PullRefreshState): Modifier =
-    pointerInput(state) {
-        awaitPointerEventScope {
-            while (true) {
-                state.touching = awaitPointerEvent(PointerEventPass.Initial).changes.fastAny { it.pressed }
-            }
-        }
-    }.nestedScroll(state)
 
 @Composable
 internal fun rememberPullRefreshState(atTop: () -> Boolean, onRefresh: () -> Unit): PullRefreshState {
