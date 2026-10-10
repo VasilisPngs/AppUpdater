@@ -31,16 +31,18 @@ data class Palette(
     val fill: Color,
     val text: Color,
     val muted: Color,
+    val tertiary: Color,
     val chevron: Color,
     val accent: Color,
-    val accentSoft: Color,
     val success: Color,
     val danger: Color,
     val tabLens: Color,
+    val switchOff: Color,
+    val menu: Color,
     val glassEdge: Color,
     val glassRim: Color,
     val shadow: Color,
-    val scrim: Color
+    val floatShadow: Color
 )
 
 private val DarkAccent = Color(0xFF0091FF)
@@ -54,16 +56,18 @@ private val DarkPalette = Palette(
     fill = Color(0x3D767680),
     text = Color(0xFFFFFFFF),
     muted = Color(0x99EBEBF5),
-    chevron = Color(0xFF98989D),
+    tertiary = Color(0x4DEBEBF5),
+    chevron = Color(0xFF98989F),
     accent = DarkAccent,
-    accentSoft = DarkAccent.copy(alpha = ACCENT_SOFT_DARK),
     success = Color(0xFF30D158),
     danger = Color(0xFFFF4245),
     tabLens = Color(0xB3000000),
+    switchOff = Color(0xFF5B5A5F),
+    menu = Color(0xFF2C2C2E).copy(alpha = Glass.MATERIAL),
     glassEdge = Color(0x2EFFFFFF),
     glassRim = Color(0x8C000000),
     shadow = Color(0x73000000),
-    scrim = Color(0x6B04060A)
+    floatShadow = Color(0x73000000)
 )
 
 private val LightPalette = Palette(
@@ -74,16 +78,18 @@ private val LightPalette = Palette(
     fill = Color(0x1F767680),
     text = Color(0xFF000000),
     muted = Color(0x993C3C43),
+    tertiary = Color(0x4D3C3C43),
     chevron = Color(0xFF8A8A8E),
     accent = LightAccent,
-    accentSoft = LightAccent.copy(alpha = ACCENT_SOFT_LIGHT),
     success = Color(0xFF34C759),
     danger = Color(0xFFFF383C),
     tabLens = Color(0x13000000),
+    switchOff = Color(0xFFD1D1D6),
+    menu = Color(0x99FFFFFF),
     glassEdge = Color(0xD9FFFFFF),
     glassRim = Color(0x24121828),
     shadow = Color(0x1F121828),
-    scrim = Color(0x6B04060A)
+    floatShadow = Color(0x40000000)
 )
 
 @Immutable
@@ -91,22 +97,24 @@ data class TypeScale(
     val h1: TextStyle,
     val h2: TextStyle,
     val body: TextStyle,
+    val subhead: TextStyle,
     val barTitle: TextStyle,
     val button: TextStyle,
     val buttonSmall: TextStyle,
     val muted: TextStyle,
+    val note: TextStyle,
+    val menu: TextStyle,
     val tab: TextStyle
 )
 
-private val Medium = FontWeight(560)
-private val Semibold = FontWeight(650)
+private val Medium = FontWeight(510)
+private val Semibold = FontWeight(590)
 
-private fun text(size: Float, weight: FontWeight = FontWeight.Normal, tracking: Float = 0f) = TextStyle(
+private fun text(size: Float, weight: FontWeight = FontWeight.Normal) = TextStyle(
     fontFamily = FontFamily.Default,
     fontSize = size.sp,
     lineHeight = (size * LINE_HEIGHT).sp,
-    fontWeight = weight,
-    letterSpacing = (size * tracking).sp
+    fontWeight = weight
 )
 
 private val Scale = TypeScale(
@@ -114,17 +122,22 @@ private val Scale = TypeScale(
         lineHeight = (LARGE_TITLE * TITLE_LINE_HEIGHT).sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both)
     ),
-    h2 = text(BODY, Semibold, TIGHT_TRACKING),
+    h2 = text(BODY, Semibold),
     body = text(BODY),
+    subhead = text(SUBHEAD),
     barTitle = text(BODY, Semibold),
     button = text(BODY, Medium),
     buttonSmall = text(SUBHEAD, Medium),
     muted = text(FOOTNOTE),
+    note = text(FOOTNOTE).copy(lineHeight = NOTE_LINE_HEIGHT.sp),
+    menu = text(BODY).copy(lineHeight = MENU_LINE_HEIGHT.sp),
     tab = text(TAB, Medium).copy(lineHeight = TAB.sp)
 )
 
 object Radius {
     val card = 30.dp
+    val menu = 34.dp
+    val sheet = 38.dp
 }
 
 val ShapeCard = RoundedCornerShape(Radius.card)
@@ -163,6 +176,7 @@ object Motion {
 
 object Space {
     val hairline = 1.dp
+    val xs = 4.dp
     val s = 8.dp
     val m = 12.dp
     val l = 16.dp
@@ -176,14 +190,14 @@ object Glass {
     const val BAR = 0.72f
     const val MATERIAL = 0.73f
     const val TOAST = 0.78f
-    const val SHEET = 0.9f
     const val SATURATION = 1.8f
-    const val SHEET_BACKDROP_SATURATION = 1.4f
+    val rim = 0.5.dp
     val blur = 32.dp
     val toastBlur = 18.dp
-    val sheetBackdropBlur = 14.dp
     val shadowBlur = 40.dp
     val shadowOffset = 18.dp
+    val floatShadowBlur = 48.dp
+    val floatShadowOffset = 8.dp
     val edgeFade = 24.dp
 }
 
@@ -219,8 +233,6 @@ fun AppUpdaterTheme(
 }
 
 private const val SELECTION_ALPHA = 0.4f
-private const val ACCENT_SOFT_DARK = 0.18f
-private const val ACCENT_SOFT_LIGHT = 0.14f
 private const val LARGE_TITLE = 34f
 private const val BODY = 17f
 private const val SUBHEAD = 15f
@@ -228,5 +240,6 @@ private const val FOOTNOTE = 13f
 private const val TAB = 10f
 private const val LINE_HEIGHT = 1.3f
 private const val TITLE_LINE_HEIGHT = 1.15f
-private const val TIGHT_TRACKING = -0.01f
+private const val NOTE_LINE_HEIGHT = 18f
+private const val MENU_LINE_HEIGHT = 20f
 private const val ICON_CORNER = 0.2237f

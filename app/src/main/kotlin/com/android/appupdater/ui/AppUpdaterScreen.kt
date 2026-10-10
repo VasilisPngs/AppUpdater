@@ -3,6 +3,7 @@ package com.android.appupdater.ui
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.view.RoundedCorner
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +11,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
@@ -34,6 +36,8 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -62,12 +66,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -82,6 +86,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
@@ -95,7 +100,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -138,6 +142,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -153,6 +158,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -161,8 +169,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
@@ -173,6 +183,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -205,10 +216,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 private val TabBarInset = 21.dp
-private val TabBarPaddingVertical = 3.dp
-private val TabBarPaddingHorizontal = 1.dp
+private val TabBarPadding = 4.dp
+private val TabWidth = 98.dp
 private val TabTop = 8.dp
 private val TabBottom = 9.dp
 private val TabGap = 1.dp
@@ -224,23 +236,33 @@ private val AppIconSize = 44.dp
 private val DotSize = 7.dp
 private val IconSize = 18.dp
 private val ChevronInset = 2.dp
-private val SwitchWidth = 51.dp
-private val SwitchHeight = 31.dp
-private val SwitchKnob = 27.dp
+private val SwitchWidth = 64.dp
+private val SwitchHeight = 28.dp
+private val SwitchKnobWidth = 37.dp
+private val SwitchKnobHeight = 24.dp
 private val SwitchInset = 2.dp
 private val SheetMaxWidth = 560.dp
 private val SheetWideBottom = 24.dp
 private val SheetDragClose = 200.dp
-private val GrabberWidth = 36.dp
-private val GrabberHeight = 5.dp
+private val GrabberWidth = 60.dp
+private val GrabberHeight = 4.dp
 private val GrabberTop = 6.dp
+private val MenuWidth = 250.dp
+private val MenuGap = 8.dp
+private val MenuSectionPadding = 10.dp
+private val MenuItemStart = 22.dp
+private val MenuItemEnd = 24.dp
+private val MenuItemVertical = 10.dp
+private val MenuIconColumn = 28.dp
+private val MenuIconSize = 20.dp
+private val ShapeMenu = RoundedCornerShape(Radius.menu)
 private val ToastMaxWidth = 544.dp
 private val ToastGap = 20.dp
 private val ToastEnter = 10.dp
 private val ToastExit = 6.dp
 private val EmptyPadding = 32.dp
+private val EmptySymbolSize = 40.dp
 private val FieldPadding = 10.dp
-private val GroupInset = 17.dp
 private val KnobShadowBlur = 6.dp
 private val KnobShadowOffset = 2.dp
 private val KnobShadow = Color(0x4D000000)
@@ -262,7 +284,7 @@ private const val TAB_ICON_ASPECT = 1.2f
 private const val TITLE_KEY = "title"
 private const val APPEARANCE_KEY = "appearance"
 private const val SHEET_FLICK_DP_PER_SECOND = 500
-private const val SHEET_DRAG_FADE = 0.6f
+private const val MENU_HIDDEN_SCALE = 0.2f
 private const val GRABBER_ALPHA = 0.28f
 private const val BAR_ITEM_HIDDEN_SCALE = 0.9f
 private const val FOCUS_PIVOT = 0.3f
@@ -277,8 +299,6 @@ private enum class CardStyle(val horizontal: Dp, val vertical: Dp, val gap: Dp) 
     Tight(Space.l, Space.m, Space.s),
     Flush(0.dp, 0.dp, 0.dp)
 }
-
-private enum class ButtonStyle { Regular, Primary, Ghost, Selected }
 
 private class Toast(val id: Long, val message: String)
 
@@ -320,26 +340,17 @@ fun AppUpdaterScreen(
         uri?.let(viewModel::installBundle)
     }
     var manualPackage by rememberSaveable { mutableStateOf<String?>(null) }
-    var themeSheet by rememberSaveable { mutableStateOf(false) }
+    var themeMenu by remember { mutableStateOf(false) }
+    var themeAnchor by remember { mutableStateOf(Rect.Zero) }
     var pendingTheme by remember { mutableStateOf<ThemeMode?>(null) }
     val manualTarget = uiState.updates.firstOrNull { it.packageName == manualPackage }
     LaunchedEffect(manualTarget == null) {
         if (manualTarget == null) manualPackage = null
     }
-    val sheetOpen = manualTarget != null || themeSheet
-    val closeSheets = {
-        manualPackage = null
-        themeSheet = false
-    }
+    val sheetOpen = manualTarget != null
+    val closeSheet = { manualPackage = null }
     BackHandler(enabled = !sheetOpen && selectedTab != AppTab.Updates) { selectedTab = AppTab.Updates }
-    BackHandler(enabled = sheetOpen, onBack = closeSheets)
-    val sheetProgress = animateFloatAsState(
-        targetValue = if (sheetOpen) 1f else 0f,
-        animationSpec = tween(Motion.SHEET, easing = Motion.easeSheet),
-        label = "sheet"
-    )
-    val sheetShown by remember { derivedStateOf { sheetProgress.value > 0f } }
-    val sheetDrag = remember { mutableFloatStateOf(0f) }
+    BackHandler(enabled = sheetOpen, onBack = closeSheet)
     val density = LocalDensity.current
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
@@ -361,14 +372,6 @@ fun AppUpdaterScreen(
                     is InstallEvent.Failed -> failedFormat.format(event.message)
                 }
             )
-        }
-    }
-
-    LaunchedEffect(pendingTheme, sheetShown) {
-        val mode = pendingTheme ?: return@LaunchedEffect
-        if (!sheetShown) {
-            pendingTheme = null
-            viewModel.setThemeMode(mode)
         }
     }
 
@@ -430,7 +433,7 @@ fun AppUpdaterScreen(
         val endPadding = max(Space.l, endInset)
         val contentTop = barTop + barOffset + Space.l
         val tabBarBottom = max(TabBarBottom, bottomInset - TabBarSafeOverlap)
-        val tabBarHeight = (TabBarPaddingVertical + Space.hairline) * 2 + TabTop + TabBottom +
+        val tabBarHeight = TabBarPadding * 2 + TabTop + TabBottom +
             TabIconWidth / TAB_ICON_ASPECT + TabGap + tabLine
         val contentPadding = PaddingValues(
             start = startPadding,
@@ -445,18 +448,7 @@ fun AppUpdaterScreen(
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    renderEffect = (sheetProgress.value * (1f - SHEET_DRAG_FADE * sheetDrag.floatValue)).takeIf { it > 0f }?.let { progress ->
-                        backdropEffect(
-                            Glass.sheetBackdropBlur.toPx() * progress,
-                            1f + (Glass.SHEET_BACKDROP_SATURATION - 1f) * progress
-                        )
-                    }
-                }
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxSize().captureBackdrop(backdrop, colors.background)) {
                 CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
                     when (selectedTab) {
@@ -485,7 +477,10 @@ fun AppUpdaterScreen(
                             themeMode = themeMode,
                             includeDisabledApps = uiState.includeDisabledApps,
                             onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                            onTheme = { themeSheet = true },
+                            onTheme = { anchor ->
+                                themeAnchor = anchor
+                                themeMenu = true
+                            },
                             onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
                         )
                     }
@@ -546,22 +541,18 @@ fun AppUpdaterScreen(
             )
         }
 
-        if (sheetShown) {
+        if (sheetOpen) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .drawBehind {
-                        val progress = sheetProgress.value * (1f - SHEET_DRAG_FADE * sheetDrag.floatValue)
-                        drawRect(colors.scrim.copy(alpha = colors.scrim.alpha * progress))
-                    }
-                    .pointerInput(Unit) { detectTapGestures { closeSheets() } }
+                    .pointerInput(Unit) { detectTapGestures { closeSheet() } }
             )
         }
 
         ManualSheet(
             target = manualTarget,
             wide = wideSheet,
-            drag = sheetDrag,
+            backdrop = backdrop,
             returnFocus = updatesFocus,
             modifier = Modifier.align(Alignment.BottomCenter),
             onCancel = { manualPackage = null },
@@ -571,17 +562,22 @@ fun AppUpdaterScreen(
             }
         )
 
-        ThemeSheet(
-            visible = themeSheet,
+        ThemeMenu(
+            visible = themeMenu && selectedTab == AppTab.Settings,
+            anchor = themeAnchor,
             current = themeMode,
-            wide = wideSheet,
-            drag = sheetDrag,
+            backdrop = backdrop,
+            top = barTop + Space.control + BarBottom,
+            bottom = tabBarBottom + tabBarHeight,
             returnFocus = settingsFocus,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            onCancel = { themeSheet = false },
+            onDismiss = { themeMenu = false },
             onSelect = { mode ->
-                themeSheet = false
+                themeMenu = false
                 pendingTheme = mode
+            },
+            onHidden = {
+                pendingTheme?.let(viewModel::setThemeMode)
+                pendingTheme = null
             }
         )
 
@@ -686,7 +682,14 @@ private fun UpdatesView(
         }
 
         if (updates.isEmpty() && loaded) {
-            item(key = "empty") { EmptyState(stringResource(R.string.all_up_to_date), Modifier.animateItem()) }
+            item(key = "empty") {
+                EmptyState(
+                    symbol = R.drawable.ic_up_to_date,
+                    title = stringResource(R.string.all_up_to_date),
+                    message = stringResource(R.string.all_up_to_date_note),
+                    modifier = Modifier.animateItem()
+                )
+            }
         }
 
         itemsIndexed(items = updates, key = { _, pair -> pair.first.packageName }) { index, pair ->
@@ -717,7 +720,7 @@ private fun SettingsView(
     themeMode: ThemeMode,
     includeDisabledApps: Boolean,
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
-    onTheme: () -> Unit,
+    onTheme: (Rect) -> Unit,
     onPickBundle: () -> Unit
 ) {
     val colors = Design.colors
@@ -737,8 +740,9 @@ private fun SettingsView(
 
         item(key = APPEARANCE_KEY) {
             Group(heading = stringResource(R.string.appearance), modifier = reveal.modifier) {
+                var anchor by remember { mutableStateOf<LayoutCoordinates?>(null) }
                 Card(style = CardStyle.Flush) {
-                    ListRow(onClick = onTheme) {
+                    ListRow(onClick = { anchor?.let { onTheme(it.boundsInRoot()) } }) {
                         Text(
                             text = stringResource(R.string.theme),
                             style = Design.type.body,
@@ -746,12 +750,13 @@ private fun SettingsView(
                             modifier = Modifier.weight(1f)
                         )
                         Row(
+                            modifier = Modifier.onGloballyPositioned { anchor = it },
                             horizontalArrangement = Arrangement.spacedBy(Space.s),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(text = stringResource(themeMode.labelRes), style = Design.type.body, color = colors.muted)
                             Icon(
-                                painter = painterResource(R.drawable.ic_chevron_down),
+                                painter = painterResource(R.drawable.ic_chevrons),
                                 contentDescription = null,
                                 tint = colors.chevron,
                                 modifier = Modifier.padding(end = ChevronInset).size(IconSize)
@@ -815,17 +820,17 @@ private fun Group(
             Text(
                 text = heading,
                 style = Design.type.h2,
-                color = colors.text,
-                modifier = Modifier.padding(horizontal = GroupInset)
+                color = colors.muted,
+                modifier = Modifier.padding(horizontal = Space.l)
             )
         }
         content()
         if (note != null) {
             Text(
                 text = note,
-                style = Design.type.muted,
+                style = Design.type.note,
                 color = colors.muted,
-                modifier = Modifier.padding(horizontal = GroupInset)
+                modifier = Modifier.padding(horizontal = Space.l)
             )
         }
     }
@@ -1100,7 +1105,6 @@ private fun Button(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     small: Boolean = false,
-    style: ButtonStyle = ButtonStyle.Regular,
     enabled: Boolean = true,
     busy: Boolean = false,
     progress: Float? = null,
@@ -1116,25 +1120,6 @@ private fun Button(
         animationSpec = tween(Motion.FAST, easing = Motion.ease),
         label = "press"
     )
-    val fill by animateColorAsState(
-        targetValue = when (style) {
-            ButtonStyle.Regular -> colors.fill
-            ButtonStyle.Selected -> colors.accentSoft
-            ButtonStyle.Primary -> colors.accent
-            ButtonStyle.Ghost -> Color.Transparent
-        },
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "fill"
-    )
-    val content by animateColorAsState(
-        targetValue = when (style) {
-            ButtonStyle.Primary -> Color.White
-            ButtonStyle.Selected -> colors.accent
-            ButtonStyle.Regular, ButtonStyle.Ghost -> colors.text
-        },
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "content"
-    )
     val percent = remember { NumberFormat.getPercentInstance() }
     val progressShown by animateFloatAsState(
         targetValue = if (busy && progress != null) 1f else 0f,
@@ -1149,7 +1134,7 @@ private fun Button(
             .alpha(if (enabled || busy) 1f else DisabledOpacity)
             .focusRing(focused, colors.accent, Dp.Infinity)
             .clip(ShapePill)
-            .background(fill)
+            .background(colors.fill)
             .semantics { if (busy) disabled() }
             .clickable(
                 interactionSource = interaction,
@@ -1165,12 +1150,12 @@ private fun Button(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val textStyle = if (small) Design.type.buttonSmall else Design.type.button
-            if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, tint = content)
+            if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, tint = colors.text)
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = text,
                     style = textStyle,
-                    color = content,
+                    color = colors.text,
                     maxLines = 1,
                     modifier = Modifier.graphicsLayer { alpha = 1f - progressShown }
                 )
@@ -1178,7 +1163,7 @@ private fun Button(
                     Text(
                         text = percent.format(progress),
                         style = textStyle.copy(fontFeatureSettings = TABULAR_FIGURES),
-                        color = content,
+                        color = colors.text,
                         maxLines = 1,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.matchParentSize().graphicsLayer { alpha = progressShown }
@@ -1217,7 +1202,7 @@ private fun BarButton(
             .size(Space.control)
             .alpha(fade)
             .focusRing(focused, colors.accent, Dp.Infinity)
-            .border(Space.hairline, colors.glassRim, CircleShape)
+            .border(Glass.rim, colors.glassRim, CircleShape)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -1239,7 +1224,7 @@ private fun BarButton(
 private fun Sheet(
     visible: Boolean,
     wide: Boolean,
-    drag: MutableFloatState,
+    backdrop: GraphicsLayer,
     returnFocus: FocusRequester,
     modifier: Modifier,
     onDismiss: () -> Unit,
@@ -1248,30 +1233,36 @@ private fun Sheet(
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = slideInVertically(tween(Motion.SHEET, easing = Motion.easeSheet)) { it } +
-            fadeIn(tween(Motion.SHEET, easing = Motion.easeSheet)),
-        exit = slideOutVertically(tween(Motion.SHEET, easing = Motion.easeSheet)) { it } +
-            fadeOut(tween(Motion.SHEET, easing = Motion.easeSheet))
+        enter = slideInVertically(tween(Motion.SHEET, easing = Motion.easeSheet)) { it },
+        exit = slideOutVertically(tween(Motion.SHEET, easing = Motion.easeSheet)) { it }
     ) {
         val colors = Design.colors
         val density = LocalDensity.current
+        val view = LocalView.current
         val focusManager = LocalFocusManager.current
         val inputModeManager = LocalInputModeManager.current
         val touch = inputModeManager.inputMode == InputMode.Touch
         val initialFocus = remember { FocusRequester() }
         val open by rememberUpdatedState(visible)
         var height by remember { mutableIntStateOf(0) }
-        var offset by remember { mutableFloatStateOf(0f) }
-        val follow = { value: Float ->
-            offset = value
-            drag.floatValue = if (height > 0) (value / height).coerceAtMost(1f) else 0f
-        }
-        val dragState = rememberDraggableState { delta -> follow((offset + delta).coerceAtLeast(0f)) }
+        val dragOffset = remember { mutableFloatStateOf(0f) }
+        val dragState = rememberDraggableState { delta -> dragOffset.floatValue = (dragOffset.floatValue + delta).coerceAtLeast(0f) }
         val closeDistance = with(density) { SheetDragClose.toPx() }
         val flick = with(density) { SHEET_FLICK_DP_PER_SECOND.dp.toPx() }
-        val insets = WindowInsets.ime.union(WindowInsets.navigationBars)
-            .add(WindowInsets(bottom = if (wide) SheetWideBottom else Space.s))
+        val inset = if (wide) SheetWideBottom else Space.s
+        val insets = WindowInsets.ime.union(WindowInsets.tappableElement)
+            .add(WindowInsets(bottom = inset))
             .only(WindowInsetsSides.Bottom)
+        val ime = WindowInsets.ime
+        val tappable = WindowInsets.tappableElement
+        val edge by remember(touch, wide, density) {
+            derivedStateOf { touch && !wide && ime.getBottom(density) == 0 && tappable.getBottom(density) == 0 }
+        }
+        val displayCorner = remember(view) {
+            view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT)?.radius ?: 0
+        }
+        val bottomCorner = if (edge) max(Radius.sheet, with(density) { displayCorner.toDp() } - inset) else Radius.sheet
+        val shape = RoundedCornerShape(Radius.sheet, Radius.sheet, bottomCorner, bottomCorner)
 
         LaunchedEffect(Unit) {
             if (inputModeManager.inputMode == InputMode.Keyboard) initialFocus.requestFocus()
@@ -1279,33 +1270,37 @@ private fun Sheet(
         if (!visible) LaunchedEffect(Unit) {
             if (inputModeManager.inputMode == InputMode.Keyboard) returnFocus.requestFocus() else focusManager.clearFocus()
         }
-        DisposableEffect(Unit) {
-            onDispose { drag.floatValue = 0f }
-        }
 
-        Box(
+        BackdropSurface(
+            backdrop = backdrop,
+            tint = colors.surface2.copy(alpha = Glass.MATERIAL),
+            shape = shape,
+            blurRadius = Glass.blur,
+            highlight = colors.glassEdge,
             modifier = Modifier
                 .windowInsetsPadding(insets)
                 .padding(horizontal = if (wide) Space.l else Space.s)
                 .widthIn(max = SheetMaxWidth)
                 .fillMaxWidth()
                 .onSizeChanged { height = it.height }
-                .graphicsLayer { translationY = offset }
-                .clip(ShapeCard)
-                .background(colors.surface.copy(alpha = Glass.SHEET))
-                .innerTopHighlight(ShapeCard, colors.glassEdge)
-                .border(Space.hairline, colors.glassRim, ShapeCard)
+                .offset { IntOffset(0, dragOffset.floatValue.roundToInt()) }
+                .dropShadow(shape) {
+                    radius = Glass.floatShadowBlur.toPx()
+                    offset = Offset(0f, Glass.floatShadowOffset.toPx())
+                    color = colors.floatShadow
+                }
+                .border(Glass.rim, colors.glassRim, shape)
                 .pointerInput(Unit) { detectTapGestures { } }
                 .draggable(
                     state = dragState,
                     orientation = Orientation.Vertical,
                     enabled = touch && visible,
                     onDragStopped = { velocity ->
-                        if (offset > min(height / 2f, closeDistance) || velocity > flick) {
+                        if (dragOffset.floatValue > min(height / 2f, closeDistance) || velocity > flick) {
                             onDismiss()
                         } else {
-                            animate(offset, 0f, animationSpec = tween(Motion.SHEET, easing = Motion.easeSheet)) { value, _ ->
-                                follow(value)
+                            animate(dragOffset.floatValue, 0f, animationSpec = tween(Motion.SHEET, easing = Motion.easeSheet)) { value, _ ->
+                                dragOffset.floatValue = value
                             }
                         }
                     }
@@ -1314,7 +1309,7 @@ private fun Sheet(
                 .focusGroup()
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = Space.l, vertical = Space.xl),
+                modifier = Modifier.padding(start = Space.l, end = Space.l, top = Space.l, bottom = Space.xl),
                 verticalArrangement = Arrangement.spacedBy(Space.m)
             ) {
                 content(initialFocus)
@@ -1333,10 +1328,89 @@ private fun Sheet(
 }
 
 @Composable
+private fun SheetBar(title: String, doneEnabled: Boolean, onClose: () -> Unit, onDone: () -> Unit) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Space.s),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SheetButton(icon = R.drawable.ic_close, description = stringResource(R.string.cancel), onClick = onClose)
+        Text(
+            text = title,
+            style = Design.type.h2,
+            color = Design.colors.text,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        SheetButton(
+            icon = R.drawable.ic_check,
+            description = stringResource(R.string.update),
+            primary = true,
+            enabled = doneEnabled,
+            onClick = onDone
+        )
+    }
+}
+
+@Composable
+private fun SheetButton(
+    @DrawableRes icon: Int,
+    description: String,
+    onClick: () -> Unit,
+    primary: Boolean = false,
+    enabled: Boolean = true
+) {
+    val colors = Design.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val fade by animateFloatAsState(
+        targetValue = if (pressed && enabled) PressedOpacity else 1f,
+        animationSpec = tween(Motion.FAST, easing = Motion.ease),
+        label = "press"
+    )
+    Box(
+        modifier = Modifier
+            .size(Space.control)
+            .alpha(fade)
+            .focusRing(focused, colors.accent, Dp.Infinity)
+            .then(if (primary) Modifier else Modifier.border(Glass.rim, colors.glassRim, CircleShape))
+            .clip(CircleShape)
+            .background(
+                when {
+                    !primary -> colors.surface2.copy(alpha = Glass.MATERIAL)
+                    enabled -> colors.accent
+                    else -> colors.fill
+                }
+            )
+            .innerTopHighlight(CircleShape, colors.glassEdge)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = description,
+            tint = when {
+                !primary -> colors.text
+                enabled -> Color.White
+                else -> colors.tertiary
+            },
+            modifier = Modifier.size(BarIconSize)
+        )
+    }
+}
+
+@Composable
 private fun ManualSheet(
     target: AppUpdateInfo?,
     wide: Boolean,
-    drag: MutableFloatState,
+    backdrop: GraphicsLayer,
     returnFocus: FocusRequester,
     modifier: Modifier,
     onCancel: () -> Unit,
@@ -1345,7 +1419,7 @@ private fun ManualSheet(
     Sheet(
         visible = target != null,
         wide = wide,
-        drag = drag,
+        backdrop = backdrop,
         returnFocus = returnFocus,
         modifier = modifier,
         onDismiss = onCancel
@@ -1357,70 +1431,165 @@ private fun ManualSheet(
             if (versionCode != null) onSubmit(update, versionCode)
         }
 
-        Text(
-            text = update.appName,
-            style = Design.type.h2,
-            color = Design.colors.text,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        SheetBar(title = update.appName, doneEnabled = versionCode != null, onClose = onCancel, onDone = submit)
         VersionCodeField(state = code, focus = initialFocus, onDone = submit)
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-            Button(
-                text = stringResource(R.string.cancel),
-                onClick = onCancel,
-                modifier = Modifier.weight(1f)
+    }
+}
+
+@Composable
+private fun ThemeMenu(
+    visible: Boolean,
+    anchor: Rect,
+    current: ThemeMode,
+    backdrop: GraphicsLayer,
+    top: Dp,
+    bottom: Dp,
+    returnFocus: FocusRequester,
+    onDismiss: () -> Unit,
+    onSelect: (ThemeMode) -> Unit,
+    onHidden: () -> Unit
+) {
+    val progress = remember { Animatable(0f) }
+    val hidden by remember { derivedStateOf { progress.value == 0f } }
+    LaunchedEffect(visible) {
+        if (visible) {
+            progress.animateTo(1f, tween(Motion.SPRING, easing = Motion.easeSpring))
+        } else if (progress.value > 0f) {
+            progress.animateTo(0f, tween(Motion.NORMAL, easing = Motion.ease))
+            onHidden()
+        }
+    }
+    if (!visible && hidden) return
+
+    val colors = Design.colors
+    val inputModeManager = LocalInputModeManager.current
+    val focusManager = LocalFocusManager.current
+    val initialFocus = remember { FocusRequester() }
+    val open by rememberUpdatedState(visible)
+
+    BackHandler(enabled = visible, onBack = onDismiss)
+    LaunchedEffect(visible) {
+        if (inputModeManager.inputMode != InputMode.Keyboard) {
+            if (!visible) focusManager.clearFocus()
+        } else if (visible) {
+            initialFocus.requestFocus()
+        } else {
+            returnFocus.requestFocus()
+        }
+    }
+
+    Layout(
+        content = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(visible) {
+                        if (visible) awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            onDismiss()
+                        }
+                    }
             )
-            Button(
-                text = stringResource(R.string.update),
-                onClick = submit,
-                style = ButtonStyle.Primary,
-                enabled = versionCode != null,
-                modifier = Modifier.weight(1f)
-            )
+            BackdropSurface(
+                backdrop = backdrop,
+                tint = colors.menu,
+                shape = ShapeMenu,
+                blurRadius = Glass.blur,
+                highlight = colors.glassEdge,
+                modifier = Modifier
+                    .dropShadow(ShapeMenu) {
+                        radius = Glass.floatShadowBlur.toPx()
+                        offset = Offset(0f, Glass.floatShadowOffset.toPx())
+                        color = colors.floatShadow
+                    }
+                    .border(Glass.rim, colors.glassRim, ShapeMenu)
+                    .focusProperties { onExit = { if (open) cancelFocusChange() } }
+                    .focusGroup()
+            ) {
+                Column(modifier = Modifier.padding(vertical = MenuSectionPadding)) {
+                    ThemeMode.entries.forEach { mode ->
+                        val checked = mode == current
+                        MenuItem(
+                            label = stringResource(mode.labelRes),
+                            checked = checked,
+                            enabled = visible,
+                            modifier = if (checked) Modifier.focusRequester(initialFocus) else Modifier,
+                            onClick = { onSelect(mode) }
+                        )
+                    }
+                }
+            }
+        }
+    ) { measurables, constraints ->
+        val margin = Space.l.roundToPx()
+        val width = min(MenuWidth.roundToPx(), constraints.maxWidth - margin * 2)
+        val catcher = measurables[0].measure(constraints)
+        val menu = measurables[1].measure(Constraints.fixedWidth(width))
+        val fromLeft = anchor.center.x < constraints.maxWidth / 2f
+        val below = constraints.maxHeight - bottom.toPx() - margin - anchor.bottom
+        val above = anchor.top - top.toPx() - margin
+        val fromBottom = menu.height > below && above > below
+        val gap = MenuGap.roundToPx()
+        val x = if (fromLeft) anchor.left.roundToInt() else anchor.right.roundToInt() - width
+        val y = if (fromBottom) anchor.top.roundToInt() - gap - menu.height else anchor.bottom.roundToInt() + gap
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            catcher.place(0, 0)
+            menu.placeWithLayer(x.coerceIn(margin, constraints.maxWidth - margin - width), y) {
+                val value = progress.value
+                val scale = MENU_HIDDEN_SCALE + (1f - MENU_HIDDEN_SCALE) * value
+                scaleX = scale
+                scaleY = scale
+                alpha = value.coerceIn(0f, 1f)
+                transformOrigin = TransformOrigin(if (fromLeft) 0f else 1f, if (fromBottom) 1f else 0f)
+            }
         }
     }
 }
 
 @Composable
-private fun ThemeSheet(
-    visible: Boolean,
-    current: ThemeMode,
-    wide: Boolean,
-    drag: MutableFloatState,
-    returnFocus: FocusRequester,
+private fun MenuItem(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
     modifier: Modifier,
-    onCancel: () -> Unit,
-    onSelect: (ThemeMode) -> Unit
+    onClick: () -> Unit
 ) {
-    Sheet(
-        visible = visible,
-        wide = wide,
-        drag = drag,
-        returnFocus = returnFocus,
-        modifier = modifier,
-        onDismiss = onCancel
-    ) { initialFocus ->
-        Text(text = stringResource(R.string.theme), style = Design.type.h2, color = Design.colors.text)
-        Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
-            ThemeMode.entries.forEach { mode ->
-                val selected = mode == current
-                Button(
-                    text = stringResource(mode.labelRes),
-                    onClick = { onSelect(mode) },
-                    style = if (selected) ButtonStyle.Selected else ButtonStyle.Regular,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(if (selected) Modifier.focusRequester(initialFocus) else Modifier)
+    val colors = Design.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val fill by animateColorAsState(
+        targetValue = if (pressed || focused) colors.fill else Color.Transparent,
+        animationSpec = tween(Motion.FAST, easing = Motion.ease),
+        label = "item"
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(fill)
+            .selectable(
+                selected = checked,
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onClick
+            )
+            .padding(start = MenuItemStart, end = MenuItemEnd, top = MenuItemVertical, bottom = MenuItemVertical),
+        horizontalArrangement = Arrangement.spacedBy(Space.s),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.width(MenuIconColumn), contentAlignment = Alignment.Center) {
+            if (checked) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_menu_check),
+                    contentDescription = null,
+                    tint = colors.text,
+                    modifier = Modifier.size(MenuIconSize)
                 )
             }
-            Button(
-                text = stringResource(R.string.cancel),
-                onClick = onCancel,
-                style = ButtonStyle.Ghost,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
+        Text(text = label, style = Design.type.menu, color = colors.text)
     }
 }
 
@@ -1463,17 +1632,30 @@ private val DigitsOnly = InputTransformation {
 }
 
 @Composable
-private fun EmptyState(text: String, modifier: Modifier = Modifier) {
+private fun EmptyState(
+    @DrawableRes symbol: Int,
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    val colors = Design.colors
     Card(style = CardStyle.Flush, modifier = modifier) {
-        Text(
-            text = text,
-            style = Design.type.muted,
-            color = Design.colors.text,
-            textAlign = TextAlign.Center,
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Space.l, vertical = EmptyPadding)
-        )
+                .padding(horizontal = Space.l, vertical = EmptyPadding),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Space.xs)
+        ) {
+            Icon(
+                painter = painterResource(symbol),
+                contentDescription = null,
+                tint = colors.muted,
+                modifier = Modifier.padding(bottom = Space.s).size(EmptySymbolSize)
+            )
+            Text(text = title, style = Design.type.h2, color = colors.text, textAlign = TextAlign.Center)
+            Text(text = message, style = Design.type.subhead, color = colors.muted, textAlign = TextAlign.Center)
+        }
     }
 }
 
@@ -1607,21 +1789,16 @@ private fun TabBar(
         highlight = colors.glassEdge,
         observe = observe,
         modifier = modifier
-            .fillMaxWidth()
             .dropShadow(ShapePill) {
                 radius = Glass.shadowBlur.toPx()
                 offset = Offset(0f, Glass.shadowOffset.toPx())
                 color = colors.shadow
             }
+            .border(Glass.rim, colors.glassRim, ShapePill)
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .border(Space.hairline, colors.glassRim, ShapePill)
-                .padding(
-                    horizontal = Space.hairline + TabBarPaddingHorizontal,
-                    vertical = Space.hairline + TabBarPaddingVertical
-                )
+                .padding(TabBarPadding)
                 .drawBehind {
                     val width = size.width / AppTab.entries.size
                     val index = if (layoutDirection == LayoutDirection.Rtl) AppTab.entries.lastIndex - lens.value else lens.value
@@ -1638,7 +1815,7 @@ private fun TabBar(
                     tab = tab,
                     selected = tab == selectedTab,
                     modifier = Modifier
-                        .weight(1f)
+                        .width(TabWidth)
                         .then(if (tab == selectedTab) Modifier.focusRequester(focus) else Modifier)
                         .focusProperties {
                             up = listFocus
@@ -1701,12 +1878,12 @@ private fun TabItem(
 private fun SwitchTrack(checked: Boolean, focused: Boolean) {
     val colors = Design.colors
     val track by animateColorAsState(
-        targetValue = if (checked) colors.success else colors.surface3,
+        targetValue = if (checked) colors.success else colors.switchOff,
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "track"
     )
     val travel by animateDpAsState(
-        targetValue = if (checked) SwitchWidth - SwitchKnob - SwitchInset * 2 else 0.dp,
+        targetValue = if (checked) SwitchWidth - SwitchKnobWidth - SwitchInset * 2 else 0.dp,
         animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
         label = "knob"
     )
@@ -1721,13 +1898,13 @@ private fun SwitchTrack(checked: Boolean, focused: Boolean) {
         Box(
             modifier = Modifier
                 .offset { IntOffset(travel.roundToPx(), 0) }
-                .size(SwitchKnob)
-                .dropShadow(CircleShape) {
+                .size(width = SwitchKnobWidth, height = SwitchKnobHeight)
+                .dropShadow(ShapePill) {
                     radius = KnobShadowBlur.toPx()
                     offset = Offset(0f, KnobShadowOffset.toPx())
                     color = KnobShadow
                 }
-                .background(Color.White, CircleShape)
+                .background(Color.White, ShapePill)
         )
     }
 }
@@ -1792,7 +1969,7 @@ private fun ToastItem(message: String, backdrop: GraphicsLayer, onGone: () -> Un
                 color = colors.text,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
-                    .border(Space.hairline, colors.glassRim, ShapePill)
+                    .border(Glass.rim, colors.glassRim, ShapePill)
                     .padding(horizontal = Space.l, vertical = Space.s)
             )
         }
