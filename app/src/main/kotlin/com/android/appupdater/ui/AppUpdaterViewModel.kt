@@ -112,10 +112,16 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
                 _uiState.update { current ->
                     when (status) {
                         ScanStatus.Scanning -> current.copy(scanStatus = status)
-                        is ScanStatus.Success ->
-                            current.copy(scanStatus = status, loaded = true, updates = status.updates)
-                        is ScanStatus.Error ->
-                            current.copy(scanStatus = status, loaded = true, updates = status.partialUpdates)
+                        is ScanStatus.Success -> current.copy(
+                            scanStatus = status,
+                            loaded = true,
+                            updates = status.updates.pending(current.installedApps)
+                        )
+                        is ScanStatus.Error -> current.copy(
+                            scanStatus = status,
+                            loaded = true,
+                            updates = status.partialUpdates.pending(current.installedApps)
+                        )
                     }
                 }
             }
@@ -203,16 +209,13 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
 
     private suspend fun refreshInstalledApps(): List<InstalledApp> {
         val apps = repository.getInstalledApps()
-        val versions = apps.associate { it.packageName to it.versionCode }
-        _uiState.update { state ->
-            state.copy(
-                installedApps = apps,
-                updates = state.updates.filter {
-                    it.newVersionCode > (versions[it.packageName] ?: 0L)
-                }
-            )
-        }
+        _uiState.update { state -> state.copy(installedApps = apps, updates = state.updates.pending(apps)) }
         return apps
+    }
+
+    private fun List<AppUpdateInfo>.pending(apps: List<InstalledApp>): List<AppUpdateInfo> {
+        val versions = apps.associate { it.packageName to it.versionCode }
+        return filter { update -> versions[update.packageName]?.let { update.newVersionCode > it } == true }
     }
 
     override fun onCleared() {

@@ -7,11 +7,9 @@ import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.content.pm.SigningInfo
 import android.os.Build
-import android.util.DisplayMetrics
 import com.android.appupdater.data.api.ApkMirrorClient
 import com.android.appupdater.data.appLabel
 import com.android.appupdater.data.isStableRelease
-import com.android.appupdater.data.model.ApkMirrorApk
 import com.android.appupdater.data.model.ApkMirrorApp
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstalledApp
@@ -33,8 +31,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -54,15 +50,16 @@ class AppUpdateRepository(
 ) {
     private val packageManager = context.packageManager
     private val isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
-    private val isAutomotive = packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
     private val packageFlags = PackageManager.PackageInfoFlags.of(
         (PACKAGE_FLAGS or if (isTelevision) PackageManager.GET_CONFIGURATIONS else 0).toLong()
     )
-    private val deviceAbis = Build.SUPPORTED_ABIS.map(String::lowercase)
-    private val universalAbiRank = deviceAbis.size
-    private val deviceDensityBucket = DENSITY_BUCKETS
-        .firstOrNull { it >= context.resources.displayMetrics.densityDpi }
-        ?: DENSITY_BUCKETS.last()
+    private val selector = ApkMirrorSelector(
+        sdk = Build.VERSION.SDK_INT,
+        abis = Build.SUPPORTED_ABIS.asList(),
+        densityDpi = context.resources.displayMetrics.densityDpi,
+        isTelevision = isTelevision,
+        isAutomotive = packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
+    )
 
     suspend fun getInstalledApps(): List<InstalledApp> = withContext(Dispatchers.IO) {
         val televisionLaunchers = if (isTelevision) televisionLaunchers() else emptySet()
@@ -111,8 +108,11 @@ class AppUpdateRepository(
                 failedBatches > 0 -> add("Some applications were not checked on APKMirror: $mirrorFailure")
             }
             playResult.exceptionOrNull()?.let { add("Google Play: ${reason(it)}") }
-            val unchecked = confirmation.unconfirmed + delivery.unchecked
-            if (unchecked > 0) add("Google Play: $unchecked updates could not be checked")
+            val unchecked = (confirmation.unconfirmed + delivery.unchecked)
+                .distinct()
+                .map(packageManager::appLabel)
+                .sortedWith(String.CASE_INSENSITIVE_ORDER)
+            if (unchecked.isNotEmpty()) add("Google Play: could not check ${unchecked.joinToString()}")
         }
 
         emit(
@@ -149,7 +149,7 @@ class AppUpdateRepository(
             dates = confirmed.mapNotNull { (packageName, details) ->
                 playDate(details.second.updatedOn, details.first.locale)?.let { packageName to it }
             }.toMap(),
-            unconfirmed = results.count { it.second.isFailure }
+            unconfirmed = results.filter { it.second.isFailure }.map { it.first }
         )
     }
 
@@ -183,7 +183,7 @@ class AppUpdateRepository(
                         update
                     }
                 },
-                unchecked = checks.count { it.second?.isFailure == true }
+                unchecked = checks.filter { it.second?.isFailure == true }.map { it.first.packageName }
             )
         }
 
@@ -207,7 +207,7 @@ class AppUpdateRepository(
             val play = playByPackage[app.packageName]?.takeIf { matchesSignature(it, app) }
             val requiresTelevisionBuild = isTelevision && (app.isTelevisionBuild || play != null)
             val mirror = mirrorByPackage[app.packageName]
-                ?.mapNotNull { mirrorCandidate(it, app, requiresTelevisionBuild) }
+                ?.mapNotNull { selector.select(it, app, requiresTelevisionBuild) }
                 ?.maxByOrNull { it.apk.versionCode }
             val playUpdate = confirmation.apps[app.packageName]?.let { playUpdate(it, app) }
 
@@ -238,200 +238,10 @@ class AppUpdateRepository(
         }
     }
 
-    private fun mirrorCandidate(
-        app: ApkMirrorApp,
-        installed: InstalledApp,
-        requiresTelevisionBuild: Boolean
-    ): MirrorCandidate? {
-        if (!isStableRelease(app.versionName)) return null
-        val releaseNumbers = versionNumbers(app.versionName)
-        if (isInstalledVersion(releaseNumbers, installed)) return null
-        val apk = bestApk(app.apks, installed, releaseNumbers, requiresTelevisionBuild, variantDigits(app, installed)) ?: return null
-        return MirrorCandidate(
-            apk = apk,
-            versionName = fullVersionName(apk, app.versionName),
-            publishedAt = publishedAt(apk.publishDate.ifBlank { app.publishDate })
-        )
-    }
-
-    private fun isInstalledVersion(releaseNumbers: List<String>, installed: InstalledApp): Boolean {
-        val installedNumbers = versionNumbers(installed.versionName)
-        return releaseNumbers.isNotEmpty() &&
-            installedNumbers.size >= releaseNumbers.size &&
-            releaseNumbers.indices.all { releaseNumbers[it].trimStart('0') == installedNumbers[it].trimStart('0') }
-    }
-
     private fun matchesSignature(app: App, installed: InstalledApp): Boolean =
         app.certificateSetList.any { set ->
             runCatching { Base64.getUrlDecoder().decode(set.certificateSet).toHex() }.getOrNull() in installed.signatureSha1s
         }
-
-    private fun bestApk(
-        apks: List<ApkMirrorApk>,
-        installed: InstalledApp,
-        releaseNumbers: List<String>,
-        requiresTelevisionBuild: Boolean,
-        variantDigits: Int
-    ): ApkMirrorApk? = apks
-        .asSequence()
-        .filter { it.versionCode > installed.versionCode }
-        .filter { variantSuffix(it.versionCode, installed.versionCode, variantDigits) >= variantDigits }
-        .filter { it.minimumApi <= Build.VERSION.SDK_INT }
-        .filter { isStableLink(it.link, releaseNumbers) }
-        .filter { matchesFlavour(it, installed, releaseNumbers) }
-        .filter { matchesFormFactor(it, requiresTelevisionBuild) }
-        .filter { matchesSignature(it, installed) }
-        .filter { abiRank(it) != UNSUPPORTED_ABI }
-        .minWithOrNull(
-            compareByDescending<ApkMirrorApk> { variantSuffix(it.versionCode, installed.versionCode, MIN_VARIANT_SUFFIX) }
-                .thenBy(::abiRank)
-                .thenBy(::densityRank)
-                .thenByDescending(ApkMirrorApk::minimumApi)
-                .thenByDescending(ApkMirrorApk::versionCode)
-        )
-
-    private fun variantSuffix(versionCode: Long, installedVersionCode: Long, minimum: Int): Int {
-        var candidate = versionCode
-        var current = installedVersionCode
-        var matched = 0
-        while (candidate > 0 && current > 0 && candidate % 10 == current % 10) {
-            matched++
-            candidate /= 10
-            current /= 10
-        }
-        return if (matched >= minimum) matched else 0
-    }
-
-    private fun variantDigits(app: ApkMirrorApp, installed: InstalledApp): Int {
-        var digits = 0
-        app.apks.forEachIndexed { index, apk ->
-            for (other in app.apks.subList(index + 1, app.apks.size)) {
-                val width = differingDigits(apk.versionCode, other.versionCode)
-                if (width in 1..MAX_VARIANT_DIGITS && !apk.sameTarget(other)) digits = maxOf(digits, width)
-            }
-        }
-        if (digits == 0) return 0
-        val named = codeSuffix(app.versionName, app.apks.maxOf(ApkMirrorApk::versionCode))
-        return if (named != null && named <= MAX_VARIANT_DIGITS && named == codeSuffix(installed.versionName, installed.versionCode)) {
-            maxOf(digits, named)
-        } else {
-            digits
-        }
-    }
-
-    private fun codeSuffix(versionName: String, versionCode: Long): Int? {
-        val prefix = LEADING_VERSION.find(versionName.trim())?.value?.replace(".", "") ?: return null
-        val code = versionCode.toString()
-        return (code.length - prefix.length).takeIf { it > 0 && code.startsWith(prefix) }
-    }
-
-    private fun differingDigits(first: Long, second: Long): Int {
-        var a = first
-        var b = second
-        var position = 0
-        var width = 0
-        while (a > 0 || b > 0) {
-            position++
-            if (a % 10 != b % 10) width = position
-            a /= 10
-            b /= 10
-        }
-        return width
-    }
-
-    private fun ApkMirrorApk.sameTarget(other: ApkMirrorApk): Boolean =
-        architectures.toSet() == other.architectures.toSet() &&
-            densities.toSet() == other.densities.toSet() &&
-            minimumApi == other.minimumApi &&
-            capabilities.toSet() == other.capabilities.toSet()
-
-    private fun fullVersionName(apk: ApkMirrorApk, releaseVersion: String): String {
-        val description = apk.description.trim().substringBefore('\n').trim()
-        val detailed = releaseVersion.isNotEmpty() &&
-            description.startsWith(releaseVersion) &&
-            description.length <= MAX_VERSION_NAME
-        return if (detailed) description else releaseVersion
-    }
-
-    private fun abiRank(apk: ApkMirrorApk): Int {
-        if (apk.architectures.isEmpty()) return universalAbiRank
-        if (apk.architectures.any { it in UNIVERSAL_ARCHITECTURES }) return universalAbiRank
-        return apk.architectures.minOf(::abiIndex)
-    }
-
-    private fun abiIndex(architecture: String): Int =
-        deviceAbis.indexOf(architecture).takeIf { it >= 0 } ?: UNSUPPORTED_ABI
-
-    private fun densityRank(apk: ApkMirrorApk): Int {
-        if (apk.densities.isEmpty() || NO_DENSITY in apk.densities) return UNIVERSAL_DENSITY_RANK
-
-        val ranges = apk.densities.mapNotNull(::densityRange)
-        return when {
-            ranges.isEmpty() -> UNIVERSAL_DENSITY_RANK
-            ranges.any { it.first == it.last && it.first == deviceDensityBucket } -> MATCHING_DENSITY_RANK
-            ranges.any { it.first < it.last && deviceDensityBucket in it } -> UNIVERSAL_DENSITY_RANK
-            else -> FOREIGN_DENSITY_RANK
-        }
-    }
-
-    private fun densityRange(density: String): IntRange? {
-        val bounds = density.removeSuffix(DPI_SUFFIX).split('-').map { it.trim().toIntOrNull() ?: return null }
-        return when (bounds.size) {
-            1 -> bounds[0]..bounds[0]
-            2 -> bounds[0]..bounds[1]
-            else -> null
-        }
-    }
-
-    private fun matchesFormFactor(apk: ApkMirrorApk, requiresTelevisionBuild: Boolean): Boolean = when {
-        WEAR_STANDALONE in apk.capabilities -> false
-        !isAutomotive && apk.capabilities.any { AUTOMOTIVE in it } -> false
-        requiresTelevisionBuild -> LEANBACK in apk.capabilities || LEANBACK_STANDALONE in apk.capabilities
-        isTelevision -> true
-        else -> LEANBACK_STANDALONE !in apk.capabilities
-    }
-
-    private fun matchesFlavour(apk: ApkMirrorApk, installed: InstalledApp, releaseNumbers: List<String>): Boolean {
-        val installedFlavour = flavour(installed.versionName.lowercase().split(*VERSION_SEPARATORS)) ?: return true
-        val apkFlavour = flavour(variantTokens(apk.link, releaseNumbers)) ?: return true
-        return apkFlavour == installedFlavour
-    }
-
-    private fun versionNumbers(version: String): List<String> =
-        version.split(*VERSION_SEPARATORS).filter { it.isNotEmpty() && it.all(Char::isDigit) }
-
-    private fun variantTokens(link: String, numbers: List<String>): List<String> {
-        if (numbers.isEmpty()) return emptyList()
-        val tokens = link.trimEnd('/').substringAfterLast('/').lowercase().split('-')
-        var matched = 0
-        tokens.forEachIndexed { index, token ->
-            if (token == numbers[matched] && ++matched == numbers.size) return tokens.drop(index + 1)
-        }
-        return emptyList()
-    }
-
-    private fun flavour(tokens: List<String>): String? = tokens.firstOrNull { token ->
-        token.isNotEmpty() && token.all { it.isLetter() || it == '_' } && token !in NEUTRAL_TOKENS
-    }
-
-    private fun matchesSignature(apk: ApkMirrorApk, installed: InstalledApp): Boolean = when {
-        apk.signatureSha256s.isNotEmpty() && installed.signatureSha256s.isNotEmpty() ->
-            apk.signatureSha256s.any { it in installed.signatureSha256s }
-        apk.signatureSha1s.isNotEmpty() && installed.signatureSha1s.isNotEmpty() ->
-            apk.signatureSha1s.any { it in installed.signatureSha1s }
-        else -> true
-    }
-
-    private fun publishedAt(value: String): Long? {
-        val text = value.trim().replace(' ', 'T')
-        if (text.isEmpty()) return null
-
-        return runCatching { OffsetDateTime.parse(text).toInstant() }
-            .recoverCatching { LocalDateTime.parse(text).toInstant(ZoneOffset.UTC) }
-            .recoverCatching { LocalDate.parse(text).atStartOfDay(ZoneOffset.UTC).toInstant() }
-            .getOrNull()
-            ?.toEpochMilli()
-    }
 
     private fun playDate(value: String, locale: Locale): Long? = runCatching {
         LocalDate.parse(value.trim(), DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
@@ -439,18 +249,6 @@ class AppUpdateRepository(
             .toInstant()
             .toEpochMilli()
     }.getOrNull()
-
-    private fun isStableLink(link: String, releaseNumbers: List<String>): Boolean = link
-        .substringAfter(APKMIRROR_PATH_PREFIX, "")
-        .split('/')
-        .drop(2)
-        .all { isStableRelease(versionPart(it, releaseNumbers)) }
-
-    private fun versionPart(slug: String, releaseNumbers: List<String>): String {
-        val tokens = slug.split('-')
-        val start = releaseNumbers.firstOrNull()?.let(tokens::indexOf) ?: -1
-        return if (start < 0) slug else tokens.subList(start, tokens.size).joinToString("-")
-    }
 
     private fun PackageInfo.toInstalledApp(televisionLaunchers: Set<String>): InstalledApp? {
         val appInfo = applicationInfo ?: return null
@@ -460,6 +258,7 @@ class AppUpdateRepository(
             packageName = packageName,
             versionName = versionName.orEmpty(),
             versionCode = longVersionCode,
+            minSdk = appInfo.minSdkVersion,
             signatureSha1s = certificates.digests("SHA-1"),
             signatureSha256s = certificates.digests("SHA-256"),
             isEnabled = appInfo.enabled,
@@ -489,42 +288,13 @@ class AppUpdateRepository(
     private companion object {
         const val API_BATCH_SIZE = 100
         const val APKMIRROR_URL = "https://www.apkmirror.com"
-        const val APKMIRROR_PATH_PREFIX = "/apk/"
-        const val NO_DENSITY = "nodpi"
-        const val DPI_SUFFIX = "dpi"
-        const val MAX_VERSION_NAME = 60
         val NEWEST_FIRST = compareByDescending<AppUpdateInfo> { it.publishedAt ?: Long.MIN_VALUE }
             .thenBy { it.appName.lowercase(Locale.ROOT) }
-        const val UNSUPPORTED_ABI = Int.MAX_VALUE
-        const val MATCHING_DENSITY_RANK = 0
-        const val UNIVERSAL_DENSITY_RANK = 1
-        const val FOREIGN_DENSITY_RANK = 2
         const val PACKAGE_FLAGS = PackageManager.GET_SIGNING_CERTIFICATES
-        val UNIVERSAL_ARCHITECTURES = setOf("universal", "noarch")
-        const val WEAR_STANDALONE = "wear_standalone"
-        const val LEANBACK = "leanback"
-        const val LEANBACK_STANDALONE = "leanback_standalone"
-        const val AUTOMOTIVE = "automotive"
         const val PLAY_CONFIRMATIONS = 4
-        const val MIN_VARIANT_SUFFIX = 2
-        const val MAX_VARIANT_DIGITS = 3
-        val LEADING_VERSION = Regex("^\\d+(?:\\.\\d+)*")
-        val VERSION_SEPARATORS = charArrayOf('.', '-', ' ', '(', ')', '[', ']')
-        val NEUTRAL_TOKENS = setOf("android", "apk", "bundle", "download", "arm", "armeabi", "universal", "noarch", "nodpi")
-        val DENSITY_BUCKETS = listOf(
-            DisplayMetrics.DENSITY_LOW,
-            DisplayMetrics.DENSITY_MEDIUM,
-            DisplayMetrics.DENSITY_TV,
-            DisplayMetrics.DENSITY_HIGH,
-            DisplayMetrics.DENSITY_XHIGH,
-            DisplayMetrics.DENSITY_XXHIGH,
-            DisplayMetrics.DENSITY_XXXHIGH
-        )
     }
 
-    private class MirrorCandidate(val apk: ApkMirrorApk, val versionName: String, val publishedAt: Long?)
+    private class PlayConfirmation(val apps: Map<String, App>, val dates: Map<String, Long>, val unconfirmed: List<String>)
 
-    private class PlayConfirmation(val apps: Map<String, App>, val dates: Map<String, Long>, val unconfirmed: Int)
-
-    private class PlayDelivery(val updates: List<AppUpdateInfo>, val unchecked: Int)
+    private class PlayDelivery(val updates: List<AppUpdateInfo>, val unchecked: List<String>)
 }

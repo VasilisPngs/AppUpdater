@@ -42,6 +42,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests.all { it.useJUnitPlatform() }
+    }
 }
 
 dependencies {
@@ -56,4 +60,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.aurora.gplayapi)
     androidLintTool(platform(libs.asm.bom))
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }

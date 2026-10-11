@@ -681,7 +681,7 @@ private fun UpdatesView(
             }
         }
 
-        if (updates.isEmpty() && loaded) {
+        if (updates.isEmpty() && loaded && notice == null) {
             item(key = "empty") {
                 EmptyState(
                     symbol = R.drawable.ic_up_to_date,

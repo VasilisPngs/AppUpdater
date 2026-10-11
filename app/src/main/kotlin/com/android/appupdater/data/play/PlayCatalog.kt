@@ -28,9 +28,20 @@ class PlayCatalog(private val authProvider: PlayAuthProvider) {
                 certificateHash = certificateHash
             )
         }.second.any { it.type == PlayFile.Type.BASE }
-    } catch (_: GooglePlayException) {
-        false
+    } catch (exception: GooglePlayException) {
+        if (exception.isUnavailable) false else throw exception
     }
+
+    private val GooglePlayException.isUnavailable: Boolean
+        get() = when (this) {
+            is GooglePlayException.AppNotPurchased,
+            is GooglePlayException.AppNotSupported,
+            is GooglePlayException.AppRemoved,
+            is GooglePlayException.NotFound,
+            is GooglePlayException.EmptyDownloads -> true
+            is GooglePlayException.Unknown -> code < HTTP_STATUS_MIN
+            else -> false
+        }
 
     private fun detailsHelper(auth: AuthData): AppDetailsHelper =
         AppDetailsHelper(auth).using(authProvider.httpClient)
@@ -43,5 +54,9 @@ class PlayCatalog(private val authProvider: PlayAuthProvider) {
             val renewed = authProvider.renew(session)
             renewed to block(renewed)
         }
+    }
+
+    private companion object {
+        const val HTTP_STATUS_MIN = 100
     }
 }
