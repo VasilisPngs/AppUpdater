@@ -8,5 +8,5 @@
       android:strokeWidth="1.8"
       android:strokeLineCap="round"
       android:strokeLineJoin="round"
-      android:pathData="M5,12.5L9.5,17L19,7.5"/>
+      android:pathData="M6,13.1L10.2,18L18,6"/>
 </vector>

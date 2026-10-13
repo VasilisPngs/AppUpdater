@@ -197,7 +197,6 @@ import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
 import com.android.appupdater.data.model.ThemeMode
-import com.android.appupdater.data.repository.ScanStatus
 import com.android.appupdater.ui.theme.Design
 import com.android.appupdater.ui.theme.DisabledOpacity
 import com.android.appupdater.ui.theme.Glass
@@ -230,6 +229,7 @@ private val TabBarSafeOverlap = 13.dp
 private val BarTopMin = 8.dp
 private val BarBottom = 6.dp
 private val BarIconSize = 22.dp
+private val BarTitleGap = 13.dp
 private val ContentBottomGap = 28.dp
 private val WideSheetBreakpoint = 600.dp
 private val AppIconSize = 44.dp
@@ -395,7 +395,7 @@ fun AppUpdaterScreen(
             }
         }
     }
-    val scanning = uiState.scanStatus == ScanStatus.Scanning
+    val scanning = uiState.scanning
     val loading = scanning && !uiState.loaded
     val refreshing = scanning && uiState.loaded && selectedTab == AppTab.Updates
     var loadingShown by remember { mutableStateOf(false) }
@@ -460,13 +460,14 @@ fun AppUpdaterScreen(
                                 exitFocus = tabFocus,
                                 contentPadding = contentPadding,
                                 loaded = uiState.loaded,
-                                notice = (uiState.scanStatus as? ScanStatus.Error)?.message,
+                                notice = uiState.notice,
                                 updates = updates,
                                 installs = uiState.installs,
                                 playInstalls = uiState.playInstalls,
                                 onApkMirror = { openUrlInBrowser(context, it) },
                                 onPlay = viewModel::updateFromPlay,
                                 onManual = { manualPackage = it.packageName },
+                                onRefresh = viewModel::scanForUpdates,
                                 modifier = pull.modifier.graphicsLayer { translationY = pull.offset }
                             )
                         }
@@ -607,6 +608,7 @@ private fun UpdatesView(
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
     onManual: (AppUpdateInfo) -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val firstKey = updates.firstOrNull()?.first?.packageName
@@ -649,7 +651,7 @@ private fun UpdatesView(
             )
         }
 
-        if (notice != null) {
+        if (notice != null && updates.isNotEmpty()) {
             item(key = "notice") {
                 Card(style = CardStyle.Tight, modifier = Modifier.animateItem()) {
                     Row(
@@ -681,14 +683,25 @@ private fun UpdatesView(
             }
         }
 
-        if (updates.isEmpty() && loaded && notice == null) {
+        if (updates.isEmpty() && loaded) {
             item(key = "empty") {
-                EmptyState(
-                    symbol = R.drawable.ic_up_to_date,
-                    title = stringResource(R.string.all_up_to_date),
-                    message = stringResource(R.string.all_up_to_date_note),
-                    modifier = Modifier.animateItem()
-                )
+                if (notice == null) {
+                    EmptyState(
+                        symbol = R.drawable.ic_up_to_date,
+                        title = stringResource(R.string.all_up_to_date),
+                        message = stringResource(R.string.all_up_to_date_note),
+                        modifier = Modifier.animateItem()
+                    )
+                } else {
+                    EmptyState(
+                        symbol = R.drawable.ic_warning,
+                        title = stringResource(R.string.check_failed),
+                        message = notice,
+                        modifier = Modifier.animateItem()
+                    ) {
+                        Button(text = stringResource(R.string.try_again), onClick = onRefresh)
+                    }
+                }
             }
         }
 
@@ -800,7 +813,7 @@ private fun SettingsView(
         item(key = "install-bundle") {
             Card(style = CardStyle.Flush) {
                 ListRow(onClick = onPickBundle) {
-                    Text(text = stringResource(R.string.install_bundle), style = Design.type.button, color = colors.accent)
+                    Text(text = stringResource(R.string.install_bundle), style = Design.type.body, color = colors.accent)
                 }
             }
         }
@@ -1400,8 +1413,7 @@ private fun SheetButton(
                 !primary -> colors.text
                 enabled -> Color.White
                 else -> colors.tertiary
-            },
-            modifier = Modifier.size(BarIconSize)
+            }
         )
     }
 }
@@ -1606,7 +1618,7 @@ private fun VersionCodeField(state: TextFieldState, focus: FocusRequester, onDon
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
         onKeyboardAction = { onDone() },
         lineLimits = TextFieldLineLimits.SingleLine,
-        cursorBrush = SolidColor(colors.text),
+        cursorBrush = SolidColor(colors.accent),
         decorator = { field ->
             Box(
                 modifier = Modifier
@@ -1636,7 +1648,8 @@ private fun EmptyState(
     @DrawableRes symbol: Int,
     title: String,
     message: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null
 ) {
     val colors = Design.colors
     Card(style = CardStyle.Flush, modifier = modifier) {
@@ -1655,6 +1668,7 @@ private fun EmptyState(
             )
             Text(text = title, style = Design.type.h2, color = colors.text, textAlign = TextAlign.Center)
             Text(text = message, style = Design.type.subhead, color = colors.muted, textAlign = TextAlign.Center)
+            if (action != null) Box(modifier = Modifier.padding(top = Space.m)) { action() }
         }
     }
 }
@@ -1725,10 +1739,11 @@ private fun TopBar(
         ) { measurables, constraints ->
             val loose = constraints.copy(minWidth = 0, minHeight = 0)
             val end = measurables[1].measure(loose)
-            val side = end.width + Space.m.roundToPx()
-            val heading = measurables[0].measure(loose.copy(maxWidth = (constraints.maxWidth - side * 2).coerceAtLeast(0)))
+            val side = if (end.width > 0) end.width + BarTitleGap.roundToPx() else 0
+            val heading = measurables[0].measure(loose.copy(maxWidth = (constraints.maxWidth - side).coerceAtLeast(0)))
             layout(constraints.maxWidth, constraints.maxHeight) {
-                heading.placeRelative((constraints.maxWidth - heading.width) / 2, (constraints.maxHeight - heading.height) / 2)
+                val x = min((constraints.maxWidth - heading.width) / 2, constraints.maxWidth - side - heading.width)
+                heading.placeRelative(x, (constraints.maxHeight - heading.height) / 2)
                 end.placeRelative(constraints.maxWidth - end.width, (constraints.maxHeight - end.height) / 2)
             }
         }

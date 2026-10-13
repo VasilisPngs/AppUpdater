@@ -1,6 +1,7 @@
 package com.android.appupdater
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -35,6 +36,16 @@ class MainActivity : ComponentActivity() {
                 AppUpdaterScreen(viewModel = viewModel)
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val light = resources.getBoolean(R.bool.light_system_bars)
+        WindowCompat.getInsetsController(window, window.decorView).run {
+            isAppearanceLightStatusBars = light
+            isAppearanceLightNavigationBars = light
+        }
+        window.setBackgroundDrawableResource(R.color.window_background)
     }
 
     override fun onNewIntent(intent: Intent) {

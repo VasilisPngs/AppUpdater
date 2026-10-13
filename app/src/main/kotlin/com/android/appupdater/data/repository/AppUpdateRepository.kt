@@ -38,7 +38,6 @@ import java.util.Base64
 import java.util.Locale
 
 sealed interface ScanStatus {
-    data object Scanning : ScanStatus
     data class Success(val updates: List<AppUpdateInfo>) : ScanStatus
     data class Error(val message: String, val partialUpdates: List<AppUpdateInfo>) : ScanStatus
 }
