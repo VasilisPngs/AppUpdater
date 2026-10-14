@@ -84,8 +84,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -173,9 +171,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -331,7 +326,7 @@ fun AppUpdaterScreen(
     val tabFocus = remember { FocusRequester() }
     val pull = rememberPullRefreshState(
         atTop = { !updatesListState.canScrollBackward },
-        onRefresh = { viewModel.scanForUpdates() }
+        onRefresh = viewModel::refresh
     )
     val inputModeManager = LocalInputModeManager.current
     val coroutineScope = rememberCoroutineScope()
@@ -470,7 +465,7 @@ fun AppUpdaterScreen(
                                 onApkMirror = { if (!openUrlInBrowser(context, it)) toasts.show(noBrowser) },
                                 onPlay = viewModel::updateFromPlay,
                                 onManual = { manualPackage = it.packageName },
-                                onRefresh = viewModel::scanForUpdates,
+                                onRefresh = viewModel::refresh,
                                 modifier = pull.modifier.graphicsLayer { translationY = pull.offset }
                             )
                         }
@@ -535,7 +530,7 @@ fun AppUpdaterScreen(
                 titled = titled,
                 actions = selectedTab == AppTab.Updates,
                 listFocus = activeFocus,
-                onRefresh = viewModel::scanForUpdates
+                onRefresh = viewModel::refresh
             )
 
             TabBar(
@@ -797,11 +792,10 @@ private fun SettingsView(
                     Row(
                         modifier = Modifier
                             .defaultMinSize(minHeight = Space.row)
-                            .toggleable(
-                                value = includeDisabledApps,
+                            .clickable(
                                 interactionSource = interaction,
                                 indication = null,
-                                onValueChange = onIncludeDisabledAppsChange
+                                onClick = { onIncludeDisabledAppsChange(!includeDisabledApps) }
                             )
                             .padding(horizontal = Space.l),
                         horizontalArrangement = Arrangement.spacedBy(Space.m),
@@ -1157,7 +1151,6 @@ private fun Button(
             .focusRing(focused, colors.accent, Dp.Infinity)
             .clip(ShapePill)
             .background(colors.fill)
-            .semantics { if (busy) disabled() }
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -1355,7 +1348,7 @@ private fun SheetBar(title: String, doneEnabled: Boolean, onClose: () -> Unit, o
         horizontalArrangement = Arrangement.spacedBy(Space.s),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SheetButton(icon = R.drawable.ic_close, description = stringResource(R.string.cancel), onClick = onClose)
+        SheetButton(icon = R.drawable.ic_close, onClick = onClose)
         Text(
             text = title,
             style = Design.type.h2,
@@ -1367,7 +1360,6 @@ private fun SheetBar(title: String, doneEnabled: Boolean, onClose: () -> Unit, o
         )
         SheetButton(
             icon = R.drawable.ic_check,
-            description = stringResource(R.string.update),
             primary = true,
             enabled = doneEnabled,
             onClick = onDone
@@ -1378,7 +1370,6 @@ private fun SheetBar(title: String, doneEnabled: Boolean, onClose: () -> Unit, o
 @Composable
 private fun SheetButton(
     @DrawableRes icon: Int,
-    description: String,
     onClick: () -> Unit,
     primary: Boolean = false,
     enabled: Boolean = true
@@ -1417,7 +1408,7 @@ private fun SheetButton(
     ) {
         Icon(
             painter = painterResource(icon),
-            contentDescription = description,
+            contentDescription = null,
             tint = when {
                 !primary -> colors.text
                 enabled -> Color.White
@@ -1588,12 +1579,10 @@ private fun MenuItem(
         modifier = modifier
             .fillMaxWidth()
             .background(fill)
-            .selectable(
-                selected = checked,
+            .clickable(
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled,
-                role = Role.RadioButton,
                 onClick = onClick
             )
             .padding(start = MenuItemStart, end = MenuItemEnd, top = MenuItemVertical, bottom = MenuItemVertical),
@@ -1878,8 +1867,7 @@ private fun TabItem(
         modifier = modifier
             .alpha(fade)
             .focusRing(focused, colors.accent, Dp.Infinity)
-            .selectable(
-                selected = selected,
+            .clickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = onClick

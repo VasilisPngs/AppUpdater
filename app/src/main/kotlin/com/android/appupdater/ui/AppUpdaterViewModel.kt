@@ -34,7 +34,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 sealed interface InstallEvent {
     data class Finished(val appName: String) : InstallEvent
@@ -63,12 +62,14 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     private val _uiState = MutableStateFlow(AppUpdaterUiState())
     private val _themeMode = MutableStateFlow(ThemeMode.System)
     private val _events = Channel<InstallEvent>(Channel.BUFFERED)
-    private val installJobs = ConcurrentHashMap<String, Job>()
-    private val packageChanges = Channel<Unit>(Channel.CONFLATED)
+    private val pendingBundles = mutableSetOf<String>()
+    private val packageChanges = Channel<String>(Channel.UNLIMITED)
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            intent.data?.schemeSpecificPart?.let(AppIconCache::evict)
-            packageChanges.trySend(Unit)
+            if (intent.action != Intent.ACTION_PACKAGE_REPLACED && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return
+            val packageName = intent.data?.schemeSpecificPart ?: return
+            AppIconCache.evict(packageName)
+            packageChanges.trySend(packageName)
         }
     }
     private var scanJob: Job? = null
@@ -88,7 +89,13 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
             }
         )
         viewModelScope.launch {
-            packageChanges.receiveAsFlow().collect { refreshInstalledApps() }
+            packageChanges.receiveAsFlow().collect { packageName ->
+                val app = repository.getInstalledApp(packageName)
+                _uiState.update { state ->
+                    val apps = state.installedApps.filterNot { it.packageName == packageName } + listOfNotNull(app)
+                    state.copy(installedApps = apps, updates = state.updates.pending(apps))
+                }
+            }
         }
         viewModelScope.launch {
             val (includeDisabledApps, themeMode) = withContext(Dispatchers.IO) {
@@ -100,7 +107,11 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun scanForUpdates() {
+    fun refresh() {
+        if (!_uiState.value.scanning) scanForUpdates()
+    }
+
+    private fun scanForUpdates() {
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
             _uiState.update { it.copy(scanning = true) }
@@ -108,22 +119,21 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
             val includeDisabledApps = _uiState.value.includeDisabledApps
             val appsToCheck = apps.filter { includeDisabledApps || it.isEnabled }
 
-            repository.scanForUpdates(appsToCheck).collect { status ->
-                _uiState.update { current ->
-                    when (status) {
-                        is ScanStatus.Success -> current.copy(
-                            scanning = false,
-                            loaded = true,
-                            notice = null,
-                            updates = status.updates.pending(current.installedApps)
-                        )
-                        is ScanStatus.Error -> current.copy(
-                            scanning = false,
-                            loaded = true,
-                            notice = status.message,
-                            updates = status.partialUpdates.pending(current.installedApps)
-                        )
-                    }
+            val status = repository.scanForUpdates(appsToCheck)
+            _uiState.update { current ->
+                when (status) {
+                    is ScanStatus.Success -> current.copy(
+                        scanning = false,
+                        loaded = true,
+                        notice = null,
+                        updates = status.updates.pending(current.installedApps)
+                    )
+                    is ScanStatus.Error -> current.copy(
+                        scanning = false,
+                        loaded = true,
+                        notice = status.message,
+                        updates = status.partialUpdates.pending(current.installedApps)
+                    )
                 }
             }
         }
@@ -131,9 +141,9 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
 
     fun installBundle(uri: Uri) {
         val key = uri.toString()
-        if (installJobs.containsKey(key)) return
+        if (!pendingBundles.add(key)) return
 
-        installJobs[key] = viewModelScope.launch {
+        viewModelScope.launch {
             bundleInstaller.install(uri) { state ->
                 when (state) {
                     is InstallState.Success -> _events.trySend(InstallEvent.Finished(state.appName))
@@ -143,7 +153,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
                 _uiState.update { it.copy(installs = it.installs + (key to state)) }
             }
 
-            installJobs.remove(key)
+            pendingBundles.remove(key)
             _uiState.update { it.copy(installs = it.installs - key) }
         }
     }
@@ -175,15 +185,14 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         install: suspend (onProgress: (Float?) -> Unit) -> InstallEvent
     ) {
         val packageName = update.packageName
-        if (installJobs.containsKey(packageName)) return
+        if (packageName in _uiState.value.playInstalls) return
 
         _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(manual, null))) }
-        installJobs[packageName] = viewModelScope.launch {
+        viewModelScope.launch {
             val event = install { progress ->
                 _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(manual, progress))) }
             }
 
-            installJobs.remove(packageName)
             _uiState.update { it.copy(playInstalls = it.playInstalls - packageName) }
             _events.trySend(event)
         }

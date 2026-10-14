@@ -13,8 +13,12 @@ android {
 
     defaultConfig {
         applicationId = "com.android.appupdater"
-        minSdk = 34
-        targetSdk = 37
+        minSdk {
+            version = release(34)
+        }
+        targetSdk {
+            version = release(37)
+        }
         versionCode = (System.currentTimeMillis() / 1000).toInt()
         versionName = "AppUpdater"
     }

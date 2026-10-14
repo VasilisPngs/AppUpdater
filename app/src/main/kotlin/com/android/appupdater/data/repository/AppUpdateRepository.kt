@@ -22,9 +22,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -66,18 +63,20 @@ class AppUpdateRepository(
             .mapNotNull { packageInfo -> runCatching { packageInfo.toInstalledApp(televisionLaunchers) }.getOrNull() }
     }
 
-    private fun televisionLaunchers(): Set<String> = packageManager
+    suspend fun getInstalledApp(packageName: String): InstalledApp? = withContext(Dispatchers.IO) {
+        val televisionLaunchers = if (isTelevision) televisionLaunchers(packageName) else emptySet()
+        runCatching { packageManager.getPackageInfo(packageName, packageFlags).toInstalledApp(televisionLaunchers) }.getOrNull()
+    }
+
+    private fun televisionLaunchers(packageName: String? = null): Set<String> = packageManager
         .queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER),
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER).setPackage(packageName),
             PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DISABLED_COMPONENTS.toLong())
         )
         .mapTo(HashSet()) { it.activityInfo.packageName }
 
-    fun scanForUpdates(appsToCheck: List<InstalledApp>): Flow<ScanStatus> = flow {
-        if (appsToCheck.isEmpty()) {
-            emit(ScanStatus.Success(emptyList()))
-            return@flow
-        }
+    suspend fun scanForUpdates(appsToCheck: List<InstalledApp>): ScanStatus = withContext(Dispatchers.IO) {
+        if (appsToCheck.isEmpty()) return@withContext ScanStatus.Success(emptyList())
 
         val batches = appsToCheck.chunked(API_BATCH_SIZE)
         val (mirrorResults, playResult) = coroutineScope {
@@ -114,11 +113,8 @@ class AppUpdateRepository(
             if (unchecked.isNotEmpty()) add("Google Play: could not check ${unchecked.joinToString()}")
         }
 
-        emit(
-            if (failures.isEmpty()) ScanStatus.Success(updates)
-            else ScanStatus.Error(failures.joinToString("\n"), updates)
-        )
-    }.flowOn(Dispatchers.IO)
+        if (failures.isEmpty()) ScanStatus.Success(updates) else ScanStatus.Error(failures.joinToString("\n"), updates)
+    }
 
     private inline fun <T> attempt(block: () -> T): Result<T> = try {
         Result.success(block())

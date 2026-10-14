@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
+import android.util.DisplayMetrics
 import com.android.appupdater.data.model.InstallState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -139,13 +140,13 @@ class BundleInstaller(private val context: Context) {
         const val FALLBACK_LANGUAGE = "en"
         val ABIS = setOf("armeabi", "armeabi_v7a", "arm64_v8a", "x86", "x86_64", "riscv64")
         val DENSITIES = mapOf(
-            "ldpi" to 120,
-            "mdpi" to 160,
-            "tvdpi" to 213,
-            "hdpi" to 240,
-            "xhdpi" to 320,
-            "xxhdpi" to 480,
-            "xxxhdpi" to 640
+            "ldpi" to DisplayMetrics.DENSITY_LOW,
+            "mdpi" to DisplayMetrics.DENSITY_MEDIUM,
+            "tvdpi" to DisplayMetrics.DENSITY_TV,
+            "hdpi" to DisplayMetrics.DENSITY_HIGH,
+            "xhdpi" to DisplayMetrics.DENSITY_XHIGH,
+            "xxhdpi" to DisplayMetrics.DENSITY_XXHIGH,
+            "xxxhdpi" to DisplayMetrics.DENSITY_XXXHIGH
         )
         val LANGUAGE_PATTERN = Regex("[a-z]{2,3}(_[a-z0-9]{2,8})*")
     }

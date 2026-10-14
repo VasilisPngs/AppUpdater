@@ -40,6 +40,9 @@
 - Text always uses the device's own default font through `FontFamily.Default`, whatever the platform or the manufacturer sets; never bundle, download or name a font family, and let the platform render the type scale weights instead of forcing font variation axes.
 - Obtain values from the relevant official platform API whenever the system or the device can provide them at runtime, including device capabilities, application metadata such as icons, labels and package information, locales and configuration, instead of assuming manufacturer-specific behavior or duplicating them in resources and hardcoded mappings.
 - An intent that no installed app can handle, such as an APKMirror link on a television without a browser or the APK bundle picker, shows a toast instead of failing silently or crashing.
+- Returning to the app, when the single activity restarts after being stopped, starts a check unless one is already running; the refresh button, pull to refresh and Try again likewise never cancel and restart a running check, and only changing the disabled apps setting does, because it changes the set of apps.
+- A package broadcast updates only the package it names: removals and additions that are part of a replacement are ignored, and a replacement, a new installation or a removal rereads or drops just that package.
+- AppUpdater carries no accessibility code: no content descriptions, roles, or selected, toggleable or disabled semantics; interactive elements use plain clickable.
 - Keep expensive work away from the UI thread.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
 - Draw edge to edge and let the window insets place the content, rather than reserving space manually.
@@ -47,6 +50,7 @@
 
 ## Verification
 - Before considering a change complete, verify build/lint results, dependencies, resources, release configuration and relevant runtime behavior.
+- Lint keeps `androidLintTool(platform(libs.asm.bom))` while the Java target is newer than the ASM bundled with lint: without it lint still passes but skips every class with "Unsupported class file major version 71".
 
 ## Official references
 
