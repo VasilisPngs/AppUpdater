@@ -39,6 +39,8 @@ data class Palette(
     val tabLens: Color,
     val switchOff: Color,
     val menu: Color,
+    val bar: Color,
+    val separator: Color,
     val glassEdge: Color,
     val glassRim: Color,
     val shadow: Color,
@@ -64,6 +66,8 @@ private val DarkPalette = Palette(
     tabLens = Color(0xB3000000),
     switchOff = Color(0xFF5B5A5F),
     menu = Color(0xFF2C2C2E).copy(alpha = Glass.MATERIAL),
+    bar = Color(0xC90E0E0E),
+    separator = Color(0x80545458),
     glassEdge = Color(0x2EFFFFFF),
     glassRim = Color(0x8C000000),
     shadow = Color(0x73000000),
@@ -86,6 +90,8 @@ private val LightPalette = Palette(
     tabLens = Color(0x13000000),
     switchOff = Color(0xFFD1D1D6),
     menu = Color(0x99FFFFFF),
+    bar = Color(0xDBFBFAFF),
+    separator = Color(0x1F3C3C43),
     glassEdge = Color(0xD9FFFFFF),
     glassRim = Color(0x24121828),
     shadow = Color(0x1F121828),
@@ -198,7 +204,6 @@ object Glass {
     val shadowOffset = 18.dp
     val floatShadowBlur = 48.dp
     val floatShadowOffset = 8.dp
-    val edgeFade = 24.dp
 }
 
 const val PressedScale = 0.96f

@@ -135,10 +135,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
@@ -393,6 +390,13 @@ fun AppUpdaterScreen(
             }
         }
     }
+    val edged by remember(activeListState, barEdge) {
+        derivedStateOf {
+            val info = activeListState.layoutInfo
+            val first = info.visibleItemsInfo.firstOrNull()
+            first != null && (first.index > 0 || first.offset - info.viewportStartOffset < barEdge)
+        }
+    }
     val scanning = uiState.scanning
     val loading = scanning && !uiState.loaded
     val refreshing = scanning && uiState.loaded && selectedTab == AppTab.Updates
@@ -528,6 +532,7 @@ fun AppUpdaterScreen(
                     stringResource(selectedTab.labelRes)
                 },
                 titled = titled,
+                edged = edged,
                 actions = selectedTab == AppTab.Updates,
                 listFocus = activeFocus,
                 onRefresh = viewModel::refresh
@@ -1680,6 +1685,7 @@ private fun TopBar(
     endPadding: Dp,
     title: String,
     titled: Boolean,
+    edged: Boolean,
     actions: Boolean,
     listFocus: FocusRequester,
     onRefresh: () -> Unit
@@ -1690,17 +1696,31 @@ private fun TopBar(
     val itemExit = fadeOut(tween(Motion.FAST, easing = Motion.ease)) +
         scaleOut(tween(Motion.FAST, easing = Motion.ease), targetScale = BAR_ITEM_HIDDEN_SCALE)
     Box(modifier = Modifier.fillMaxWidth()) {
-        BackdropSurface(
-            backdrop = backdrop,
-            tint = colors.background.copy(alpha = Glass.BAR),
-            shape = RectangleShape,
-            blurRadius = Glass.blur,
-            observe = observe,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(top + Space.control + BarBottom + Glass.edgeFade)
-                .fadeBottom(Glass.edgeFade)
-        )
+        key(actions) {
+            val edge = animateFloatAsState(
+                targetValue = if (edged) 1f else 0f,
+                animationSpec = tween(Motion.FAST, easing = Motion.ease),
+                label = "edge"
+            )
+            val shown by remember { derivedStateOf { edge.value > 0f } }
+            if (shown) {
+                BackdropSurface(
+                    backdrop = backdrop,
+                    tint = colors.bar,
+                    shape = RectangleShape,
+                    blurRadius = Glass.blur,
+                    observe = observe,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(top + Space.control + BarBottom)
+                        .graphicsLayer { alpha = edge.value }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(colors.separator, Offset(0f, size.height - 1f), Size(size.width, 1f))
+                        }
+                )
+            }
+        }
         Layout(
             content = {
                 key(title) {
@@ -1987,20 +2007,6 @@ private fun ToastItem(message: String, backdrop: GraphicsLayer, onGone: () -> Un
         }
     }
 }
-
-private fun Modifier.fadeBottom(length: Dp): Modifier =
-    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithCache {
-            val mask = Brush.verticalGradient(
-                0f to Color.Black,
-                (1f - length.toPx() / size.height).coerceIn(0f, 1f) to Color.Black,
-                1f to Color.Transparent
-            )
-            onDrawWithContent {
-                drawContent()
-                drawRect(mask, blendMode = BlendMode.DstIn)
-            }
-        }
 
 private fun Modifier.focusRing(
     focused: Boolean,
