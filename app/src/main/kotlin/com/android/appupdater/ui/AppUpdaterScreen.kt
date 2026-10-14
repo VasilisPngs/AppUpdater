@@ -390,13 +390,6 @@ fun AppUpdaterScreen(
             }
         }
     }
-    val edged by remember(activeListState, barEdge) {
-        derivedStateOf {
-            val info = activeListState.layoutInfo
-            val first = info.visibleItemsInfo.firstOrNull()
-            first != null && (first.index > 0 || first.offset - info.viewportStartOffset < barEdge)
-        }
-    }
     val scanning = uiState.scanning
     val loading = scanning && !uiState.loaded
     val refreshing = scanning && uiState.loaded && selectedTab == AppTab.Updates
@@ -532,7 +525,7 @@ fun AppUpdaterScreen(
                     stringResource(selectedTab.labelRes)
                 },
                 titled = titled,
-                edged = edged,
+                edged = activeListState.canScrollBackward,
                 actions = selectedTab == AppTab.Updates,
                 listFocus = activeFocus,
                 onRefresh = viewModel::refresh
@@ -1699,7 +1692,7 @@ private fun TopBar(
         key(actions) {
             val edge = animateFloatAsState(
                 targetValue = if (edged) 1f else 0f,
-                animationSpec = tween(Motion.FAST, easing = Motion.ease),
+                animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
                 label = "edge"
             )
             val shown by remember { derivedStateOf { edge.value > 0f } }
@@ -1708,7 +1701,8 @@ private fun TopBar(
                     backdrop = backdrop,
                     tint = colors.bar,
                     shape = RectangleShape,
-                    blurRadius = Glass.blur,
+                    blurRadius = Glass.barBlur,
+                    saturation = 1f,
                     observe = observe,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1716,7 +1710,7 @@ private fun TopBar(
                         .graphicsLayer { alpha = edge.value }
                         .drawWithContent {
                             drawContent()
-                            drawRect(colors.separator, Offset(0f, size.height - 1f), Size(size.width, 1f))
+                            drawRect(colors.barLine, Offset(0f, size.height), Size(size.width, Glass.rim.toPx()))
                         }
                 )
             }

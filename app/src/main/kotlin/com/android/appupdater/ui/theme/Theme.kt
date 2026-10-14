@@ -40,7 +40,7 @@ data class Palette(
     val switchOff: Color,
     val menu: Color,
     val bar: Color,
-    val separator: Color,
+    val barLine: Color,
     val glassEdge: Color,
     val glassRim: Color,
     val shadow: Color,
@@ -66,8 +66,8 @@ private val DarkPalette = Palette(
     tabLens = Color(0xB3000000),
     switchOff = Color(0xFF5B5A5F),
     menu = Color(0xFF2C2C2E).copy(alpha = Glass.MATERIAL),
-    bar = Color(0xC90E0E0E),
-    separator = Color(0x80545458),
+    bar = Color(0xCC0F0F0F),
+    barLine = Color(0x0DFFFFFF),
     glassEdge = Color(0x2EFFFFFF),
     glassRim = Color(0x8C000000),
     shadow = Color(0x73000000),
@@ -90,8 +90,8 @@ private val LightPalette = Palette(
     tabLens = Color(0x13000000),
     switchOff = Color(0xFFD1D1D6),
     menu = Color(0x99FFFFFF),
-    bar = Color(0xDBFBFAFF),
-    separator = Color(0x1F3C3C43),
+    bar = Color(0xCCFDFBFF),
+    barLine = Color(0x0F000000),
     glassEdge = Color(0xD9FFFFFF),
     glassRim = Color(0x24121828),
     shadow = Color(0x1F121828),
@@ -199,6 +199,7 @@ object Glass {
     const val SATURATION = 1.8f
     val rim = 0.5.dp
     val blur = 32.dp
+    val barBlur = 2.dp
     val toastBlur = 18.dp
     val shadowBlur = 40.dp
     val shadowOffset = 18.dp

@@ -46,14 +46,18 @@ internal fun Modifier.captureBackdrop(backdrop: GraphicsLayer, background: Color
     }
 
 internal fun backdropEffect(radius: Float, saturation: Float): ComposeRenderEffect =
-    RenderEffect.createBlurEffect(
-        radius,
-        radius,
-        RenderEffect.createColorFilterEffect(
-            ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) })
-        ),
-        Shader.TileMode.CLAMP
-    ).asComposeRenderEffect()
+    if (saturation == 1f) {
+        RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
+    } else {
+        RenderEffect.createBlurEffect(
+            radius,
+            radius,
+            RenderEffect.createColorFilterEffect(
+                ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) })
+            ),
+            Shader.TileMode.CLAMP
+        )
+    }.asComposeRenderEffect()
 
 private fun CacheDrawScope.topHighlight(shape: Shape): Path {
     val outline = shape.createOutline(size, layoutDirection, this)
@@ -81,6 +85,7 @@ internal fun BackdropSurface(
     shape: Shape,
     blurRadius: Dp,
     modifier: Modifier = Modifier,
+    saturation: Float = Glass.SATURATION,
     highlight: Color = Color.Transparent,
     observe: () -> Unit = {},
     content: @Composable BoxScope.() -> Unit = {}
@@ -88,8 +93,8 @@ internal fun BackdropSurface(
     val layer = rememberGraphicsLayer()
     val density = LocalDensity.current
     var origin by remember { mutableStateOf(Offset.Zero) }
-    val effect = remember(blurRadius, density) {
-        backdropEffect(with(density) { blurRadius.toPx() }, Glass.SATURATION)
+    val effect = remember(blurRadius, saturation, density) {
+        backdropEffect(with(density) { blurRadius.toPx() }, saturation)
     }
 
     Box(
