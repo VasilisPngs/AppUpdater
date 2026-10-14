@@ -1,5 +1,6 @@
 package com.android.appupdater.ui
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -362,6 +363,8 @@ fun AppUpdaterScreen(
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
     val failedFormat = stringResource(R.string.update_failed)
+    val noBrowser = stringResource(R.string.no_browser)
+    val noFilePicker = stringResource(R.string.no_file_picker)
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -464,7 +467,7 @@ fun AppUpdaterScreen(
                                 updates = updates,
                                 installs = uiState.installs,
                                 playInstalls = uiState.playInstalls,
-                                onApkMirror = { openUrlInBrowser(context, it) },
+                                onApkMirror = { if (!openUrlInBrowser(context, it)) toasts.show(noBrowser) },
                                 onPlay = viewModel::updateFromPlay,
                                 onManual = { manualPackage = it.packageName },
                                 onRefresh = viewModel::scanForUpdates,
@@ -482,7 +485,13 @@ fun AppUpdaterScreen(
                                 themeAnchor = anchor
                                 themeMenu = true
                             },
-                            onPickBundle = { bundlePicker.launch(arrayOf("*/*")) }
+                            onPickBundle = {
+                                try {
+                                    bundlePicker.launch(arrayOf("*/*"))
+                                } catch (_: ActivityNotFoundException) {
+                                    toasts.show(noFilePicker)
+                                }
+                            }
                         )
                     }
                 }
@@ -2077,6 +2086,9 @@ private class FocusScroll(private val top: Float, private val bottom: Float) : B
 private fun displayVersion(name: String): String =
     if (name.length > 1 && name[0].lowercaseChar() == 'v' && name[1].isDigit()) name.substring(1) else name
 
-private fun openUrlInBrowser(context: Context, url: String) {
-    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
+private fun openUrlInBrowser(context: Context, url: String): Boolean = try {
+    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+    true
+} catch (_: ActivityNotFoundException) {
+    false
 }

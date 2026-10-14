@@ -5,8 +5,11 @@ plugins {
 
 android {
     namespace = "com.android.appupdater"
-    compileSdk = 37
-    compileSdkMinor = 2
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
 
     defaultConfig {
         applicationId = "com.android.appupdater"

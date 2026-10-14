@@ -85,8 +85,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
                 addAction(Intent.ACTION_PACKAGE_REPLACED)
                 addAction(Intent.ACTION_PACKAGE_REMOVED)
                 addDataScheme(PACKAGE_SCHEME)
-            },
-            Context.RECEIVER_NOT_EXPORTED
+            }
         )
         viewModelScope.launch {
             packageChanges.receiveAsFlow().collect { refreshInstalledApps() }
@@ -222,8 +221,6 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
 
     override fun onCleared() {
         getApplication<Application>().unregisterReceiver(packageReceiver)
-        scanJob?.cancel()
-        installJobs.values.forEach(Job::cancel)
     }
 }
 

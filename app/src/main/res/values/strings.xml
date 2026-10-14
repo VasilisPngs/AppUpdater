@@ -22,6 +22,8 @@
     <string name="all_up_to_date_note">New versions of your apps appear here.</string>
     <string name="check_failed">Couldn\'t check for updates</string>
     <string name="try_again">Try again</string>
+    <string name="no_browser">No app can open links</string>
+    <string name="no_file_picker">No app can pick files</string>
     <string name="update_installed">%1$s was updated</string>
     <string name="update_installed_play">%1$s was updated to v%2$s, the latest on Google Play</string>
     <string name="update_failed">Update failed: %1$s</string>

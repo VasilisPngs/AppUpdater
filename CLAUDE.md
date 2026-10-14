@@ -39,6 +39,7 @@
 - Keep every value in the shared token set and apply it consistently across all screens and components; do not use dynamic color and do not introduce one-off colours, sizes, radii or durations.
 - Text always uses the device's own default font through `FontFamily.Default`, whatever the platform or the manufacturer sets; never bundle, download or name a font family, and let the platform render the type scale weights instead of forcing font variation axes.
 - Obtain values from the relevant official platform API whenever the system or the device can provide them at runtime, including device capabilities, application metadata such as icons, labels and package information, locales and configuration, instead of assuming manufacturer-specific behavior or duplicating them in resources and hardcoded mappings.
+- An intent that no installed app can handle, such as an APKMirror link on a television without a browser or the APK bundle picker, shows a toast instead of failing silently or crashing.
 - Keep expensive work away from the UI thread.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
 - Draw edge to edge and let the window insets place the content, rather than reserving space manually.
