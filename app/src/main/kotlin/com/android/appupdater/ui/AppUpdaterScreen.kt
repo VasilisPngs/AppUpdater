@@ -656,13 +656,7 @@ private fun UpdatesView(
         if (notice != null && updates.isNotEmpty()) {
             item(key = "notice") {
                 Card(style = CardStyle.Tight, modifier = Modifier.animateItem()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Space.s)
-                    ) {
-                        StatusDot(color = Design.colors.danger, pulsing = false)
-                        Text(text = notice, style = Design.type.muted, color = Design.colors.muted)
-                    }
+                    Text(text = notice, style = Design.type.muted, color = Design.colors.muted)
                 }
             }
         }
@@ -673,7 +667,7 @@ private fun UpdatesView(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Space.s)
                 ) {
-                    StatusDot(color = Design.colors.accent, pulsing = true)
+                    PulseDot()
                     Text(
                         text = state.appName,
                         style = Design.type.body,
@@ -1763,32 +1757,27 @@ private fun TopBar(
 }
 
 @Composable
-private fun StatusDot(color: Color, pulsing: Boolean) {
-    val pulse = if (pulsing) {
-        rememberInfiniteTransition(label = "pulse").animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(PULSE_MILLIS, easing = Motion.ease),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "pulse"
-        )
-    } else {
-        null
-    }
+private fun PulseDot() {
+    val pulse = rememberInfiniteTransition(label = "pulse").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(PULSE_MILLIS, easing = Motion.ease),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
 
     Box(
         modifier = Modifier
             .size(DotSize)
             .graphicsLayer {
-                val factor = pulse?.value ?: 0f
-                scaleX = 1f - PULSE_SHRINK * factor
+                scaleX = 1f - PULSE_SHRINK * pulse.value
                 scaleY = scaleX
-                alpha = 1f - PULSE_FADE * factor
+                alpha = 1f - PULSE_FADE * pulse.value
             }
             .clip(CircleShape)
-            .background(color)
+            .background(Design.colors.accent)
     )
 }
 
