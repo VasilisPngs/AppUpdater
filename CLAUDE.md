@@ -44,6 +44,7 @@
 - A check runs only when the app starts and when the user asks for one with the refresh button, pull to refresh or Try again. Returning to the app never starts a check, because every check sends Google Play requests for each update, details for each Play candidate and a purchase for each APKMirror version also on Play, over the shared anonymous account; no timer or minimum interval replaces it. A check the user asks for never cancels and restarts a running one, and only changing the disabled apps setting does, because it changes the set of apps.
 - A package broadcast updates only the package it names: removals and additions that are part of a replacement are ignored, and a replacement, a new installation or a removal rereads or drops just that package.
 - AppUpdater carries no accessibility code: no content descriptions, roles, or selected, toggleable or disabled semantics; interactive elements use plain clickable.
+- Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules; add a keep rule only for code that a missing rule demonstrably breaks.
 - Keep expensive work away from the UI thread.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
 - Draw edge to edge and let the window insets place the content, rather than reserving space manually.
