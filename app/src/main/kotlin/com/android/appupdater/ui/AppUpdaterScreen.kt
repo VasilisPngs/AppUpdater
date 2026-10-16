@@ -1,171 +1,122 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.android.appupdater.ui
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
-import android.view.RoundedCorner
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.add
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.tappableElement
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.maxLengthTrim
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarState
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.dropShadow
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.onFocusEvent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.LinkAnnotation
@@ -176,12 +127,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.appupdater.R
@@ -190,113 +138,32 @@ import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
 import com.android.appupdater.data.model.ThemeMode
-import com.android.appupdater.ui.theme.Design
-import com.android.appupdater.ui.theme.DisabledOpacity
-import com.android.appupdater.ui.theme.Glass
-import com.android.appupdater.ui.theme.Motion
-import com.android.appupdater.ui.theme.PressedOpacity
-import com.android.appupdater.ui.theme.PressedScale
-import com.android.appupdater.ui.theme.Radius
-import com.android.appupdater.ui.theme.ShapeCard
-import com.android.appupdater.ui.theme.ShapeIcon
-import com.android.appupdater.ui.theme.ShapePill
-import com.android.appupdater.ui.theme.Space
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
-import kotlin.math.min
-import kotlin.math.roundToInt
 
-private val TabBarInset = 21.dp
-private val TabBarPadding = 4.dp
-private val TabWidth = 98.dp
-private val TabTop = 8.dp
-private val TabBottom = 9.dp
-private val TabGap = 1.dp
-private val TabIconWidth = 32.dp
-private val TabBarBottom = 12.dp
-private val TabBarSafeOverlap = 13.dp
-private val BarTopMin = 8.dp
-private val BarBottom = 6.dp
-private val BarIconSize = 22.dp
-private val BarTitleGap = 13.dp
-private val ContentBottomGap = 28.dp
-private val WideSheetBreakpoint = 600.dp
-private val AppIconSize = 44.dp
-private val DotSize = 7.dp
-private val IconSize = 18.dp
-private val ChevronInset = 2.dp
-private val SwitchWidth = 64.dp
-private val SwitchHeight = 28.dp
-private val SwitchKnobWidth = 37.dp
-private val SwitchKnobHeight = 24.dp
-private val SwitchInset = 2.dp
-private val SheetMaxWidth = 560.dp
-private val SheetWideBottom = 24.dp
-private val SheetDragClose = 200.dp
-private val GrabberWidth = 60.dp
-private val GrabberHeight = 4.dp
-private val GrabberTop = 6.dp
-private val MenuWidth = 250.dp
-private val MenuGap = 8.dp
-private val MenuSectionPadding = 10.dp
-private val MenuItemStart = 22.dp
-private val MenuItemEnd = 24.dp
-private val MenuItemVertical = 10.dp
-private val MenuIconColumn = 28.dp
-private val MenuIconSize = 20.dp
-private val ShapeMenu = RoundedCornerShape(Radius.menu)
-private val ToastMaxWidth = 544.dp
-private val ToastGap = 20.dp
-private val ToastEnter = 10.dp
-private val ToastExit = 6.dp
-private val EmptyPadding = 32.dp
-private val EmptySymbolSize = 40.dp
-private val FieldPadding = 10.dp
-private val KnobShadowBlur = 6.dp
-private val KnobShadowOffset = 2.dp
-private val KnobShadow = Color(0x4D000000)
-private val FocusRingWidth = 2.dp
-private val FocusRingOffset = 2.dp
-private const val TOAST_MILLIS = 2200L
-private const val LOADING_DELAY_MILLIS = 2000L
-private const val PULSE_MILLIS = 550
-private const val PULSE_SHRINK = 0.14f
-private const val PULSE_FADE = 0.55f
+private val ContentMargin = 16.dp
+private val SmallSpacing = 8.dp
+private val EmptyPadding = 48.dp
+private val EmptyIconSize = 48.dp
+private val AppIconSize = 40.dp
 private const val MAX_VERSION_CODE_DIGITS = 19
 private const val APKMIRROR_SLOT = 0
 private const val PLAY_SLOT = 1
 private const val MANUAL_SLOT = 2
 private const val BUTTON_SLOTS = 3
 private const val TABULAR_FIGURES = "tnum"
-private const val TOP_BAR_EMS = 3.125f
-private const val TAB_ICON_ASPECT = 1.2f
-private const val TITLE_KEY = "title"
-private const val APPEARANCE_KEY = "appearance"
-private const val SHEET_FLICK_DP_PER_SECOND = 500
-private const val MENU_HIDDEN_SCALE = 0.2f
-private const val GRABBER_ALPHA = 0.28f
-private const val BAR_ITEM_HIDDEN_SCALE = 0.9f
 private const val FOCUS_PIVOT = 0.3f
 
-private enum class AppTab(@StringRes val labelRes: Int, @DrawableRes val iconRes: Int) {
-    Updates(R.string.updates, R.drawable.ic_updates),
-    Settings(R.string.settings, R.drawable.ic_settings)
-}
-
-private enum class CardStyle(val horizontal: Dp, val vertical: Dp, val gap: Dp) {
-    Regular(Space.l, Space.l, Space.m),
-    Tight(Space.l, Space.m, Space.s),
-    Flush(0.dp, 0.dp, 0.dp)
-}
-
-private class Toast(val id: Long, val message: String)
-
-private fun SnapshotStateList<Toast>.show(message: String) {
-    add(Toast(System.nanoTime(), message))
+private enum class AppTab(
+    @StringRes val labelRes: Int,
+    @DrawableRes val iconRes: Int,
+    @DrawableRes val selectedIconRes: Int
+) {
+    Updates(R.string.updates, R.drawable.ic_updates, R.drawable.ic_updates_filled),
+    Settings(R.string.settings, R.drawable.ic_settings, R.drawable.ic_settings_filled)
 }
 
 @get:StringRes
@@ -312,55 +179,43 @@ fun AppUpdaterScreen(
     viewModel: AppUpdaterViewModel,
     modifier: Modifier = Modifier
 ) {
-    val colors = Design.colors
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(AppTab.Updates) }
     val updatesListState = rememberLazyListState()
     val settingsListState = rememberLazyListState()
+    val updatesBarState = rememberTopAppBarState()
+    val settingsBarState = rememberTopAppBarState()
     val updatesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
-    val tabFocus = remember { FocusRequester() }
-    val pull = rememberPullRefreshState(
-        atTop = { !updatesListState.canScrollBackward },
-        onRefresh = viewModel::refresh
-    )
+    val navigationFocus = remember { FocusRequester() }
+    val snackbarHostState = remember { SnackbarHostState() }
     val inputModeManager = LocalInputModeManager.current
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val toasts = remember { mutableStateListOf<Toast>() }
-    val backdrop = rememberGraphicsLayer()
+    val expandSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val bundlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::installBundle)
     }
     var manualPackage by rememberSaveable { mutableStateOf<String?>(null) }
-    var themeMenu by remember { mutableStateOf(false) }
-    var themeAnchor by remember { mutableStateOf(Rect.Zero) }
-    var pendingTheme by remember { mutableStateOf<ThemeMode?>(null) }
+    var themeDialog by rememberSaveable { mutableStateOf(false) }
     val manualTarget = uiState.updates.firstOrNull { it.packageName == manualPackage }
     LaunchedEffect(manualTarget == null) {
         if (manualTarget == null) manualPackage = null
     }
-    val sheetOpen = manualTarget != null
-    val closeSheet = { manualPackage = null }
-    BackHandler(enabled = !sheetOpen && selectedTab != AppTab.Updates) { selectedTab = AppTab.Updates }
-    BackHandler(enabled = sheetOpen, onBack = closeSheet)
-    val density = LocalDensity.current
-    val context = LocalContext.current
-    val layoutDirection = LocalLayoutDirection.current
-    val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout).asPaddingValues()
-    val barTop = max(insets.calculateTopPadding(), BarTopMin)
-    val barOffset = with(density) { (Design.type.body.fontSize * TOP_BAR_EMS).toDp() }
-    val barEdge = with(density) { (barTop + Space.control + BarBottom).roundToPx() }
-    val tabLine = with(density) { Design.type.tab.lineHeight.toDp() }
+    BackHandler(enabled = selectedTab != AppTab.Updates) { selectedTab = AppTab.Updates }
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
     val failedFormat = stringResource(R.string.update_failed)
     val noBrowser = stringResource(R.string.no_browser)
     val noFilePicker = stringResource(R.string.no_file_picker)
+    val showMessage: (String) -> Unit = { message ->
+        coroutineScope.launch { snackbarHostState.showSnackbar(message) }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
-            toasts.show(
+            showMessage(
                 when (event) {
                     is InstallEvent.Finished -> installedFormat.format(event.appName)
                     is InstallEvent.FinishedFromPlay -> installedFromPlayFormat.format(event.appName, displayVersion(event.versionName))
@@ -368,6 +223,9 @@ fun AppUpdaterScreen(
                 }
             )
         }
+    }
+    LaunchedEffect(Unit) {
+        if (inputModeManager.inputMode == InputMode.Keyboard) navigationFocus.requestFocus()
     }
 
     val updates = remember(uiState.installedApps, uiState.updates) {
@@ -378,219 +236,167 @@ fun AppUpdaterScreen(
     }
 
     val activeListState = if (selectedTab == AppTab.Updates) updatesListState else settingsListState
+    val activeBarState = if (selectedTab == AppTab.Updates) updatesBarState else settingsBarState
     val activeFocus = if (selectedTab == AppTab.Updates) updatesFocus else settingsFocus
-    val titled by remember(activeListState, barEdge) {
-        derivedStateOf {
-            val info = activeListState.layoutInfo
-            val heading = info.visibleItemsInfo.firstOrNull { it.key == TITLE_KEY }
-            if (heading == null) {
-                activeListState.firstVisibleItemIndex > 0
-            } else {
-                activeListState.canScrollBackward && heading.offset + heading.size - info.viewportStartOffset <= barEdge
-            }
-        }
-    }
-    val scanning = uiState.scanning
-    val loading = scanning && !uiState.loaded
-    val refreshing = scanning && uiState.loaded && selectedTab == AppTab.Updates
-    var loadingShown by remember { mutableStateOf(false) }
-
-    LaunchedEffect(loading) {
-        loadingShown = false
-        if (loading) {
-            delay(LOADING_DELAY_MILLIS)
-            loadingShown = true
-        }
-    }
     val selectTab: (AppTab) -> Unit = { tab ->
         if (tab != selectedTab) {
             selectedTab = tab
-        } else if (activeListState.canScrollBackward) {
-            coroutineScope.launch { activeListState.animateScrollToItem(0) }
-        }
-    }
-
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        LaunchedEffect(Unit) {
-            if (inputModeManager.inputMode == InputMode.Keyboard) tabFocus.requestFocus()
-        }
-        SideEffect {
-            pull.enabled = selectedTab == AppTab.Updates && uiState.loaded && inputModeManager.inputMode == InputMode.Touch
-            pull.extent = constraints.maxHeight.toFloat()
-            pull.update(refreshing)
-        }
-        val wideSheet = maxWidth >= WideSheetBreakpoint
-        val topInset = insets.calculateTopPadding()
-        val bottomInset = insets.calculateBottomPadding()
-        val startInset = insets.calculateStartPadding(layoutDirection)
-        val endInset = insets.calculateEndPadding(layoutDirection)
-        val startPadding = max(Space.l, startInset)
-        val endPadding = max(Space.l, endInset)
-        val contentTop = barTop + barOffset + Space.l
-        val tabBarBottom = max(TabBarBottom, bottomInset - TabBarSafeOverlap)
-        val tabBarHeight = TabBarPadding * 2 + TabTop + TabBottom +
-            TabIconWidth / TAB_ICON_ASPECT + TabGap + tabLine
-        val contentPadding = PaddingValues(
-            start = startPadding,
-            end = endPadding,
-            top = contentTop,
-            bottom = tabBarBottom + tabBarHeight + ContentBottomGap
-        )
-        val toastBottom = tabBarBottom + tabBarHeight + ToastGap
-        val focusScroll = remember(contentPadding, density) {
-            with(density) {
-                FocusScroll(contentPadding.calculateTopPadding().toPx(), contentPadding.calculateBottomPadding().toPx())
+        } else {
+            coroutineScope.launch {
+                launch { activeBarState.expand(expandSpec) }
+                activeListState.animateScrollToItem(0)
             }
         }
+    }
+    val navigationSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfo())
+    val navigationBar = navigationSuiteType == NavigationSuiteType.ShortNavigationBarCompact ||
+        navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxSize().captureBackdrop(backdrop, colors.background)) {
-                CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
-                    when (selectedTab) {
-                        AppTab.Updates -> {
-                            DisposableEffect(pull) { onDispose(pull::release) }
-                            UpdatesView(
-                                listState = updatesListState,
-                                focus = updatesFocus,
-                                exitFocus = tabFocus,
-                                contentPadding = contentPadding,
-                                loaded = uiState.loaded,
-                                notice = uiState.notice,
-                                updates = updates,
-                                installs = uiState.installs,
-                                playInstalls = uiState.playInstalls,
-                                onApkMirror = { if (!openUrlInBrowser(context, it)) toasts.show(noBrowser) },
-                                onPlay = viewModel::updateFromPlay,
-                                onManual = { manualPackage = it.packageName },
-                                onRefresh = viewModel::refresh,
-                                modifier = pull.modifier.graphicsLayer { translationY = pull.offset }
-                            )
-                        }
-                        AppTab.Settings -> SettingsView(
-                            listState = settingsListState,
-                            focus = settingsFocus,
-                            contentPadding = contentPadding,
-                            themeMode = themeMode,
-                            includeDisabledApps = uiState.includeDisabledApps,
-                            onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                            onTheme = { anchor ->
-                                themeAnchor = anchor
-                                themeMenu = true
-                            },
-                            onPickBundle = {
-                                try {
-                                    bundlePicker.launch(arrayOf("*/*"))
-                                } catch (_: ActivityNotFoundException) {
-                                    toasts.show(noFilePicker)
-                                }
-                            }
+    NavigationSuiteScaffold(
+        navigationItems = {
+            AppTab.entries.forEach { tab ->
+                val selected = tab == selectedTab
+                NavigationSuiteItem(
+                    selected = selected,
+                    onClick = { selectTab(tab) },
+                    icon = {
+                        Icon(
+                            painter = painterResource(if (selected) tab.selectedIconRes else tab.iconRes),
+                            contentDescription = null
                         )
-                    }
-                }
-                AnimatedVisibility(
-                    visible = loadingShown && selectedTab == AppTab.Updates,
-                    enter = fadeIn(tween(Motion.FAST, easing = LinearEasing)),
-                    exit = fadeOut(tween(Motion.FAST, easing = LinearEasing)),
-                    modifier = Modifier.align(Alignment.Center)
-                ) {
-                    LoadingIndicator(color = colors.muted, modifier = Modifier.size(LoadingSpinnerSize))
-                }
-                RefreshIndicator(
-                    color = colors.muted,
-                    spinning = refreshing,
-                    progress = { pull.progress },
+                    },
+                    label = { Text(text = stringResource(tab.labelRes)) },
+                    navigationSuiteType = navigationSuiteType,
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = barTop + Space.control + BarBottom + (PullBand - PullSpinnerSize) / 2)
-                        .size(PullSpinnerSize)
-                        .graphicsLayer {
-                            translationY = pull.lift
-                            alpha = if (pull.refreshing && pull.offset <= 0f) 0f else 1f
+                        .then(if (selected) Modifier.focusRequester(navigationFocus) else Modifier)
+                        .focusProperties {
+                            val first = tab == AppTab.entries.first()
+                            val last = tab == AppTab.entries.last()
+                            if (navigationBar) {
+                                up = activeFocus
+                                if (first) start = FocusRequester.Cancel
+                                if (last) end = FocusRequester.Cancel
+                            } else {
+                                end = activeFocus
+                                if (first) up = FocusRequester.Cancel
+                                if (last) down = FocusRequester.Cancel
+                            }
                         }
                 )
             }
-
-            TopBar(
-                backdrop = backdrop,
-                observe = {
-                    activeListState.firstVisibleItemScrollOffset
-                    pull.offset
-                },
-                top = barTop,
-                startPadding = startPadding,
-                endPadding = endPadding,
-                title = if (selectedTab == AppTab.Updates && updates.isNotEmpty()) {
-                    stringResource(R.string.updates_count, updates.size)
-                } else {
-                    stringResource(selectedTab.labelRes)
-                },
-                titled = titled,
-                edged = activeListState.canScrollBackward,
-                actions = selectedTab == AppTab.Updates,
-                listFocus = activeFocus,
-                onRefresh = viewModel::refresh
+        },
+        modifier = modifier,
+        navigationSuiteType = navigationSuiteType,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(activeBarState)
+        Scaffold(
+            topBar = {
+                LargeFlexibleTopAppBar(
+                    title = {
+                        Text(
+                            text = if (selectedTab == AppTab.Updates && updates.isNotEmpty()) {
+                                stringResource(R.string.updates_count, updates.size)
+                            } else {
+                                stringResource(selectedTab.labelRes)
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    actions = {
+                        if (selectedTab == AppTab.Updates) {
+                            IconButton(
+                                onClick = viewModel::refresh,
+                                modifier = Modifier.focusProperties { down = updatesFocus }
+                            ) {
+                                Icon(painter = painterResource(R.drawable.ic_refresh), contentDescription = null)
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ),
+                    scrollBehavior = scrollBehavior
+                )
+            },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ) { padding ->
+            val layoutDirection = LocalLayoutDirection.current
+            val density = LocalDensity.current
+            val contentPadding = PaddingValues(
+                start = padding.calculateStartPadding(layoutDirection) + ContentMargin,
+                top = padding.calculateTopPadding(),
+                end = padding.calculateEndPadding(layoutDirection) + ContentMargin,
+                bottom = padding.calculateBottomPadding() + ContentMargin
             )
+            val focusScroll = remember(density) { FocusScroll(density) }
+            SideEffect { focusScroll.padding = contentPadding }
 
-            TabBar(
-                backdrop = backdrop,
-                focus = tabFocus,
-                listFocus = activeFocus,
-                observe = { activeListState.firstVisibleItemScrollOffset },
-                selectedTab = selectedTab,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(start = max(TabBarInset, startInset), end = max(TabBarInset, endInset), bottom = tabBarBottom),
-                onSelect = selectTab
-            )
+            CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
+                when (selectedTab) {
+                    AppTab.Updates -> UpdatesView(
+                        listState = updatesListState,
+                        barState = updatesBarState,
+                        nestedScroll = scrollBehavior.nestedScrollConnection,
+                        focus = updatesFocus,
+                        exitFocus = navigationFocus,
+                        contentPadding = contentPadding,
+                        loaded = uiState.loaded,
+                        loading = uiState.scanning && !uiState.loaded,
+                        refreshing = uiState.scanning && uiState.loaded,
+                        notice = uiState.notice,
+                        updates = updates,
+                        installs = uiState.installs,
+                        playInstalls = uiState.playInstalls,
+                        onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
+                        onPlay = viewModel::updateFromPlay,
+                        onManual = { manualPackage = it.packageName },
+                        onRefresh = viewModel::refresh
+                    )
+                    AppTab.Settings -> SettingsView(
+                        listState = settingsListState,
+                        barState = settingsBarState,
+                        nestedScroll = scrollBehavior.nestedScrollConnection,
+                        focus = settingsFocus,
+                        contentPadding = contentPadding,
+                        themeMode = themeMode,
+                        includeDisabledApps = uiState.includeDisabledApps,
+                        onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
+                        onTheme = { themeDialog = true },
+                        onPickBundle = {
+                            try {
+                                bundlePicker.launch(arrayOf("*/*"))
+                            } catch (_: ActivityNotFoundException) {
+                                showMessage(noFilePicker)
+                            }
+                        }
+                    )
+                }
+            }
         }
+    }
 
-        if (sheetOpen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) { detectTapGestures { closeSheet() } }
-            )
-        }
-
-        ManualSheet(
-            target = manualTarget,
-            wide = wideSheet,
-            backdrop = backdrop,
-            returnFocus = updatesFocus,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            onCancel = { manualPackage = null },
-            onSubmit = { update, versionCode ->
+    manualTarget?.let { update ->
+        ManualDialog(
+            update = update,
+            onDismiss = { manualPackage = null },
+            onSubmit = { versionCode ->
                 manualPackage = null
                 viewModel.installManually(update, versionCode)
             }
         )
+    }
 
-        ThemeMenu(
-            visible = themeMenu && selectedTab == AppTab.Settings,
-            anchor = themeAnchor,
+    if (themeDialog) {
+        ThemeDialog(
             current = themeMode,
-            backdrop = backdrop,
-            top = barTop + Space.control + BarBottom,
-            bottom = tabBarBottom + tabBarHeight,
-            returnFocus = settingsFocus,
-            onDismiss = { themeMenu = false },
+            onDismiss = { themeDialog = false },
             onSelect = { mode ->
-                themeMenu = false
-                pendingTheme = mode
-            },
-            onHidden = {
-                pendingTheme?.let(viewModel::setThemeMode)
-                pendingTheme = null
-            }
-        )
-
-        ToastHost(
-            toasts = toasts,
-            backdrop = backdrop,
-            modifier = if (sheetOpen) {
-                Modifier.align(Alignment.TopCenter).padding(top = topInset + Space.m)
-            } else {
-                Modifier.align(Alignment.BottomCenter).padding(bottom = toastBottom)
+                themeDialog = false
+                viewModel.setThemeMode(mode)
             }
         )
     }
@@ -599,10 +405,14 @@ fun AppUpdaterScreen(
 @Composable
 private fun UpdatesView(
     listState: LazyListState,
+    barState: TopAppBarState,
+    nestedScroll: NestedScrollConnection,
     focus: FocusRequester,
     exitFocus: FocusRequester,
     contentPadding: PaddingValues,
     loaded: Boolean,
+    loading: Boolean,
+    refreshing: Boolean,
     notice: String?,
     updates: List<Pair<InstalledApp, AppUpdateInfo>>,
     installs: Map<String, InstallState>,
@@ -610,13 +420,13 @@ private fun UpdatesView(
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
     onManual: (AppUpdateInfo) -> Unit,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
+    onRefresh: () -> Unit
 ) {
-    val firstKey = updates.firstOrNull()?.first?.packageName
-    val reveal = rememberTitleReveal(listState, firstKey)
+    val pullState = rememberPullToRefreshState()
+    val reveal = rememberTopReveal(listState, barState)
     val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
     val cards = remember(keyboard) { CardFocus() }
+    val installList = installs.entries.toList()
 
     val previous = cards.keys
     val lost = cards.focused?.takeIf { key -> updates.none { it.first.packageName == key } }
@@ -635,88 +445,116 @@ private fun UpdatesView(
         if (entry?.requestFocus() != true) exitFocus.requestFocus()
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = modifier
-            .fillMaxSize()
-            .focusRequester(focus)
-            .focusRestorer()
-            .onFocusChanged { if (!it.hasFocus) cards.codes = false },
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(Space.l)
-    ) {
-        item(key = TITLE_KEY) {
-            Text(
-                text = if (updates.isEmpty()) stringResource(R.string.updates) else stringResource(R.string.updates_count, updates.size),
-                style = Design.type.h1,
-                color = Design.colors.text
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        state = pullState,
+        enabled = loaded,
+        indicator = {
+            PullToRefreshDefaults.LoadingIndicator(
+                state = pullState,
+                isRefreshing = refreshing,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = contentPadding.calculateTopPadding())
             )
         }
-
-        if (notice != null && updates.isNotEmpty()) {
-            item(key = "notice") {
-                Card(style = CardStyle.Tight, modifier = Modifier.animateItem()) {
-                    Text(text = notice, style = Design.type.muted, color = Design.colors.muted)
-                }
-            }
-        }
-
-        items(installs.entries.toList(), key = { it.key }) { (_, state) ->
-            Card(style = CardStyle.Tight, modifier = Modifier.animateItem()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Space.s)
-                ) {
-                    PulseDot()
-                    Text(
-                        text = state.appName,
-                        style = Design.type.body,
-                        color = Design.colors.text,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-
-        if (updates.isEmpty() && loaded) {
-            item(key = "empty") {
-                if (notice == null) {
-                    EmptyState(
-                        symbol = R.drawable.ic_up_to_date,
-                        title = stringResource(R.string.all_up_to_date),
-                        message = stringResource(R.string.all_up_to_date_note),
-                        modifier = Modifier.animateItem()
-                    )
-                } else {
-                    EmptyState(
-                        symbol = R.drawable.ic_warning,
-                        title = stringResource(R.string.check_failed),
-                        message = notice,
-                        modifier = Modifier.animateItem()
+    ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(nestedScroll)
+                .focusRequester(focus)
+                .focusRestorer()
+                .onFocusChanged { if (!it.hasFocus) cards.codes = false },
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
+        ) {
+            if (notice != null && updates.isNotEmpty()) {
+                item(key = "notice") {
+                    SegmentedListItem(
+                        shapes = ListItemDefaults.segmentedShapes(0, 1),
+                        modifier = Modifier
+                            .animateItem()
+                            .padding(bottom = ContentMargin)
                     ) {
-                        Button(text = stringResource(R.string.try_again), onClick = onRefresh)
+                        Text(
+                            text = notice,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
+
+            itemsIndexed(installList, key = { _, entry -> entry.key }) { index, (_, state) ->
+                SegmentedListItem(
+                    shapes = ListItemDefaults.segmentedShapes(index, installList.size),
+                    modifier = Modifier
+                        .animateItem()
+                        .then(if (index == installList.lastIndex) Modifier.padding(bottom = ContentMargin) else Modifier),
+                    supportingContent = { LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth()) }
+                ) {
+                    Text(text = state.appName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+
+            if (updates.isEmpty() && loaded) {
+                item(key = "empty") {
+                    if (notice == null) {
+                        EmptyState(
+                            symbol = R.drawable.ic_up_to_date,
+                            title = stringResource(R.string.all_up_to_date),
+                            message = stringResource(R.string.all_up_to_date_note),
+                            modifier = Modifier.animateItem()
+                        )
+                    } else {
+                        EmptyState(
+                            symbol = R.drawable.ic_warning,
+                            title = stringResource(R.string.check_failed),
+                            message = notice,
+                            modifier = Modifier.animateItem()
+                        ) {
+                            FilledTonalButton(
+                                onClick = onRefresh,
+                                shapes = ButtonDefaults.shapes(),
+                                modifier = reveal.modifier
+                            ) {
+                                Text(text = stringResource(R.string.try_again))
+                            }
+                        }
+                    }
+                }
+            }
+
+            itemsIndexed(items = updates, key = { _, pair -> pair.first.packageName }) { index, pair ->
+                UpdateItem(
+                    app = pair.first,
+                    update = pair.second,
+                    install = playInstalls[pair.first.packageName],
+                    keyboard = keyboard,
+                    cards = cards,
+                    index = index,
+                    count = updates.size,
+                    onApkMirror = onApkMirror,
+                    onPlay = onPlay,
+                    onManual = onManual,
+                    modifier = Modifier
+                        .animateItem()
+                        .then(if (index == 0) reveal.modifier else Modifier)
+                )
+            }
         }
 
-        itemsIndexed(items = updates, key = { _, pair -> pair.first.packageName }) { index, pair ->
-            UpdateCard(
-                app = pair.first,
-                update = pair.second,
-                install = playInstalls[pair.first.packageName],
-                keyboard = keyboard,
-                cards = cards,
-                first = index == 0,
-                last = index == updates.lastIndex,
-                onApkMirror = onApkMirror,
-                onPlay = onPlay,
-                onManual = onManual,
-                modifier = Modifier
-                    .animateItem()
-                    .then(if (pair.first.packageName == firstKey) reveal.modifier else Modifier)
-            )
+        AnimatedVisibility(
+            visible = loading,
+            enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+            exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            LoadingIndicator()
         }
     }
 }
@@ -724,193 +562,86 @@ private fun UpdatesView(
 @Composable
 private fun SettingsView(
     listState: LazyListState,
+    barState: TopAppBarState,
+    nestedScroll: NestedScrollConnection,
     focus: FocusRequester,
     contentPadding: PaddingValues,
     themeMode: ThemeMode,
     includeDisabledApps: Boolean,
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
-    onTheme: (Rect) -> Unit,
+    onTheme: () -> Unit,
     onPickBundle: () -> Unit
 ) {
-    val colors = Design.colors
-    val reveal = rememberTitleReveal(listState, APPEARANCE_KEY)
+    val reveal = rememberTopReveal(listState, barState)
     LazyColumn(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
+            .nestedScroll(nestedScroll)
             .focusRequester(focus)
             .focusRestorer(),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(Space.l)
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
     ) {
-        item(key = TITLE_KEY) {
-            Text(text = stringResource(R.string.settings), style = Design.type.h1, color = colors.text)
+        item(key = "appearance") {
+            Text(
+                text = stringResource(R.string.appearance),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = ContentMargin, end = ContentMargin, bottom = SmallSpacing)
+            )
         }
 
-        item(key = APPEARANCE_KEY) {
-            Group(heading = stringResource(R.string.appearance), modifier = reveal.modifier) {
-                var anchor by remember { mutableStateOf<LayoutCoordinates?>(null) }
-                Card(style = CardStyle.Flush) {
-                    ListRow(onClick = { anchor?.let { onTheme(it.boundsInRoot()) } }) {
-                        Text(
-                            text = stringResource(R.string.theme),
-                            style = Design.type.body,
-                            color = colors.text,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Row(
-                            modifier = Modifier.onGloballyPositioned { anchor = it },
-                            horizontalArrangement = Arrangement.spacedBy(Space.s),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = stringResource(themeMode.labelRes), style = Design.type.body, color = colors.muted)
-                            Icon(
-                                painter = painterResource(R.drawable.ic_chevrons),
-                                contentDescription = null,
-                                tint = colors.chevron,
-                                modifier = Modifier.padding(end = ChevronInset).size(IconSize)
-                            )
-                        }
-                    }
-                }
+        item(key = "theme") {
+            SegmentedListItem(
+                onClick = onTheme,
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                modifier = reveal.modifier,
+                supportingContent = { Text(text = stringResource(themeMode.labelRes)) }
+            ) {
+                Text(text = stringResource(R.string.theme))
             }
         }
 
         item(key = "disabled-apps") {
-            val interaction = remember { MutableInteractionSource() }
-            val focused by interaction.collectIsFocusedAsState()
-            Group(note = stringResource(R.string.disabled_apps_description)) {
-                Card(style = CardStyle.Flush) {
-                    Row(
-                        modifier = Modifier
-                            .defaultMinSize(minHeight = Space.row)
-                            .clickable(
-                                interactionSource = interaction,
-                                indication = null,
-                                onClick = { onIncludeDisabledAppsChange(!includeDisabledApps) }
-                            )
-                            .padding(horizontal = Space.l),
-                        horizontalArrangement = Arrangement.spacedBy(Space.m),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.disabled_apps),
-                            style = Design.type.body,
-                            color = colors.text,
-                            modifier = Modifier.weight(1f)
-                        )
-                        SwitchTrack(checked = includeDisabledApps, focused = focused)
-                    }
-                }
+            SegmentedListItem(
+                checked = includeDisabledApps,
+                onCheckedChange = onIncludeDisabledAppsChange,
+                shapes = ListItemDefaults.segmentedShapes(0, 2),
+                modifier = Modifier.padding(top = ContentMargin),
+                supportingContent = { Text(text = stringResource(R.string.disabled_apps_description)) },
+                trailingContent = { Switch(checked = includeDisabledApps, onCheckedChange = null) }
+            ) {
+                Text(text = stringResource(R.string.disabled_apps))
             }
         }
 
         item(key = "install-bundle") {
-            Card(style = CardStyle.Flush) {
-                ListRow(onClick = onPickBundle) {
-                    Text(text = stringResource(R.string.install_bundle), style = Design.type.body, color = colors.accent)
-                }
+            SegmentedListItem(
+                onClick = onPickBundle,
+                shapes = ListItemDefaults.segmentedShapes(1, 2)
+            ) {
+                Text(text = stringResource(R.string.install_bundle))
             }
         }
     }
 }
 
 @Composable
-private fun Group(
-    modifier: Modifier = Modifier,
-    heading: String? = null,
-    note: String? = null,
-    content: @Composable () -> Unit
-) {
-    val colors = Design.colors
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Space.s)) {
-        if (heading != null) {
-            Text(
-                text = heading,
-                style = Design.type.h2,
-                color = colors.muted,
-                modifier = Modifier.padding(horizontal = Space.l)
-            )
-        }
-        content()
-        if (note != null) {
-            Text(
-                text = note,
-                style = Design.type.note,
-                color = colors.muted,
-                modifier = Modifier.padding(horizontal = Space.l)
-            )
-        }
-    }
-}
-
-@Composable
-private fun Card(
-    modifier: Modifier = Modifier,
-    style: CardStyle = CardStyle.Regular,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    val colors = Design.colors
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(ShapeCard)
-            .background(colors.surface)
-            .padding(horizontal = style.horizontal, vertical = style.vertical),
-        verticalArrangement = Arrangement.spacedBy(style.gap),
-        content = content
-    )
-}
-
-@Composable
-private fun ListRow(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit
-) {
-    val colors = Design.colors
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val focused by interaction.collectIsFocusedAsState()
-    val fill by animateColorAsState(
-        targetValue = if (pressed || focused) colors.surface2 else Color.Transparent,
-        animationSpec = tween(Motion.FAST, easing = Motion.ease),
-        label = "row"
-    )
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = Space.row)
-            .background(fill)
-            .focusRing(focused, colors.accent, Radius.card, inset = true)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick
-            )
-            .padding(horizontal = Space.l, vertical = Space.m),
-        horizontalArrangement = Arrangement.spacedBy(Space.m),
-        verticalAlignment = Alignment.CenterVertically,
-        content = content
-    )
-}
-
-@Composable
-private fun UpdateCard(
+private fun UpdateItem(
     app: InstalledApp,
     update: AppUpdateInfo,
     install: PlayInstall?,
     keyboard: Boolean,
     cards: CardFocus,
-    first: Boolean,
-    last: Boolean,
+    index: Int,
+    count: Int,
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
     onManual: (AppUpdateInfo) -> Unit,
     modifier: Modifier
 ) {
-    val colors = Design.colors
+    val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
@@ -918,6 +649,8 @@ private fun UpdateCard(
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val toCode = if (ltr) Key.DirectionLeft else Key.DirectionRight
     val toButtons = if (ltr) Key.DirectionRight else Key.DirectionLeft
+    val first = index == 0
+    val last = index == count - 1
     val codeFocus = remember { FocusRequester() }
     val buttonFocus = remember { List(BUTTON_SLOTS) { FocusRequester() } }
     var codeFocused by remember(keyboard) { mutableStateOf(false) }
@@ -989,7 +722,7 @@ private fun UpdateCard(
     val latestText = stringResource(R.string.version_latest, displayVersion(update.newVersionName), update.newVersionCode)
     val latest = remember(latestText, code, colors, keyboard, codeFocused) {
         val start = latestText.lastIndexOf(code)
-        val highlight = SpanStyle(color = Color.White, background = colors.accent)
+        val highlight = SpanStyle(color = colors.onPrimary, background = colors.primary)
         buildAnnotatedString {
             append(latestText)
             if (start >= 0) {
@@ -1017,12 +750,12 @@ private fun UpdateCard(
         }
     }
 
-    Card(modifier = modifier.then(cardModifier)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Space.m)
-        ) {
-            Box(modifier = Modifier.size(AppIconSize).clip(ShapeIcon)) {
+    SegmentedListItem(
+        shapes = ListItemDefaults.segmentedShapes(index, count),
+        modifier = modifier.then(cardModifier),
+        verticalAlignment = Alignment.CenterVertically,
+        leadingContent = {
+            Box(modifier = Modifier.size(AppIconSize)) {
                 iconBitmap?.let { bitmap ->
                     Image(
                         bitmap = bitmap.asImageBitmap(),
@@ -1032,30 +765,20 @@ private fun UpdateCard(
                     )
                 }
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = update.appName,
-                    style = Design.type.body,
-                    color = colors.text,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+        },
+        supportingContent = {
+            Column {
                 Text(
                     text = if (app.versionName.isEmpty()) {
                         stringResource(R.string.version_current_code, app.versionCode)
                     } else {
                         stringResource(R.string.version_current, displayVersion(app.versionName), app.versionCode)
-                    },
-                    style = Design.type.muted,
-                    color = colors.muted
+                    }
                 )
-                Text(
-                    text = latest,
-                    style = Design.type.muted,
-                    color = colors.muted,
-                    modifier = codeModifier
-                )
+                Text(text = latest, modifier = codeModifier)
             }
+        },
+        trailingContent = {
             Column(
                 modifier = Modifier
                     .width(IntrinsicSize.Max)
@@ -1066,571 +789,92 @@ private fun UpdateCard(
                         cards.codes = true
                         codeFocus.requestFocus().also { if (!it) cards.codes = false }
                     },
-                verticalArrangement = Arrangement.spacedBy(Space.s)
+                verticalArrangement = Arrangement.spacedBy(SmallSpacing)
             ) {
                 update.apkMirrorUrl?.let { url ->
-                    Button(
+                    SourceButton(
                         text = stringResource(R.string.update),
-                        small = true,
-                        enabled = install == null,
                         icon = R.drawable.ic_source_apkmirror,
+                        enabled = install == null,
                         onClick = { onApkMirror(url) },
                         modifier = buttonModifiers[APKMIRROR_SLOT]
                     )
                 }
                 if (update.playUpdate != null) {
-                    Button(
+                    SourceButton(
                         text = stringResource(R.string.update),
-                        small = true,
+                        icon = R.drawable.ic_source_play,
                         enabled = install == null,
                         busy = install?.manual == false,
                         progress = install?.progress,
-                        icon = R.drawable.ic_source_play,
                         onClick = { onPlay(update) },
                         modifier = buttonModifiers[PLAY_SLOT]
                     )
                 }
                 if (update.playAvailable) {
-                    Button(
+                    SourceButton(
                         text = stringResource(R.string.manual),
-                        small = true,
+                        icon = R.drawable.ic_source_play,
                         enabled = install == null,
                         busy = install?.manual == true,
                         progress = install?.progress,
-                        icon = R.drawable.ic_source_play,
                         onClick = { onManual(update) },
                         modifier = buttonModifiers[MANUAL_SLOT]
                     )
                 }
             }
         }
+    ) {
+        Text(text = update.appName, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-private fun Button(
+private fun SourceButton(
     text: String,
+    @DrawableRes icon: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    small: Boolean = false,
     enabled: Boolean = true,
     busy: Boolean = false,
-    progress: Float? = null,
-    @DrawableRes icon: Int? = null
+    progress: Float? = null
 ) {
-    val colors = Design.colors
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val focused by interaction.collectIsFocusedAsState()
-    val active = enabled && !busy
-    val scale by animateFloatAsState(
-        targetValue = if (pressed && active) PressedScale else 1f,
-        animationSpec = tween(Motion.FAST, easing = Motion.ease),
-        label = "press"
-    )
     val percent = remember { NumberFormat.getPercentInstance() }
+    val active = enabled && !busy
     val progressShown by animateFloatAsState(
         targetValue = if (busy && progress != null) 1f else 0f,
-        animationSpec = tween(Motion.FAST, easing = Motion.ease),
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         label = "progress"
     )
 
-    Box(
-        modifier = modifier
-            .defaultMinSize(minHeight = if (small) Space.controlSmall else Space.control)
-            .scale(scale)
-            .alpha(if (enabled || busy) 1f else DisabledOpacity)
-            .focusRing(focused, colors.accent, Dp.Infinity)
-            .clip(ShapePill)
-            .background(colors.fill)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                enabled = enabled || busy,
-                onClick = { if (active) onClick() }
-            )
-            .padding(horizontal = if (small) Space.m else Space.l),
-        contentAlignment = Alignment.Center
+    FilledTonalButton(
+        onClick = { if (active) onClick() },
+        shapes = ButtonDefaults.shapes(),
+        modifier = modifier,
+        enabled = enabled || busy,
+        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Space.s),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val textStyle = if (small) Design.type.buttonSmall else Design.type.button
-            if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, tint = colors.text)
-            Box(contentAlignment = Alignment.Center) {
+        Icon(painter = painterResource(icon), contentDescription = null)
+        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                maxLines = 1,
+                modifier = Modifier.graphicsLayer { alpha = 1f - progressShown }
+            )
+            if (busy && progress != null) {
                 Text(
-                    text = text,
-                    style = textStyle,
-                    color = colors.text,
+                    text = percent.format(progress),
+                    style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES),
                     maxLines = 1,
-                    modifier = Modifier.graphicsLayer { alpha = 1f - progressShown }
-                )
-                if (busy && progress != null) {
-                    Text(
-                        text = percent.format(progress),
-                        style = textStyle.copy(fontFeatureSettings = TABULAR_FIGURES),
-                        color = colors.text,
-                        maxLines = 1,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.matchParentSize().graphicsLayer { alpha = progressShown }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BarButton(
-    @DrawableRes icon: Int,
-    backdrop: GraphicsLayer,
-    observe: () -> Unit,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val colors = Design.colors
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val focused by interaction.collectIsFocusedAsState()
-    val fade by animateFloatAsState(
-        targetValue = if (pressed) PressedOpacity else 1f,
-        animationSpec = tween(Motion.FAST, easing = Motion.ease),
-        label = "press"
-    )
-    BackdropSurface(
-        backdrop = backdrop,
-        tint = colors.surface2.copy(alpha = Glass.MATERIAL).compositeOver(colors.background.copy(alpha = Glass.BAR)),
-        shape = CircleShape,
-        blurRadius = Glass.blur,
-        highlight = colors.glassEdge,
-        observe = observe,
-        modifier = modifier
-            .size(Space.control)
-            .alpha(fade)
-            .focusRing(focused, colors.accent, Dp.Infinity)
-            .border(Glass.rim, colors.glassRim, CircleShape)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick
-            )
-    ) {
-        Icon(
-            painter = painterResource(icon),
-            contentDescription = null,
-            tint = colors.text,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(BarIconSize)
-        )
-    }
-}
-
-@Composable
-private fun Sheet(
-    visible: Boolean,
-    wide: Boolean,
-    backdrop: GraphicsLayer,
-    returnFocus: FocusRequester,
-    modifier: Modifier,
-    onDismiss: () -> Unit,
-    content: @Composable ColumnScope.(FocusRequester) -> Unit
-) {
-    AnimatedVisibility(
-        visible = visible,
-        modifier = modifier,
-        enter = slideInVertically(tween(Motion.SHEET, easing = Motion.easeSheet)) { it },
-        exit = slideOutVertically(tween(Motion.SHEET, easing = Motion.easeSheet)) { it }
-    ) {
-        val colors = Design.colors
-        val density = LocalDensity.current
-        val view = LocalView.current
-        val focusManager = LocalFocusManager.current
-        val inputModeManager = LocalInputModeManager.current
-        val touch = inputModeManager.inputMode == InputMode.Touch
-        val initialFocus = remember { FocusRequester() }
-        val open by rememberUpdatedState(visible)
-        var height by remember { mutableIntStateOf(0) }
-        val dragOffset = remember { mutableFloatStateOf(0f) }
-        val dragState = rememberDraggableState { delta -> dragOffset.floatValue = (dragOffset.floatValue + delta).coerceAtLeast(0f) }
-        val closeDistance = with(density) { SheetDragClose.toPx() }
-        val flick = with(density) { SHEET_FLICK_DP_PER_SECOND.dp.toPx() }
-        val inset = if (wide) SheetWideBottom else Space.s
-        val insets = WindowInsets.ime.union(WindowInsets.tappableElement)
-            .add(WindowInsets(bottom = inset))
-            .only(WindowInsetsSides.Bottom)
-        val ime = WindowInsets.ime
-        val tappable = WindowInsets.tappableElement
-        val edge by remember(touch, wide, density) {
-            derivedStateOf { touch && !wide && ime.getBottom(density) == 0 && tappable.getBottom(density) == 0 }
-        }
-        val displayCorner = remember(view) {
-            view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT)?.radius ?: 0
-        }
-        val bottomCorner = if (edge) max(Radius.sheet, with(density) { displayCorner.toDp() } - inset) else Radius.sheet
-        val shape = RoundedCornerShape(Radius.sheet, Radius.sheet, bottomCorner, bottomCorner)
-
-        LaunchedEffect(Unit) {
-            if (inputModeManager.inputMode == InputMode.Keyboard) initialFocus.requestFocus()
-        }
-        if (!visible) LaunchedEffect(Unit) {
-            if (inputModeManager.inputMode == InputMode.Keyboard) returnFocus.requestFocus() else focusManager.clearFocus()
-        }
-
-        BackdropSurface(
-            backdrop = backdrop,
-            tint = colors.surface2.copy(alpha = Glass.MATERIAL),
-            shape = shape,
-            blurRadius = Glass.blur,
-            highlight = colors.glassEdge,
-            modifier = Modifier
-                .windowInsetsPadding(insets)
-                .padding(horizontal = if (wide) Space.l else Space.s)
-                .widthIn(max = SheetMaxWidth)
-                .fillMaxWidth()
-                .onSizeChanged { height = it.height }
-                .offset { IntOffset(0, dragOffset.floatValue.roundToInt()) }
-                .dropShadow(shape) {
-                    radius = Glass.floatShadowBlur.toPx()
-                    offset = Offset(0f, Glass.floatShadowOffset.toPx())
-                    color = colors.floatShadow
-                }
-                .border(Glass.rim, colors.glassRim, shape)
-                .pointerInput(Unit) { detectTapGestures { } }
-                .draggable(
-                    state = dragState,
-                    orientation = Orientation.Vertical,
-                    enabled = touch && visible,
-                    onDragStopped = { velocity ->
-                        if (dragOffset.floatValue > min(height / 2f, closeDistance) || velocity > flick) {
-                            onDismiss()
-                        } else {
-                            animate(dragOffset.floatValue, 0f, animationSpec = tween(Motion.SHEET, easing = Motion.easeSheet)) { value, _ ->
-                                dragOffset.floatValue = value
-                            }
-                        }
-                    }
-                )
-                .focusProperties { onExit = { if (open) cancelFocusChange() } }
-                .focusGroup()
-        ) {
-            Column(
-                modifier = Modifier.padding(start = Space.l, end = Space.l, top = Space.l, bottom = Space.xl),
-                verticalArrangement = Arrangement.spacedBy(Space.m)
-            ) {
-                content(initialFocus)
-            }
-            if (touch) {
-                Box(
+                    textAlign = TextAlign.Center,
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = GrabberTop)
-                        .size(width = GrabberWidth, height = GrabberHeight)
-                        .background(colors.text.copy(alpha = GRABBER_ALPHA), ShapePill)
+                        .matchParentSize()
+                        .graphicsLayer { alpha = progressShown }
                 )
             }
         }
     }
-}
-
-@Composable
-private fun SheetBar(title: String, doneEnabled: Boolean, onClose: () -> Unit, onDone: () -> Unit) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(Space.s),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SheetButton(icon = R.drawable.ic_close, onClick = onClose)
-        Text(
-            text = title,
-            style = Design.type.h2,
-            color = Design.colors.text,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        SheetButton(
-            icon = R.drawable.ic_check,
-            primary = true,
-            enabled = doneEnabled,
-            onClick = onDone
-        )
-    }
-}
-
-@Composable
-private fun SheetButton(
-    @DrawableRes icon: Int,
-    onClick: () -> Unit,
-    primary: Boolean = false,
-    enabled: Boolean = true
-) {
-    val colors = Design.colors
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val focused by interaction.collectIsFocusedAsState()
-    val fade by animateFloatAsState(
-        targetValue = if (pressed && enabled) PressedOpacity else 1f,
-        animationSpec = tween(Motion.FAST, easing = Motion.ease),
-        label = "press"
-    )
-    Box(
-        modifier = Modifier
-            .size(Space.control)
-            .alpha(fade)
-            .focusRing(focused, colors.accent, Dp.Infinity)
-            .then(if (primary) Modifier else Modifier.border(Glass.rim, colors.glassRim, CircleShape))
-            .clip(CircleShape)
-            .background(
-                when {
-                    !primary -> colors.surface2.copy(alpha = Glass.MATERIAL)
-                    enabled -> colors.accent
-                    else -> colors.fill
-                }
-            )
-            .innerTopHighlight(CircleShape, colors.glassEdge)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                enabled = enabled,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            painter = painterResource(icon),
-            contentDescription = null,
-            tint = when {
-                !primary -> colors.text
-                enabled -> Color.White
-                else -> colors.tertiary
-            }
-        )
-    }
-}
-
-@Composable
-private fun ManualSheet(
-    target: AppUpdateInfo?,
-    wide: Boolean,
-    backdrop: GraphicsLayer,
-    returnFocus: FocusRequester,
-    modifier: Modifier,
-    onCancel: () -> Unit,
-    onSubmit: (AppUpdateInfo, Long) -> Unit
-) {
-    Sheet(
-        visible = target != null,
-        wide = wide,
-        backdrop = backdrop,
-        returnFocus = returnFocus,
-        modifier = modifier,
-        onDismiss = onCancel
-    ) { initialFocus ->
-        val update = remember { checkNotNull(target) }
-        val code = rememberTextFieldState()
-        val versionCode = code.text.toString().toLongOrNull()
-        val submit = {
-            if (versionCode != null) onSubmit(update, versionCode)
-        }
-
-        SheetBar(title = update.appName, doneEnabled = versionCode != null, onClose = onCancel, onDone = submit)
-        VersionCodeField(state = code, focus = initialFocus, onDone = submit)
-    }
-}
-
-@Composable
-private fun ThemeMenu(
-    visible: Boolean,
-    anchor: Rect,
-    current: ThemeMode,
-    backdrop: GraphicsLayer,
-    top: Dp,
-    bottom: Dp,
-    returnFocus: FocusRequester,
-    onDismiss: () -> Unit,
-    onSelect: (ThemeMode) -> Unit,
-    onHidden: () -> Unit
-) {
-    val progress = remember { Animatable(0f) }
-    val hidden by remember { derivedStateOf { progress.value == 0f } }
-    LaunchedEffect(visible) {
-        if (visible) {
-            progress.animateTo(1f, tween(Motion.SPRING, easing = Motion.easeSpring))
-        } else if (progress.value > 0f) {
-            progress.animateTo(0f, tween(Motion.NORMAL, easing = Motion.ease))
-            onHidden()
-        }
-    }
-    if (!visible && hidden) return
-
-    val colors = Design.colors
-    val inputModeManager = LocalInputModeManager.current
-    val focusManager = LocalFocusManager.current
-    val initialFocus = remember { FocusRequester() }
-    val open by rememberUpdatedState(visible)
-
-    BackHandler(enabled = visible, onBack = onDismiss)
-    LaunchedEffect(visible) {
-        if (inputModeManager.inputMode != InputMode.Keyboard) {
-            if (!visible) focusManager.clearFocus()
-        } else if (visible) {
-            initialFocus.requestFocus()
-        } else {
-            returnFocus.requestFocus()
-        }
-    }
-
-    Layout(
-        content = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(visible) {
-                        if (visible) awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed = false)
-                            onDismiss()
-                        }
-                    }
-            )
-            BackdropSurface(
-                backdrop = backdrop,
-                tint = colors.menu,
-                shape = ShapeMenu,
-                blurRadius = Glass.blur,
-                highlight = colors.glassEdge,
-                modifier = Modifier
-                    .dropShadow(ShapeMenu) {
-                        radius = Glass.floatShadowBlur.toPx()
-                        offset = Offset(0f, Glass.floatShadowOffset.toPx())
-                        color = colors.floatShadow
-                    }
-                    .border(Glass.rim, colors.glassRim, ShapeMenu)
-                    .focusProperties { onExit = { if (open) cancelFocusChange() } }
-                    .focusGroup()
-            ) {
-                Column(modifier = Modifier.padding(vertical = MenuSectionPadding)) {
-                    ThemeMode.entries.forEach { mode ->
-                        val checked = mode == current
-                        MenuItem(
-                            label = stringResource(mode.labelRes),
-                            checked = checked,
-                            enabled = visible,
-                            modifier = if (checked) Modifier.focusRequester(initialFocus) else Modifier,
-                            onClick = { onSelect(mode) }
-                        )
-                    }
-                }
-            }
-        }
-    ) { measurables, constraints ->
-        val margin = Space.l.roundToPx()
-        val width = min(MenuWidth.roundToPx(), constraints.maxWidth - margin * 2)
-        val catcher = measurables[0].measure(constraints)
-        val menu = measurables[1].measure(Constraints.fixedWidth(width))
-        val fromLeft = anchor.center.x < constraints.maxWidth / 2f
-        val below = constraints.maxHeight - bottom.toPx() - margin - anchor.bottom
-        val above = anchor.top - top.toPx() - margin
-        val fromBottom = menu.height > below && above > below
-        val gap = MenuGap.roundToPx()
-        val x = if (fromLeft) anchor.left.roundToInt() else anchor.right.roundToInt() - width
-        val y = if (fromBottom) anchor.top.roundToInt() - gap - menu.height else anchor.bottom.roundToInt() + gap
-        layout(constraints.maxWidth, constraints.maxHeight) {
-            catcher.place(0, 0)
-            menu.placeWithLayer(x.coerceIn(margin, constraints.maxWidth - margin - width), y) {
-                val value = progress.value
-                val scale = MENU_HIDDEN_SCALE + (1f - MENU_HIDDEN_SCALE) * value
-                scaleX = scale
-                scaleY = scale
-                alpha = value.coerceIn(0f, 1f)
-                transformOrigin = TransformOrigin(if (fromLeft) 0f else 1f, if (fromBottom) 1f else 0f)
-            }
-        }
-    }
-}
-
-@Composable
-private fun MenuItem(
-    label: String,
-    checked: Boolean,
-    enabled: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    val colors = Design.colors
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val focused by interaction.collectIsFocusedAsState()
-    val fill by animateColorAsState(
-        targetValue = if (pressed || focused) colors.fill else Color.Transparent,
-        animationSpec = tween(Motion.FAST, easing = Motion.ease),
-        label = "item"
-    )
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(fill)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                enabled = enabled,
-                onClick = onClick
-            )
-            .padding(start = MenuItemStart, end = MenuItemEnd, top = MenuItemVertical, bottom = MenuItemVertical),
-        horizontalArrangement = Arrangement.spacedBy(Space.s),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(modifier = Modifier.width(MenuIconColumn), contentAlignment = Alignment.Center) {
-            if (checked) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_menu_check),
-                    contentDescription = null,
-                    tint = colors.text,
-                    modifier = Modifier.size(MenuIconSize)
-                )
-            }
-        }
-        Text(text = label, style = Design.type.menu, color = colors.text)
-    }
-}
-
-@Composable
-private fun VersionCodeField(state: TextFieldState, focus: FocusRequester, onDone: () -> Unit) {
-    val colors = Design.colors
-    val placeholder = stringResource(R.string.version_code)
-
-    BasicTextField(
-        state = state,
-        modifier = Modifier.fillMaxWidth().focusRequester(focus),
-        inputTransformation = DigitsOnly.maxLengthTrim(MAX_VERSION_CODE_DIGITS),
-        textStyle = Design.type.body.copy(color = colors.text),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-        onKeyboardAction = { onDone() },
-        lineLimits = TextFieldLineLimits.SingleLine,
-        cursorBrush = SolidColor(colors.accent),
-        decorator = { field ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = Space.control)
-                    .clip(ShapePill)
-                    .background(colors.fill)
-                    .padding(horizontal = Space.m, vertical = FieldPadding),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                if (state.text.isEmpty()) {
-                    Text(text = placeholder, style = Design.type.body, color = colors.muted)
-                }
-                field()
-            }
-        }
-    )
-}
-
-private val DigitsOnly = InputTransformation {
-    val digits = asCharSequence().filter(Char::isDigit)
-    if (digits.length != length) replace(0, length, digits)
 }
 
 @Composable
@@ -1641,408 +885,149 @@ private fun EmptyState(
     modifier: Modifier = Modifier,
     action: (@Composable () -> Unit)? = null
 ) {
-    val colors = Design.colors
-    Card(style = CardStyle.Flush, modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Space.l, vertical = EmptyPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Space.xs)
-        ) {
-            Icon(
-                painter = painterResource(symbol),
-                contentDescription = null,
-                tint = colors.muted,
-                modifier = Modifier.padding(bottom = Space.s).size(EmptySymbolSize)
-            )
-            Text(text = title, style = Design.type.h2, color = colors.text, textAlign = TextAlign.Center)
-            Text(text = message, style = Design.type.subhead, color = colors.muted, textAlign = TextAlign.Center)
-            if (action != null) Box(modifier = Modifier.padding(top = Space.m)) { action() }
-        }
-    }
-}
-
-@Composable
-private fun TopBar(
-    backdrop: GraphicsLayer,
-    observe: () -> Unit,
-    top: Dp,
-    startPadding: Dp,
-    endPadding: Dp,
-    title: String,
-    titled: Boolean,
-    edged: Boolean,
-    actions: Boolean,
-    listFocus: FocusRequester,
-    onRefresh: () -> Unit
-) {
-    val colors = Design.colors
-    val itemEnter = fadeIn(tween(Motion.NORMAL, easing = Motion.ease)) +
-        scaleIn(tween(Motion.SPRING, easing = Motion.easeSpring), initialScale = BAR_ITEM_HIDDEN_SCALE)
-    val itemExit = fadeOut(tween(Motion.FAST, easing = Motion.ease)) +
-        scaleOut(tween(Motion.FAST, easing = Motion.ease), targetScale = BAR_ITEM_HIDDEN_SCALE)
-    Box(modifier = Modifier.fillMaxWidth()) {
-        key(actions) {
-            val edge = animateFloatAsState(
-                targetValue = if (edged) 1f else 0f,
-                animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-                label = "edge"
-            )
-            val shown by remember { derivedStateOf { edge.value > 0f } }
-            if (shown) {
-                BackdropSurface(
-                    backdrop = backdrop,
-                    tint = colors.bar,
-                    shape = RectangleShape,
-                    blurRadius = Glass.barBlur,
-                    saturation = 1f,
-                    observe = observe,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(top + Space.control + BarBottom)
-                        .graphicsLayer { alpha = edge.value }
-                        .drawWithContent {
-                            drawContent()
-                            drawRect(colors.barLine, Offset(0f, size.height), Size(size.width, Glass.rim.toPx()))
-                        }
-                )
-            }
-        }
-        Layout(
-            content = {
-                key(title) {
-                    val titleAlpha by animateFloatAsState(
-                        targetValue = if (titled) 1f else 0f,
-                        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-                        label = "title"
-                    )
-                    Text(
-                        text = title,
-                        style = Design.type.barTitle,
-                        color = colors.text,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.graphicsLayer { alpha = titleAlpha }
-                    )
-                }
-                Box {
-                    AnimatedVisibility(visible = actions, enter = itemEnter, exit = itemExit) {
-                        BarButton(
-                            icon = R.drawable.ic_refresh,
-                            backdrop = backdrop,
-                            observe = observe,
-                            onClick = onRefresh,
-                            modifier = Modifier.focusProperties { down = listFocus }
-                        )
-                    }
-                }
-            },
-            modifier = Modifier
-                .padding(top = top, start = startPadding, end = endPadding, bottom = BarBottom)
-                .fillMaxWidth()
-                .height(Space.control)
-        ) { measurables, constraints ->
-            val loose = constraints.copy(minWidth = 0, minHeight = 0)
-            val end = measurables[1].measure(loose)
-            val side = if (end.width > 0) end.width + BarTitleGap.roundToPx() else 0
-            val heading = measurables[0].measure(loose.copy(maxWidth = (constraints.maxWidth - side).coerceAtLeast(0)))
-            layout(constraints.maxWidth, constraints.maxHeight) {
-                val x = min((constraints.maxWidth - heading.width) / 2, constraints.maxWidth - side - heading.width)
-                heading.placeRelative(x, (constraints.maxHeight - heading.height) / 2)
-                end.placeRelative(constraints.maxWidth - end.width, (constraints.maxHeight - end.height) / 2)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PulseDot() {
-    val pulse = rememberInfiniteTransition(label = "pulse").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(PULSE_MILLIS, easing = Motion.ease),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-
-    Box(
-        modifier = Modifier
-            .size(DotSize)
-            .graphicsLayer {
-                scaleX = 1f - PULSE_SHRINK * pulse.value
-                scaleY = scaleX
-                alpha = 1f - PULSE_FADE * pulse.value
-            }
-            .clip(CircleShape)
-            .background(Design.colors.accent)
-    )
-}
-
-@Composable
-private fun TabBar(
-    backdrop: GraphicsLayer,
-    focus: FocusRequester,
-    listFocus: FocusRequester,
-    observe: () -> Unit,
-    selectedTab: AppTab,
-    modifier: Modifier,
-    onSelect: (AppTab) -> Unit
-) {
-    val colors = Design.colors
-    val lens = animateFloatAsState(
-        targetValue = selectedTab.ordinal.toFloat(),
-        animationSpec = tween(Motion.SPRING, easing = Motion.easeSpring),
-        label = "lens"
-    )
-    BackdropSurface(
-        backdrop = backdrop,
-        tint = colors.surface2.copy(alpha = Glass.MATERIAL),
-        shape = ShapePill,
-        blurRadius = Glass.blur,
-        highlight = colors.glassEdge,
-        observe = observe,
-        modifier = modifier
-            .dropShadow(ShapePill) {
-                radius = Glass.shadowBlur.toPx()
-                offset = Offset(0f, Glass.shadowOffset.toPx())
-                color = colors.shadow
-            }
-            .border(Glass.rim, colors.glassRim, ShapePill)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(TabBarPadding)
-                .drawBehind {
-                    val width = size.width / AppTab.entries.size
-                    val index = if (layoutDirection == LayoutDirection.Rtl) AppTab.entries.lastIndex - lens.value else lens.value
-                    drawRoundRect(
-                        color = colors.tabLens,
-                        topLeft = Offset(width * index, 0f),
-                        size = Size(width, size.height),
-                        cornerRadius = CornerRadius(size.height / 2)
-                    )
-                }
-        ) {
-            AppTab.entries.forEach { tab ->
-                TabItem(
-                    tab = tab,
-                    selected = tab == selectedTab,
-                    modifier = Modifier
-                        .width(TabWidth)
-                        .then(if (tab == selectedTab) Modifier.focusRequester(focus) else Modifier)
-                        .focusProperties {
-                            up = listFocus
-                            if (tab == AppTab.entries.first()) start = FocusRequester.Cancel
-                            if (tab == AppTab.entries.last()) end = FocusRequester.Cancel
-                        },
-                    onClick = { onSelect(tab) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TabItem(
-    tab: AppTab,
-    selected: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    val colors = Design.colors
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val focused by interaction.collectIsFocusedAsState()
-    val fade by animateFloatAsState(
-        targetValue = if (pressed) PressedOpacity else 1f,
-        animationSpec = tween(Motion.FAST, easing = Motion.ease),
-        label = "tab"
-    )
-    val tint by animateColorAsState(
-        targetValue = if (selected) colors.accent else colors.text,
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "tint"
-    )
     Column(
         modifier = modifier
-            .alpha(fade)
-            .focusRing(focused, colors.accent, Dp.Infinity)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick
-            )
-            .padding(top = TabTop, bottom = TabBottom),
+            .fillMaxWidth()
+            .padding(horizontal = ContentMargin, vertical = EmptyPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(TabGap)
+        verticalArrangement = Arrangement.spacedBy(SmallSpacing)
     ) {
         Icon(
-            painter = painterResource(tab.iconRes),
+            painter = painterResource(symbol),
             contentDescription = null,
-            tint = tint,
-            modifier = Modifier.width(TabIconWidth).aspectRatio(TAB_ICON_ASPECT)
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(EmptyIconSize)
         )
-        Text(text = stringResource(tab.labelRes), style = Design.type.tab, color = tint)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        if (action != null) Box(modifier = Modifier.padding(top = SmallSpacing)) { action() }
     }
 }
 
 @Composable
-private fun SwitchTrack(checked: Boolean, focused: Boolean) {
-    val colors = Design.colors
-    val track by animateColorAsState(
-        targetValue = if (checked) colors.success else colors.switchOff,
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "track"
-    )
-    val travel by animateDpAsState(
-        targetValue = if (checked) SwitchWidth - SwitchKnobWidth - SwitchInset * 2 else 0.dp,
-        animationSpec = tween(Motion.NORMAL, easing = Motion.ease),
-        label = "knob"
-    )
-    Box(
-        modifier = Modifier
-            .size(width = SwitchWidth, height = SwitchHeight)
-            .focusRing(focused, colors.accent, Dp.Infinity)
-            .background(track, ShapePill)
-            .padding(SwitchInset),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(travel.roundToPx(), 0) }
-                .size(width = SwitchKnobWidth, height = SwitchKnobHeight)
-                .dropShadow(ShapePill) {
-                    radius = KnobShadowBlur.toPx()
-                    offset = Offset(0f, KnobShadowOffset.toPx())
-                    color = KnobShadow
-                }
-                .background(Color.White, ShapePill)
-        )
-    }
-}
-
-@Composable
-private fun ToastHost(
-    toasts: SnapshotStateList<Toast>,
-    backdrop: GraphicsLayer,
-    modifier: Modifier
+private fun ManualDialog(
+    update: AppUpdateInfo,
+    onDismiss: () -> Unit,
+    onSubmit: (Long) -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .padding(horizontal = Space.l)
-            .widthIn(max = ToastMaxWidth),
-        verticalArrangement = Arrangement.spacedBy(Space.s),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        toasts.forEach { toast ->
-            key(toast.id) {
-                ToastItem(message = toast.message, backdrop = backdrop, onGone = { toasts.remove(toast) })
+    val code = rememberTextFieldState()
+    val versionCode = code.text.toString().toLongOrNull()
+    val focus = remember { FocusRequester() }
+    val submit = { if (versionCode != null) onSubmit(versionCode) }
+
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = submit, enabled = versionCode != null) {
+                Text(text = stringResource(R.string.update))
             }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.cancel))
+            }
+        },
+        title = { Text(text = update.appName, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            OutlinedTextField(
+                state = code,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focus),
+                label = { Text(text = stringResource(R.string.version_code)) },
+                inputTransformation = DigitsOnly.maxLengthTrim(MAX_VERSION_CODE_DIGITS),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                onKeyboardAction = { submit() },
+                lineLimits = TextFieldLineLimits.SingleLine
+            )
         }
-    }
+    )
 }
 
 @Composable
-private fun ToastItem(message: String, backdrop: GraphicsLayer, onGone: () -> Unit) {
-    val colors = Design.colors
-    val density = LocalDensity.current
-    val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
+private fun ThemeDialog(
+    current: ThemeMode,
+    onDismiss: () -> Unit,
+    onSelect: (ThemeMode) -> Unit
+) {
+    val inputModeManager = LocalInputModeManager.current
+    val focus = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        delay(TOAST_MILLIS)
-        visibility.targetState = false
-    }
-    if (visibility.isIdle && !visibility.currentState && !visibility.targetState) {
-        LaunchedEffect(Unit) { onGone() }
+        if (inputModeManager.inputMode == InputMode.Keyboard) focus.requestFocus()
     }
 
-    AnimatedVisibility(
-        visibleState = visibility,
-        enter = fadeIn(tween(Motion.SPRING, easing = Motion.easeSpring)) +
-            slideInVertically(tween(Motion.SPRING, easing = Motion.easeSpring)) { with(density) { ToastEnter.roundToPx() } },
-        exit = fadeOut(tween(Motion.NORMAL, easing = Motion.ease)) +
-            slideOutVertically(tween(Motion.NORMAL, easing = Motion.ease)) { with(density) { ToastExit.roundToPx() } }
-    ) {
-        BackdropSurface(
-            backdrop = backdrop,
-            tint = colors.surface3.copy(alpha = Glass.TOAST),
-            shape = ShapePill,
-            blurRadius = Glass.toastBlur,
-            highlight = colors.glassEdge,
-            modifier = Modifier.dropShadow(ShapePill) {
-                radius = Glass.shadowBlur.toPx()
-                offset = Offset(0f, Glass.shadowOffset.toPx())
-                color = colors.shadow
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.cancel))
             }
-        ) {
-            Text(
-                text = message,
-                style = Design.type.muted,
-                color = colors.text,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .border(Glass.rim, colors.glassRim, ShapePill)
-                    .padding(horizontal = Space.l, vertical = Space.s)
-            )
+        },
+        title = { Text(text = stringResource(R.string.theme)) },
+        text = {
+            Column {
+                ThemeMode.entries.forEach { mode ->
+                    val selected = mode == current
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (selected) Modifier.focusRequester(focus) else Modifier)
+                            .clip(MaterialTheme.shapes.large)
+                            .clickable { onSelect(mode) }
+                            .minimumInteractiveComponentSize(),
+                        horizontalArrangement = Arrangement.spacedBy(ContentMargin),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = selected, onClick = null)
+                        Text(text = stringResource(mode.labelRes), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
         }
-    }
+    )
 }
 
-private fun Modifier.focusRing(
-    focused: Boolean,
-    color: Color,
-    cornerRadius: Dp,
-    inset: Boolean = false
-): Modifier =
-    drawWithContent {
-        drawContent()
-        if (focused) {
-            val width = FocusRingWidth.toPx()
-            val offset = (FocusRingOffset.toPx() + width / 2) * if (inset) -1f else 1f
-            val radius = (min(cornerRadius.toPx(), size.minDimension / 2) + offset).coerceAtLeast(0f)
-            drawRoundRect(
-                color = color,
-                topLeft = Offset(-offset, -offset),
-                size = Size(size.width + offset * 2, size.height + offset * 2),
-                cornerRadius = CornerRadius(radius, radius),
-                style = Stroke(width)
-            )
-        }
-    }
+private val DigitsOnly = InputTransformation {
+    val digits = asCharSequence().filter(Char::isDigit)
+    if (digits.length != length) replace(0, length, digits)
+}
 
-private class TitleReveal(scope: CoroutineScope) {
-    private val requester = BringIntoViewRequester()
-    private var height = 0
-    var reach = 0
-    val modifier = Modifier
-        .bringIntoViewRequester(requester)
-        .onSizeChanged { height = it.height }
-        .onFocusEvent { state ->
-            if (state.hasFocus) {
-                scope.launch { requester.bringIntoView(Rect(0f, -reach.toFloat(), 1f, height.toFloat())) }
-            }
-        }
+private class TopReveal(scope: CoroutineScope, listState: LazyListState, barState: TopAppBarState, spec: AnimationSpec<Float>) {
+    val modifier = Modifier.onFocusEvent { state ->
+        if (state.hasFocus) scope.reveal(listState, barState, spec)
+    }
 }
 
 @Composable
-private fun rememberTitleReveal(listState: LazyListState, key: Any?): TitleReveal {
+private fun rememberTopReveal(listState: LazyListState, barState: TopAppBarState): TopReveal {
     val scope = rememberCoroutineScope()
-    val reveal = remember(scope) { TitleReveal(scope) }
-    val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
+    val spec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    return remember(listState, barState, scope, spec) { TopReveal(scope, listState, barState, spec) }
+}
 
-    LaunchedEffect(listState, key, keyboard) {
-        if (!keyboard) return@LaunchedEffect
-        snapshotFlow {
-            val items = listState.layoutInfo.visibleItemsInfo
-            val title = items.firstOrNull { it.key == TITLE_KEY }
-            val item = items.firstOrNull { it.key == key }
-            if (title != null && item != null) item.offset - title.offset else null
-        }.collect { distance -> if (distance != null) reveal.reach = distance }
+private fun CoroutineScope.reveal(listState: LazyListState, barState: TopAppBarState, spec: AnimationSpec<Float>) {
+    launch {
+        launch { barState.expand(spec) }
+        listState.animateScrollToItem(0)
     }
-    return reveal
+}
+
+private suspend fun TopAppBarState.expand(spec: AnimationSpec<Float>) {
+    contentOffset = 0f
+    animate(heightOffset, 0f, animationSpec = spec) { value, _ -> heightOffset = value }
 }
 
 private class CardFocus {
@@ -2052,9 +1037,12 @@ private class CardFocus {
     val entries = HashMap<String, FocusRequester>()
 }
 
-private class FocusScroll(private val top: Float, private val bottom: Float) : BringIntoViewSpec {
+private class FocusScroll(private val density: Density) : BringIntoViewSpec {
+    var padding = PaddingValues()
+
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-        val end = containerSize - bottom
+        val top = with(density) { padding.calculateTopPadding().toPx() }
+        val end = containerSize - with(density) { padding.calculateBottomPadding().toPx() }
         if (offset >= top && offset + size <= end) return 0f
         return offset - (containerSize * FOCUS_PIVOT).coerceIn(top, maxOf(top, end - size))
     }

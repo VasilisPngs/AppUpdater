@@ -4,15 +4,14 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
-        android:pivotX="12"
-        android:pivotY="12"
-        android:scaleX="2.4075"
-        android:scaleY="2.4075"
-        android:translateX="42"
-        android:translateY="42">
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:fillType="evenOdd"
-            android:pathData="M8.03,3.8H15.97A4.23,4.23 0,0 1,20.2,8.03V15.97A4.23,4.23 0,0 1,15.97,20.2H8.03A4.23,4.23 0,0 1,3.8,15.97V8.03A4.23,4.23 0,0 1,8.03,3.8ZM11.25,8.27A0.75,0.75 0,0 1,12.75,8.27L12.75,13.919L14.7,11.97A0.75,0.75 0,0 1,15.76,13.03L12.53,16.26A0.75,0.75 0,0 1,11.47,16.26L8.24,13.03A0.75,0.75 0,0 1,9.3,11.97L11.25,13.919Z" />
+        android:scaleX="0.055"
+        android:scaleY="0.055"
+        android:translateX="27.6"
+        android:translateY="27.6">
+        <group android:translateY="960">
+            <path
+                android:fillColor="#FFFFFFFF"
+                android:pathData="m440-472-36-36q-11-11-28-11t-28 11q-11 11-11 28t11 28l104 104q12 12 28 12t28-12l104-104q11-11 11-28t-11-28q-11-11-28-11t-28 11l-36 36v-128q0-17-11.5-28.5T480-640q-17 0-28.5 11.5T440-600v128Zm40 392q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z" />
+        </group>
     </group>
 </vector>
