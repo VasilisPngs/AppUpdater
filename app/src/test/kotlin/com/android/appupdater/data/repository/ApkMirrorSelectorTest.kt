@@ -162,8 +162,7 @@ class ApkMirrorSelectorTest {
         signatureSha1s = emptySet(),
         signatureSha256s = emptySet(),
         isEnabled = true,
-        isTelevisionBuild = false,
-        hasLanguageSplit = false
+        isTelevisionBuild = false
     )
 
     private fun release(versionName: String, vararg apks: ApkMirrorApk) =
