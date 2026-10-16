@@ -52,14 +52,41 @@ class ApkMirrorSelectorTest {
     }
 
     @Test
-    fun `falls back to the newest compatible family when the installed one is missing`() {
+    fun `waits for the installed family when the release lacks it`() {
         val release = release(
             "25.42.31",
             apk(254231035, "google-play-services-25-42-31", minimumApi = 23),
             apk(254231037, "google-play-services-25-42-31-2", minimumApi = 28)
         )
 
-        assertEquals(254231037, select(release, installed("25.40.32", 254032040, minSdk = 31))?.apk?.versionCode)
+        assertNull(select(release, installed("25.40.32", 254032040, minSdk = 31)))
+    }
+
+    @Test
+    fun `waits for the installed family when the release ships it only for another ABI`() {
+        val release = release(
+            "26.39.64",
+            apk(
+                263964013,
+                "google-play-services-26-39-64-100400-994893731",
+                architectures = listOf("arm64-v8a", "armeabi-v7a"),
+                minimumApi = 28
+            ),
+            apk(263964038, "google-play-services-26-39-64-260800-994893731", architectures = listOf("x86_64"), minimumApi = 35)
+        )
+
+        assertNull(select(release, installed("26.39.33 (260400-995470952)", 263933035, minSdk = 35)))
+    }
+
+    @Test
+    fun `moves to the lowest family when the app raised its minimum SDK`() {
+        val release = release(
+            "4.0",
+            apk(4028, "app-4-0", minimumApi = 28),
+            apk(4031, "app-4-0-2", minimumApi = 31)
+        )
+
+        assertEquals(4028L, select(release, installed("3.9", 3924, minSdk = 24))?.apk?.versionCode)
     }
 
     @Test
@@ -135,7 +162,8 @@ class ApkMirrorSelectorTest {
         signatureSha1s = emptySet(),
         signatureSha256s = emptySet(),
         isEnabled = true,
-        isTelevisionBuild = false
+        isTelevisionBuild = false,
+        hasLanguageSplit = false
     )
 
     private fun release(versionName: String, vararg apks: ApkMirrorApk) =

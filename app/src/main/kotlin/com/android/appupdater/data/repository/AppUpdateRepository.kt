@@ -45,6 +45,7 @@ class AppUpdateRepository(
     private val client: ApkMirrorClient = ApkMirrorClient(context.packageName)
 ) {
     private val packageManager = context.packageManager
+    private val resources = context.resources
     private val isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
     private val packageFlags = PackageManager.PackageInfoFlags.of(
         (PACKAGE_FLAGS or if (isTelevision) PackageManager.GET_CONFIGURATIONS else 0).toLong()
@@ -59,13 +60,21 @@ class AppUpdateRepository(
 
     suspend fun getInstalledApps(): List<InstalledApp> = withContext(Dispatchers.IO) {
         val televisionLaunchers = if (isTelevision) televisionLaunchers() else emptySet()
+        val languages = deviceLanguages()
         packageManager.getInstalledPackages(packageFlags)
-            .mapNotNull { packageInfo -> runCatching { packageInfo.toInstalledApp(televisionLaunchers) }.getOrNull() }
+            .mapNotNull { packageInfo -> runCatching { packageInfo.toInstalledApp(televisionLaunchers, languages) }.getOrNull() }
     }
 
     suspend fun getInstalledApp(packageName: String): InstalledApp? = withContext(Dispatchers.IO) {
         val televisionLaunchers = if (isTelevision) televisionLaunchers(packageName) else emptySet()
-        runCatching { packageManager.getPackageInfo(packageName, packageFlags).toInstalledApp(televisionLaunchers) }.getOrNull()
+        runCatching {
+            packageManager.getPackageInfo(packageName, packageFlags).toInstalledApp(televisionLaunchers, deviceLanguages())
+        }.getOrNull()
+    }
+
+    private fun deviceLanguages(): Set<String> {
+        val locales = resources.configuration.locales
+        return (0 until locales.size()).mapTo(HashSet()) { locales[it].language }
     }
 
     private fun televisionLaunchers(packageName: String? = null): Set<String> = packageManager
@@ -95,7 +104,12 @@ class AppUpdateRepository(
         val confirmation = confirmPlayUpdates(
             playApps.filter { app -> installedByPackage[app.packageName]?.let { playUpdate(app, it) } != null }
         )
-        val delivery = offerMirrorVersionsOnPlay(merge(appsToCheck, mirrorApps, playApps, confirmation), playApps)
+        val delivery = offerMirrorVersionsOnPlay(
+            merge(appsToCheck, mirrorApps, playApps, confirmation),
+            playApps,
+            installedByPackage,
+            confirmation.dates
+        )
         val updates = delivery.updates.sortedWith(NEWEST_FIRST)
 
         val failures = buildList {
@@ -148,7 +162,12 @@ class AppUpdateRepository(
         )
     }
 
-    private suspend fun offerMirrorVersionsOnPlay(updates: List<AppUpdateInfo>, playApps: List<App>): PlayDelivery =
+    private suspend fun offerMirrorVersionsOnPlay(
+        updates: List<AppUpdateInfo>,
+        playApps: List<App>,
+        installed: Map<String, InstalledApp>,
+        playDates: Map<String, Long>
+    ): PlayDelivery =
         coroutineScope {
             val offerTypes = playApps.associate { it.packageName to it.offerType }
             val permits = Semaphore(PLAY_CONFIRMATIONS)
@@ -171,11 +190,22 @@ class AppUpdateRepository(
                 }
             }.awaitAll()
             PlayDelivery(
-                updates = checks.map { (update, delivered) ->
-                    if (delivered?.getOrNull() == true) {
-                        update.copy(playUpdate = PlayVersion(update.newVersionName, update.newVersionCode))
-                    } else {
-                        update
+                updates = checks.mapNotNull { (update, delivered) ->
+                    val playOnly = update.playAvailable && installed[update.packageName]?.hasLanguageSplit == true
+                    when {
+                        delivered?.getOrNull() == true -> update.copy(
+                            apkMirrorUrl = update.apkMirrorUrl.takeUnless { playOnly },
+                            playUpdate = PlayVersion(update.newVersionName, update.newVersionCode)
+                        )
+                        !playOnly || update.apkMirrorUrl == null -> update
+                        else -> update.playUpdate?.let { play ->
+                            update.copy(
+                                newVersionName = play.name,
+                                newVersionCode = play.code,
+                                publishedAt = playDates[update.packageName],
+                                apkMirrorUrl = null
+                            )
+                        }
                     }
                 },
                 unchecked = checks.filter { it.second?.isFailure == true }.map { it.first.packageName }
@@ -245,7 +275,7 @@ class AppUpdateRepository(
             .toEpochMilli()
     }.getOrNull()
 
-    private fun PackageInfo.toInstalledApp(televisionLaunchers: Set<String>): InstalledApp? {
+    private fun PackageInfo.toInstalledApp(televisionLaunchers: Set<String>, languages: Set<String>): InstalledApp? {
         val appInfo = applicationInfo ?: return null
         val certificates = signingInfo.certificates()
 
@@ -258,7 +288,11 @@ class AppUpdateRepository(
             signatureSha256s = certificates.digests("SHA-256"),
             isEnabled = appInfo.enabled,
             isTelevisionBuild = packageName in televisionLaunchers ||
-                reqFeatures?.any { it.name == PackageManager.FEATURE_LEANBACK } == true
+                reqFeatures?.any { it.name == PackageManager.FEATURE_LEANBACK } == true,
+            hasLanguageSplit = splitNames.orEmpty().any { split ->
+                split.startsWith(CONFIG_SPLIT_PREFIX) &&
+                    split.removePrefix(CONFIG_SPLIT_PREFIX).substringBefore('_') in languages
+            }
         )
     }
 
@@ -283,6 +317,7 @@ class AppUpdateRepository(
     private companion object {
         const val API_BATCH_SIZE = 100
         const val APKMIRROR_URL = "https://www.apkmirror.com"
+        const val CONFIG_SPLIT_PREFIX = "config."
         val NEWEST_FIRST = compareByDescending<AppUpdateInfo> { it.publishedAt ?: Long.MIN_VALUE }
             .thenBy { it.appName.lowercase(Locale.ROOT) }
         const val PACKAGE_FLAGS = PackageManager.GET_SIGNING_CERTIFICATES

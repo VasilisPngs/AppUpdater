@@ -27,21 +27,30 @@ internal class ApkMirrorSelector(
         val releaseNumbers = versionNumbers(app.versionName)
         if (isInstalledVersion(releaseNumbers, versionNumbers(installed.versionName))) return null
         val installedFlavour = installedFlavour(installed.versionName)
-        val apk = app.apks
+        val builds = app.apks
             .asSequence()
-            .filter { it.versionCode > installed.versionCode }
             .filter { it.minimumApi <= sdk }
             .filter { isStableLink(it.link, releaseNumbers) }
             .filter { matchesFlavour(it, installedFlavour, releaseNumbers) }
             .filter { matchesFormFactor(it, requiresTelevisionBuild) }
             .filter { matchesSignature(it, installed) }
+            .toList()
+        val families = builds.mapTo(sortedSetOf(), ApkMirrorApk::minimumApi)
+        val lowestFamily = families.firstOrNull() ?: return null
+        val family = when {
+            families.size == 1 || installed.minSdk < lowestFamily -> lowestFamily
+            installed.minSdk in families -> installed.minSdk
+            else -> return null
+        }
+        val apk = builds
+            .asSequence()
+            .filter { it.minimumApi == family }
+            .filter { it.versionCode > installed.versionCode }
             .filter { abiRank(it) != UNSUPPORTED_ABI }
             .minWithOrNull(
-                compareBy<ApkMirrorApk> { it.minimumApi != installed.minSdk }
-                    .thenBy(::abiRank)
+                compareBy(::abiRank)
                     .thenByDescending { variantSuffix(it.versionCode, installed.versionCode) }
                     .thenBy(::densityRank)
-                    .thenByDescending(ApkMirrorApk::minimumApi)
                     .thenByDescending(ApkMirrorApk::versionCode)
             ) ?: return null
         return MirrorCandidate(
