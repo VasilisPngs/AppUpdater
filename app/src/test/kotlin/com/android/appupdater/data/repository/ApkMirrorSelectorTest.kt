@@ -16,6 +16,14 @@ class ApkMirrorSelectorTest {
         isAutomotive = false
     )
 
+    private val television = ApkMirrorSelector(
+        sdk = 36,
+        abis = listOf("arm64-v8a", "armeabi-v7a", "armeabi"),
+        densityDpi = 320,
+        isTelevision = true,
+        isAutomotive = false
+    )
+
     @Test
     fun `keeps the device ABI when another ABI shares the installed decimal suffix`() {
         val release = release(
@@ -152,15 +160,104 @@ class ApkMirrorSelectorTest {
         assertNull(select(release, installed("1.9", 190)))
     }
 
+    @Test
+    fun `skips a build whose release page marks it as a pre-release`() {
+        val release = release("2.0", apk(200, "app-2-0-beta"))
+
+        assertNull(select(release, installed("1.9", 190)))
+    }
+
+    @Test
+    fun `offers a build signed with the installed key`() {
+        val release = release("2.0", apk(200, "app-2-0", sha256s = listOf(INSTALLED_KEY)))
+
+        assertEquals(200L, select(release, installed("1.9", 190, sha256s = setOf(INSTALLED_KEY)))?.apk?.versionCode)
+    }
+
+    @Test
+    fun `rejects a build signed with another key`() {
+        val release = release("2.0", apk(200, "app-2-0", sha256s = listOf(OTHER_KEY)))
+
+        assertNull(select(release, installed("1.9", 190, sha256s = setOf(INSTALLED_KEY))))
+    }
+
+    @Test
+    fun `compares SHA-1 signatures when SHA-256 ones are missing`() {
+        val release = release("2.0", apk(200, "app-2-0", sha1s = listOf(OTHER_KEY)))
+
+        assertNull(select(release, installed("1.9", 190, sha1s = setOf(INSTALLED_KEY))))
+    }
+
+    @Test
+    fun `prefers the build for the device density`() {
+        val release = release(
+            "2.0",
+            apk(200, "app-2-0", densities = listOf("320dpi")),
+            apk(201, "app-2-0-2", densities = listOf("480dpi")),
+            apk(202, "app-2-0-3", densities = listOf("nodpi"))
+        )
+
+        assertEquals(201L, select(release, installed("1.9", 190))?.apk?.versionCode)
+    }
+
+    @Test
+    fun `prefers a universal build over one for another density`() {
+        val release = release(
+            "2.0",
+            apk(203, "app-2-0-4", densities = listOf("320dpi")),
+            apk(202, "app-2-0-3", densities = listOf("nodpi"))
+        )
+
+        assertEquals(202L, select(release, installed("1.9", 190))?.apk?.versionCode)
+    }
+
+    @Test
+    fun `keeps the television build of an app installed from its television variant`() {
+        val release = release(
+            "2.0",
+            apk(201, "app-2-0-2"),
+            apk(200, "app-2-0", capabilities = listOf("leanback"))
+        )
+
+        assertEquals(200L, television.select(release, installed("1.9", 190), requiresTelevisionBuild = true)?.apk?.versionCode)
+    }
+
+    @Test
+    fun `skips television-only builds on phones`() {
+        val release = release("2.0", apk(200, "app-2-0", capabilities = listOf("leanback_standalone")))
+
+        assertNull(select(release, installed("1.9", 190)))
+    }
+
+    @Test
+    fun `skips Wear OS builds`() {
+        val release = release("2.0", apk(200, "app-2-0", capabilities = listOf("wear_standalone")))
+
+        assertNull(select(release, installed("1.9", 190)))
+    }
+
+    @Test
+    fun `skips Android Automotive builds on phones`() {
+        val release = release("2.0", apk(200, "app-2-0", capabilities = listOf("android.hardware.type.automotive")))
+
+        assertNull(select(release, installed("1.9", 190)))
+    }
+
     private fun select(release: ApkMirrorApp, installed: InstalledApp) = phone.select(release, installed, requiresTelevisionBuild = false)
 
-    private fun installed(versionName: String, versionCode: Long, minSdk: Int = 26) = InstalledApp(
+    private fun installed(
+        versionName: String,
+        versionCode: Long,
+        minSdk: Int = 26,
+        sha1s: Set<String> = emptySet(),
+        sha256s: Set<String> = emptySet()
+    ) = InstalledApp(
         packageName = PACKAGE,
         versionName = versionName,
         versionCode = versionCode,
         minSdk = minSdk,
-        signatureSha1s = emptySet(),
-        signatureSha256s = emptySet(),
+        signatureSha1s = sha1s,
+        signatureSha256s = sha256s,
         isEnabled = true,
         isTelevisionBuild = false
     )
@@ -172,21 +269,27 @@ class ApkMirrorSelectorTest {
         versionCode: Long,
         slug: String,
         architectures: List<String> = listOf("arm64-v8a"),
-        minimumApi: Int = 26
+        minimumApi: Int = 26,
+        densities: List<String> = listOf("nodpi"),
+        capabilities: List<String> = emptyList(),
+        sha1s: List<String> = emptyList(),
+        sha256s: List<String> = emptyList()
     ) = ApkMirrorApk(
         versionCode = versionCode,
         description = "",
         link = "/apk/developer/app/release/$slug-android-apk-download/",
         publishDate = "",
         architectures = architectures,
-        densities = listOf("nodpi"),
+        densities = densities,
         minimumApi = minimumApi,
-        capabilities = emptyList(),
-        signatureSha1s = emptyList(),
-        signatureSha256s = emptyList()
+        capabilities = capabilities,
+        signatureSha1s = sha1s,
+        signatureSha256s = sha256s
     )
 
     private companion object {
         const val PACKAGE = "com.example.app"
+        const val INSTALLED_KEY = "installed"
+        const val OTHER_KEY = "other"
     }
 }
