@@ -815,7 +815,6 @@ private fun UpdateItem(
         shapes = ListItemDefaults.segmentedShapes(0, 1),
         colors = listItemColors(),
         modifier = modifier.then(cardModifier),
-        verticalAlignment = Alignment.CenterVertically,
         leadingContent = {
             Box(modifier = Modifier.size(AppIconSize)) {
                 iconBitmap?.let { bitmap ->
