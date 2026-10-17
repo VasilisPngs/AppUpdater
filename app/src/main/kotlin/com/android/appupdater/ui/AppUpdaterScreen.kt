@@ -313,6 +313,7 @@ fun AppUpdaterScreen(
         modifier = modifier,
         navigationSuiteType = navigationSuiteType,
         navigationSuiteColors = NavigationSuiteDefaults.colors(
+            shortNavigationBarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             wideNavigationRailColors = WideNavigationRailDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer
             )
