@@ -36,12 +36,15 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.maxLengthTrim
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -89,7 +92,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -114,7 +116,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -243,6 +251,7 @@ fun AppUpdaterScreen(
     val navigationSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
     val navigationBar = navigationSuiteType == NavigationSuiteType.ShortNavigationBarCompact ||
         navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
+    val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
 
     NavigationSuiteScaffold(
         navigationItems = {
@@ -259,6 +268,18 @@ fun AppUpdaterScreen(
                     },
                     label = { Text(text = stringResource(tab.labelRes)) },
                     navigationSuiteType = navigationSuiteType,
+                    badge = if (tab == AppTab.Updates && updates.isNotEmpty()) {
+                        {
+                            Badge {
+                                Text(
+                                    text = "${updates.size}",
+                                    modifier = Modifier.semantics { contentDescription = updatesAvailable }
+                                )
+                            }
+                        }
+                    } else {
+                        null
+                    },
                     modifier = Modifier
                         .then(if (selected) Modifier.focusRequester(navigationFocus) else Modifier)
                         .focusProperties {
@@ -291,7 +312,10 @@ fun AppUpdaterScreen(
                                 onClick = viewModel::refresh,
                                 modifier = Modifier.focusProperties { down = updatesFocus }
                             ) {
-                                Icon(painter = painterResource(R.drawable.ic_refresh), contentDescription = null)
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_refresh),
+                                    contentDescription = stringResource(R.string.refresh)
+                                )
                             }
                         }
                     },
@@ -585,7 +609,9 @@ private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
         text = text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(start = ContentMargin, end = ContentMargin, bottom = SmallSpacing)
+        modifier = modifier
+            .padding(start = ContentMargin, end = ContentMargin, bottom = SmallSpacing)
+            .semantics { heading() }
     )
 }
 
@@ -754,6 +780,7 @@ private fun UpdateItem(
                     SourceButton(
                         text = stringResource(R.string.update),
                         icon = R.drawable.ic_source_apkmirror,
+                        source = stringResource(R.string.source_apkmirror),
                         enabled = install == null,
                         onClick = { onApkMirror(url) },
                         modifier = buttonModifiers[APKMIRROR_SLOT]
@@ -763,6 +790,7 @@ private fun UpdateItem(
                     SourceButton(
                         text = stringResource(R.string.update),
                         icon = R.drawable.ic_source_play,
+                        source = stringResource(R.string.source_play),
                         enabled = install == null,
                         busy = install?.manual == false,
                         progress = install?.progress,
@@ -774,6 +802,7 @@ private fun UpdateItem(
                     SourceButton(
                         text = stringResource(R.string.manual),
                         icon = R.drawable.ic_source_play,
+                        source = stringResource(R.string.source_play),
                         enabled = install == null,
                         busy = install?.manual == true,
                         progress = install?.progress,
@@ -792,6 +821,7 @@ private fun UpdateItem(
 private fun SourceButton(
     text: String,
     @DrawableRes icon: Int,
+    source: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -809,11 +839,11 @@ private fun SourceButton(
     FilledTonalButton(
         onClick = { if (active) onClick() },
         shapes = ButtonDefaults.shapes(),
-        modifier = modifier,
+        modifier = modifier.semantics { if (busy) disabled() },
         enabled = enabled || busy,
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding
     ) {
-        Icon(painter = painterResource(icon), contentDescription = null)
+        Icon(painter = painterResource(icon), contentDescription = source)
         Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
         Box(contentAlignment = Alignment.Center) {
             Text(
@@ -937,15 +967,14 @@ private fun ThemeDialog(
         },
         title = { Text(text = stringResource(R.string.theme)) },
         text = {
-            Column {
+            Column(modifier = Modifier.selectableGroup()) {
                 ThemeMode.entries.forEach { mode ->
                     val selected = mode == current
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(if (selected) Modifier.focusRequester(focus) else Modifier)
-                            .clip(MaterialTheme.shapes.large)
-                            .clickable { onSelect(mode) }
+                            .selectable(selected = selected, onClick = { onSelect(mode) }, role = Role.RadioButton)
                             .minimumInteractiveComponentSize(),
                         horizontalArrangement = Arrangement.spacedBy(ContentMargin),
                         verticalAlignment = Alignment.CenterVertically

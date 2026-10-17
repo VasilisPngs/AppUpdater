@@ -25,7 +25,7 @@
 - Top-level navigation follows Material's adaptive navigation: `NavigationSuiteScaffold` with the type from `NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())`, which shows the Expressive short navigation bar on compact windows and the navigation rail on larger windows and televisions.
 - Each screen has a single-row `TopAppBar` whose title is the plain screen name and whose actions hold the screen's actions; lists are flat `ListItem` rows on the surface color rather than segmented, grouped containers.
 - Build the interface from the official Material 3 components and their defaults, shapes included, taking the Expressive variant where one exists (shape-morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own logo where the interface names that third party.
-- The app adds no accessibility code of its own: no content descriptions, roles, or selected, toggleable or disabled semantics; its own interactive elements use plain `clickable`, and Material components keep only what they build in.
+- Accessibility follows Google's guidance: icons and images that carry meaning get a `contentDescription` from string resources, decorative ones and icons beside a visible label get `null`, the app's own interactive elements declare their role and state with `selectable`, `toggleable` or `semantics`, section titles are headings, and Material components keep the semantics they build in.
 - Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules; add a keep rule only for code that a missing rule demonstrably breaks.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
 - Draw edge to edge and let the window insets place the content, rather than reserving space manually.
@@ -53,6 +53,7 @@
 - App bars: https://developer.android.com/develop/ui/compose/components/app-bars
 - Navigation bar in Compose: https://developer.android.com/develop/ui/compose/components/navigation-bar
 - Navigation rail in Compose: https://developer.android.com/develop/ui/compose/components/navigation-rail
+- Badges in Compose: https://developer.android.com/develop/ui/compose/components/badges
 - Floating action button in Compose: https://developer.android.com/develop/ui/compose/components/fab
 - State and Jetpack Compose: https://developer.android.com/develop/ui/compose/state
 - Side effects in Compose: https://developer.android.com/develop/ui/compose/side-effects
@@ -63,6 +64,8 @@
 - Resources in Compose: https://developer.android.com/develop/ui/compose/resources
 - Icons in Compose: https://developer.android.com/develop/ui/compose/graphics/images/material
 - Focus in Compose: https://developer.android.com/develop/ui/compose/touch-input/focus
+- Accessibility in Compose: https://developer.android.com/develop/ui/compose/accessibility
+- Semantics in Compose: https://developer.android.com/develop/ui/compose/accessibility/semantics
 - Copy and paste in Compose: https://developer.android.com/develop/ui/compose/touch-input/copy-and-paste
 - Adaptive apps: https://developer.android.com/develop/ui/compose/layouts/adaptive/get-started-with-adaptive-apps
 - Support different display sizes: https://developer.android.com/develop/ui/compose/layouts/adaptive/support-different-display-sizes
@@ -78,6 +81,7 @@
 - Top app bar: https://m3.material.io/components/app-bars/overview
 - Navigation bar: https://m3.material.io/components/navigation-bar/overview
 - Navigation rail: https://m3.material.io/components/navigation-rail/overview
+- Badges: https://m3.material.io/components/badges/overview
 - Buttons: https://m3.material.io/components/buttons/overview
 - Icon buttons: https://m3.material.io/components/icon-buttons/overview
 - Lists: https://m3.material.io/components/lists/overview
@@ -100,6 +104,7 @@
 - Motion: https://m3.material.io/styles/motion/overview/how-it-works
 - Spacing: https://m3.material.io/styles/spacing/overview
 - Icons: https://m3.material.io/styles/icons/overview
+- Accessibility: https://m3.material.io/foundations/overview
 - Material Symbols guide: https://developers.google.com/fonts/docs/material_symbols
 - Material Symbols catalogue: https://fonts.google.com/icons
 - Material Symbols Android drawables: https://github.com/google/material-design-icons/tree/master/symbols/android
@@ -132,6 +137,7 @@
 - UiModeManager: https://developer.android.com/reference/android/app/UiModeManager
 - PackageInstaller: https://developer.android.com/reference/android/content/pm/PackageInstaller
 - Per-app language preferences: https://developer.android.com/guide/topics/resources/app-languages
+- String resources: https://developer.android.com/guide/topics/resources/string-resource
 - Kotlin coroutines on Android: https://developer.android.com/kotlin/coroutines
 - Kotlin flows on Android: https://developer.android.com/kotlin/flow
 - Kotlin serialization: https://kotlinlang.org/docs/serialization.html
@@ -153,6 +159,7 @@
 - Lifecycle in Compose: https://developer.android.com/topic/libraries/architecture/lifecycle
 - Navigation 3: https://developer.android.com/guide/navigation/navigation-3
 - Core app quality guidelines: https://developer.android.com/docs/quality-guidelines/core-app-quality
+- Build accessible apps: https://developer.android.com/guide/topics/ui/accessibility
 - Adaptive app quality guidelines: https://developer.android.com/docs/quality-guidelines/adaptive-app-quality
 - App performance guide: https://developer.android.com/topic/performance/overview
 - Compose performance: https://developer.android.com/develop/ui/compose/performance
