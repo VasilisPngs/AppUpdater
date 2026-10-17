@@ -691,6 +691,18 @@ private fun UpdateItem(
         shapes = ListItemDefaults.segmentedShapes(0, 1),
         colors = listItemColors(),
         modifier = modifier.then(cardModifier),
+        leadingContent = {
+            Box(modifier = Modifier.size(AppIconSize)) {
+                iconBitmap?.let { bitmap ->
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            }
+        },
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(SmallSpacing)) {
                 Column(verticalArrangement = Arrangement.spacedBy(VersionSpacing)) {
@@ -710,7 +722,8 @@ private fun UpdateItem(
                     )
                 }
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(SmallSpacing),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(SmallSpacing, Alignment.End),
                     verticalArrangement = Arrangement.spacedBy(SmallSpacing)
                 ) {
                     if (update.playUpdate != null) {
@@ -739,22 +752,7 @@ private fun UpdateItem(
             }
         }
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(ContentMargin)
-        ) {
-            Box(modifier = Modifier.size(AppIconSize)) {
-                iconBitmap?.let { bitmap ->
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
-                }
-            }
-            Text(text = update.appName, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
+        Text(text = update.appName, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
