@@ -20,6 +20,7 @@
 ## Android
 - The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`.
 - Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code. The window background follows the same system color resources, and the launcher icon is an adaptive icon with a monochrome layer for themed icons.
+- Top-level navigation is a Material 3 Expressive floating toolbar rather than a docked navigation bar, a deliberate departure from Material's guidance, which keeps toolbars for actions: `HorizontalFloatingToolbar` at the bottom on compact widths or heights and `VerticalFloatingToolbar` at the start on larger windows, chosen with `currentWindowAdaptiveInfoV2()`, with the screen's main action as an adjacent floating action button.
 - Build the interface from the official Material 3 components and their defaults, taking the Expressive variant where one exists (segmented list items, shape-morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own logo where the interface names that third party.
 - The app adds no accessibility code of its own: no content descriptions, roles, or selected, toggleable or disabled semantics; its own interactive elements use plain `clickable`, and Material components keep only what they build in.
 - Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules; add a keep rule only for code that a missing rule demonstrably breaks.
@@ -57,6 +58,7 @@
 - Building with M3 Expressive: https://m3.material.io/blog/building-with-m3-expressive
 - M3 Expressive motion: https://m3.material.io/blog/m3-expressive-motion-theming
 - Material components: https://m3.material.io/components
+- Toolbars: https://m3.material.io/components/toolbars/overview
 - Color roles: https://m3.material.io/styles/color/roles
 - Dynamic color: https://m3.material.io/styles/color/dynamic/choosing-a-source
 - Typography: https://m3.material.io/styles/typography/overview

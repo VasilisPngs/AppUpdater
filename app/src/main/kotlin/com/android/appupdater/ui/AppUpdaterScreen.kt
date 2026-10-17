@@ -16,7 +16,11 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -28,6 +32,8 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +41,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -48,8 +58,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledIconToggleButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItemDefaults
@@ -65,13 +79,11 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
+import androidx.compose.material3.VerticalFloatingToolbar
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -111,6 +123,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -132,6 +145,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
@@ -248,93 +262,77 @@ fun AppUpdaterScreen(
             }
         }
     }
-    val navigationSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
-    val navigationBar = navigationSuiteType == NavigationSuiteType.ShortNavigationBarCompact ||
-        navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
+    val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
+    val vertical = windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) &&
+        windowSizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
+    var verticalWidth by remember { mutableIntStateOf(0) }
+    val navigation: @Composable () -> Unit = {
+        FloatingNavigation(
+            vertical = vertical,
+            selectedTab = selectedTab,
+            focus = navigationFocus,
+            listFocus = activeFocus,
+            onSelect = selectTab,
+            onRefresh = viewModel::refresh
+        )
+    }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(activeBarState)
 
-    NavigationSuiteScaffold(
-        navigationItems = {
-            AppTab.entries.forEach { tab ->
-                val selected = tab == selectedTab
-                NavigationSuiteItem(
-                    selected = selected,
-                    onClick = { selectTab(tab) },
-                    icon = {
-                        Icon(
-                            painter = painterResource(if (selected) tab.selectedIconRes else tab.iconRes),
-                            contentDescription = null
-                        )
-                    },
-                    label = { Text(text = stringResource(tab.labelRes)) },
-                    navigationSuiteType = navigationSuiteType,
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            LargeFlexibleTopAppBar(
+                title = {
+                    Text(
+                        text = if (selectedTab == AppTab.Updates && updates.isNotEmpty()) {
+                            stringResource(R.string.updates_count, updates.size)
+                        } else {
+                            stringResource(selectedTab.labelRes)
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                ),
+                scrollBehavior = scrollBehavior
+            )
+        },
+        bottomBar = {
+            if (!vertical) {
+                Box(
                     modifier = Modifier
-                        .then(if (selected) Modifier.focusRequester(navigationFocus) else Modifier)
-                        .focusProperties {
-                            val first = tab == AppTab.entries.first()
-                            val last = tab == AppTab.entries.last()
-                            if (navigationBar) {
-                                up = activeFocus
-                                if (first) start = FocusRequester.Cancel
-                                if (last) end = FocusRequester.Cancel
-                            } else {
-                                end = activeFocus
-                                if (first) up = FocusRequester.Cancel
-                                if (last) down = FocusRequester.Cancel
-                            }
-                        }
-                )
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(bottom = FloatingToolbarDefaults.ScreenOffset),
+                    contentAlignment = Alignment.Center
+                ) {
+                    navigation()
+                }
             }
         },
-        modifier = modifier,
-        navigationSuiteType = navigationSuiteType,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.surfaceContainer
-    ) {
-        val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(activeBarState)
-        Scaffold(
-            topBar = {
-                LargeFlexibleTopAppBar(
-                    title = {
-                        Text(
-                            text = if (selectedTab == AppTab.Updates && updates.isNotEmpty()) {
-                                stringResource(R.string.updates_count, updates.size)
-                            } else {
-                                stringResource(selectedTab.labelRes)
-                            },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    actions = {
-                        if (selectedTab == AppTab.Updates) {
-                            IconButton(
-                                onClick = viewModel::refresh,
-                                modifier = Modifier.focusProperties { down = updatesFocus }
-                            ) {
-                                Icon(painter = painterResource(R.drawable.ic_refresh), contentDescription = null)
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                    ),
-                    scrollBehavior = scrollBehavior
-                )
-            },
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ) { padding ->
-            val layoutDirection = LocalLayoutDirection.current
-            val density = LocalDensity.current
-            val contentPadding = PaddingValues(
-                start = padding.calculateStartPadding(layoutDirection) + ContentMargin,
-                top = padding.calculateTopPadding(),
-                end = padding.calculateEndPadding(layoutDirection) + ContentMargin,
-                bottom = padding.calculateBottomPadding() + ContentMargin
-            )
-            val focusScroll = remember(density) { FocusScroll(density) }
-            SideEffect { focusScroll.padding = contentPadding }
+    ) { padding ->
+        val layoutDirection = LocalLayoutDirection.current
+        val density = LocalDensity.current
+        val start = if (vertical) {
+            with(density) { verticalWidth.toDp() }
+        } else {
+            padding.calculateStartPadding(layoutDirection)
+        }
+        val contentPadding = PaddingValues(
+            start = start + ContentMargin,
+            top = padding.calculateTopPadding(),
+            end = padding.calculateEndPadding(layoutDirection) + ContentMargin,
+            bottom = padding.calculateBottomPadding() + ContentMargin
+        )
+        val focusScroll = remember(density) { FocusScroll(density) }
+        SideEffect { focusScroll.padding = contentPadding }
 
+        Box(modifier = Modifier.fillMaxSize()) {
             CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
                 when (selectedTab) {
                     AppTab.Updates -> UpdatesView(
@@ -376,6 +374,17 @@ fun AppUpdaterScreen(
                     )
                 }
             }
+            if (vertical) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .onSizeChanged { verticalWidth = it.width }
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                        .padding(start = FloatingToolbarDefaults.ScreenOffset)
+                ) {
+                    navigation()
+                }
+            }
         }
     }
 
@@ -399,6 +408,108 @@ fun AppUpdaterScreen(
                 viewModel.setThemeMode(mode)
             }
         )
+    }
+}
+
+@Composable
+private fun FloatingNavigation(
+    vertical: Boolean,
+    selectedTab: AppTab,
+    focus: FocusRequester,
+    listFocus: FocusRequester,
+    onSelect: (AppTab) -> Unit,
+    onRefresh: () -> Unit
+) {
+    val colors = FloatingToolbarDefaults.standardFloatingToolbarColors()
+    val motion = MaterialTheme.motionScheme
+    val refreshable = selectedTab == AppTab.Updates
+    val tabModifier = { tab: AppTab, selected: Boolean ->
+        Modifier
+            .then(if (selected) Modifier.focusRequester(focus) else Modifier)
+            .focusProperties {
+                if (vertical) {
+                    end = listFocus
+                    if (tab == AppTab.entries.first()) up = FocusRequester.Cancel
+                } else {
+                    up = listFocus
+                    if (tab == AppTab.entries.first()) start = FocusRequester.Cancel
+                }
+            }
+    }
+    val refresh: @Composable () -> Unit = {
+        FloatingActionButton(
+            onClick = onRefresh,
+            modifier = Modifier.focusProperties { if (vertical) end = listFocus else up = listFocus },
+            containerColor = colors.fabContainerColor,
+            contentColor = colors.fabContentColor
+        ) {
+            Icon(painter = painterResource(R.drawable.ic_refresh), contentDescription = null)
+        }
+    }
+
+    if (vertical) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            VerticalFloatingToolbar(
+                expanded = true,
+                colors = colors,
+                expandedShadowElevation = FloatingToolbarDefaults.ContainerExpandedElevationWithFab
+            ) {
+                AppTab.entries.forEach { tab ->
+                    val selected = tab == selectedTab
+                    FilledIconToggleButton(
+                        checked = selected,
+                        onCheckedChange = { onSelect(tab) },
+                        shapes = IconButtonDefaults.toggleableShapes(),
+                        modifier = tabModifier(tab, selected),
+                        colors = IconButtonDefaults.filledIconToggleButtonColors(containerColor = colors.toolbarContainerColor)
+                    ) {
+                        Icon(
+                            painter = painterResource(if (selected) tab.selectedIconRes else tab.iconRes),
+                            contentDescription = null
+                        )
+                    }
+                }
+            }
+            AnimatedVisibility(
+                visible = refreshable,
+                enter = fadeIn(motion.defaultEffectsSpec()) + expandVertically(motion.defaultSpatialSpec(), clip = false),
+                exit = fadeOut(motion.fastEffectsSpec()) + shrinkVertically(motion.defaultSpatialSpec(), clip = false)
+            ) {
+                Box(modifier = Modifier.padding(top = SmallSpacing)) { refresh() }
+            }
+        }
+    } else {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HorizontalFloatingToolbar(
+                expanded = true,
+                colors = colors,
+                expandedShadowElevation = FloatingToolbarDefaults.ContainerExpandedElevationWithFab
+            ) {
+                AppTab.entries.forEach { tab ->
+                    val selected = tab == selectedTab
+                    ToggleButton(
+                        checked = selected,
+                        onCheckedChange = { onSelect(tab) },
+                        modifier = tabModifier(tab, selected),
+                        icon = {
+                            Icon(
+                                painter = painterResource(if (selected) tab.selectedIconRes else tab.iconRes),
+                                contentDescription = null
+                            )
+                        }
+                    ) {
+                        Text(text = stringResource(tab.labelRes))
+                    }
+                }
+            }
+            AnimatedVisibility(
+                visible = refreshable,
+                enter = fadeIn(motion.defaultEffectsSpec()) + expandHorizontally(motion.defaultSpatialSpec(), clip = false),
+                exit = fadeOut(motion.fastEffectsSpec()) + shrinkHorizontally(motion.defaultSpatialSpec(), clip = false)
+            ) {
+                Box(modifier = Modifier.padding(start = SmallSpacing)) { refresh() }
+            }
+        }
     }
 }
 
