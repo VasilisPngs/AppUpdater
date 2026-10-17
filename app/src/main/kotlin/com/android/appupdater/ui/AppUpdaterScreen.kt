@@ -147,6 +147,7 @@ import java.util.function.Consumer
 
 private val ContentMargin = 16.dp
 private val SmallSpacing = 8.dp
+private val VersionSpacing = 4.dp
 private val EmptyPadding = 48.dp
 private val EmptyIconSize = 48.dp
 private val AppIconSize = 40.dp
@@ -692,7 +693,7 @@ private fun UpdateItem(
         modifier = modifier.then(cardModifier),
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(SmallSpacing)) {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(VersionSpacing)) {
                     Text(
                         text = if (app.versionName.isEmpty()) {
                             stringResource(R.string.version_current_code, app.versionCode)
