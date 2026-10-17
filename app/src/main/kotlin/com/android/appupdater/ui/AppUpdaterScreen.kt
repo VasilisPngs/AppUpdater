@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,8 +37,10 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -172,6 +175,7 @@ private val TvOverscanHorizontal = 48.dp
 private val TvOverscanVertical = 27.dp
 private const val TABULAR_FIGURES = "tnum"
 private const val FOCUS_PIVOT = 0.3f
+private const val EXPANDED_COLUMNS = 2
 private const val FADE_THROUGH_SCALE = 0.92f
 private const val BLUR_BEHIND_RADIUS = 20
 private const val DIM_WITH_BLUR = 0.1f
@@ -274,6 +278,11 @@ fun AppUpdaterScreen(
         CompactMargin
     }
     val barMargin = margin - CompactMargin
+    val columns = if (windowInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)) {
+        EXPANDED_COLUMNS
+    } else {
+        1
+    }
     val navigationBar = navigationSuiteType == NavigationSuiteType.ShortNavigationBarCompact ||
         navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
     val window = LocalActivity.current?.window
@@ -405,7 +414,8 @@ fun AppUpdaterScreen(
                             playInstalls = uiState.playInstalls,
                             onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
                             onPlay = viewModel::updateFromPlay,
-                            onRefresh = viewModel::refresh
+                            onRefresh = viewModel::refresh,
+                            columns = columns
                         )
                         AppTab.Settings -> SettingsView(
                             listState = settingsListState,
@@ -453,7 +463,8 @@ private fun UpdatesView(
     playInstalls: Map<String, PlayInstall>,
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    columns: Int
 ) {
     val pullState = rememberPullToRefreshState()
     val motion = MaterialTheme.motionScheme
@@ -561,18 +572,29 @@ private fun UpdatesView(
                 }
             }
 
-            itemsIndexed(items = updates, key = { _, pair -> pair.first.packageName }) { index, pair ->
-                UpdateItem(
-                    app = pair.first,
-                    update = pair.second,
-                    install = playInstalls[pair.first.packageName],
-                    cards = cards,
-                    onApkMirror = onApkMirror,
-                    onPlay = onPlay,
+            itemsIndexed(items = updates.chunked(columns), key = { _, row -> row.first().first.packageName }) { index, row ->
+                Row(
                     modifier = Modifier
                         .animateItem(fade, placement, fade)
-                        .then(if (index == 0) reveal.modifier else Modifier)
-                )
+                        .height(IntrinsicSize.Max),
+                    horizontalArrangement = Arrangement.spacedBy(SmallSpacing)
+                ) {
+                    row.forEach { (app, update) ->
+                        UpdateItem(
+                            app = app,
+                            update = update,
+                            install = playInstalls[app.packageName],
+                            cards = cards,
+                            onApkMirror = onApkMirror,
+                            onPlay = onPlay,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .then(if (index == 0) reveal.modifier else Modifier)
+                        )
+                    }
+                    repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
             }
         }
 
@@ -762,8 +784,8 @@ private fun UpdateItem(
             }
         },
         supportingContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(SmallSpacing)) {
-                Column(verticalArrangement = Arrangement.spacedBy(VersionSpacing)) {
+            Column(modifier = Modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(SmallSpacing)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(VersionSpacing)) {
                     Text(
                         text = if (app.versionName.isEmpty()) {
                             stringResource(R.string.version_current_code, app.versionCode)
