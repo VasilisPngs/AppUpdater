@@ -70,9 +70,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
-import androidx.compose.material3.WideNavigationRailDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
@@ -311,14 +309,7 @@ fun AppUpdaterScreen(
             }
         },
         modifier = modifier,
-        navigationSuiteType = navigationSuiteType,
-        navigationSuiteColors = NavigationSuiteDefaults.colors(
-            shortNavigationBarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            wideNavigationRailColors = WideNavigationRailDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            )
-        ),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer
+        navigationSuiteType = navigationSuiteType
     ) {
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(activeBarState)
         Scaffold(
@@ -338,15 +329,10 @@ fun AppUpdaterScreen(
                             }
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                    ),
                     scrollBehavior = scrollBehavior
                 )
             },
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
         ) { padding ->
             val layoutDirection = LocalLayoutDirection.current
             val density = LocalDensity.current
@@ -500,6 +486,7 @@ private fun UpdatesView(
                 item(key = "notice") {
                     SegmentedListItem(
                         shapes = ListItemDefaults.segmentedShapes(0, 1),
+                        colors = listItemColors(),
                         modifier = Modifier.animateItem()
                     ) {
                         Text(
@@ -514,6 +501,7 @@ private fun UpdatesView(
             items(installList, key = { it.key }) { (_, state) ->
                 SegmentedListItem(
                     shapes = ListItemDefaults.segmentedShapes(0, 1),
+                    colors = listItemColors(),
                     modifier = Modifier.animateItem(),
                     supportingContent = { LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth()) }
                 ) {
@@ -611,6 +599,7 @@ private fun SettingsView(
             SegmentedListItem(
                 onClick = onTheme,
                 shapes = ListItemDefaults.segmentedShapes(0, 1),
+                colors = listItemColors(),
                 modifier = reveal.modifier,
                 supportingContent = { Text(text = stringResource(themeMode.labelRes)) }
             ) {
@@ -627,6 +616,7 @@ private fun SettingsView(
                 checked = includeDisabledApps,
                 onCheckedChange = onIncludeDisabledAppsChange,
                 shapes = ListItemDefaults.segmentedShapes(0, 1),
+                colors = listItemColors(),
                 supportingContent = { Text(text = stringResource(R.string.disabled_apps_description)) },
                 trailingContent = { Switch(checked = includeDisabledApps, onCheckedChange = null) }
             ) {
@@ -637,13 +627,17 @@ private fun SettingsView(
         item(key = "install-bundle") {
             SegmentedListItem(
                 onClick = onPickBundle,
-                shapes = ListItemDefaults.segmentedShapes(0, 1)
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                colors = listItemColors()
             ) {
                 Text(text = stringResource(R.string.install_bundle))
             }
         }
     }
 }
+
+@Composable
+private fun listItemColors() = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
 
 @Composable
 private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
@@ -780,6 +774,7 @@ private fun UpdateItem(
 
     SegmentedListItem(
         shapes = ListItemDefaults.segmentedShapes(0, 1),
+        colors = listItemColors(),
         modifier = modifier.then(cardModifier),
         verticalAlignment = Alignment.CenterVertically,
         leadingContent = {

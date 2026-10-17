@@ -22,7 +22,7 @@
 ## Android
 - The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`, taking the Expressive variant where one exists and keeping the components' defaults, Google's rounded shapes included.
 - Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code.
-- Each screen has a single-row `TopAppBar` with the plain screen name as its title, and every list entry is its own fully rounded Material 3 Expressive `SegmentedListItem`, spaced apart on the surface container color rather than joined into a group.
+- Each screen has a single-row `TopAppBar` with the plain screen name as its title, and every list entry is its own fully rounded Material 3 Expressive `SegmentedListItem` in the surface container color of Google's samples, spaced apart rather than joined into a group.
 - Icons come from Material Symbols Rounded, except a third party's own logo where the interface names that third party.
 - Text uses Google Sans from Google Fonts through Compose downloadable fonts.
 - Use Google's blur and transparency effects wherever Google's guidance uses them, such as the window blur behind dialogs.
@@ -56,6 +56,7 @@
 - State and Jetpack Compose: https://developer.android.com/develop/ui/compose/state
 - Side effects in Compose: https://developer.android.com/develop/ui/compose/side-effects
 - Lazy lists and grids: https://developer.android.com/develop/ui/compose/lists
+- Compose Material 3 list samples: https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-main/compose/material3/material3/samples/src/main/java/androidx/compose/material3/samples/ListSamples.kt
 - Animations in Compose: https://developer.android.com/develop/ui/compose/animation/quick-guide
 - Text in Compose: https://developer.android.com/develop/ui/compose/text
 - Fonts and downloadable fonts in Compose: https://developer.android.com/develop/ui/compose/text/fonts
