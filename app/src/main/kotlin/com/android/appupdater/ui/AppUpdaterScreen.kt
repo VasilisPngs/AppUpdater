@@ -211,6 +211,8 @@ fun AppUpdaterScreen(
     val bundlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::installBundle)
     }
+    val newInstallFormat = stringResource(R.string.app_installed)
+    val installFailedFormat = stringResource(R.string.install_failed)
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
     val versionFormat = stringResource(R.string.version_number)
@@ -232,6 +234,8 @@ fun AppUpdaterScreen(
         viewModel.events.collect { event ->
             showMessage(
                 when (event) {
+                    is InstallEvent.Installed -> newInstallFormat.format(event.appName)
+                    is InstallEvent.InstallFailed -> installFailedFormat.format(event.message)
                     is InstallEvent.Finished -> installedFormat.format(event.appName)
                     is InstallEvent.FinishedFromPlay ->
                         installedFromPlayFormat.format(event.appName, displayVersion(event.versionName, versionFormat))

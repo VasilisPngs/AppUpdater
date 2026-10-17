@@ -25,6 +25,8 @@
     <string name="try_again">Try again</string>
     <string name="no_browser">No app can open links</string>
     <string name="no_file_picker">No app can pick files</string>
+    <string name="app_installed">%1$s was installed</string>
+    <string name="install_failed">Installation failed: %1$s</string>
     <string name="update_installed">%1$s was updated</string>
     <string name="update_installed_play">%1$s was updated to %2$s, the latest on Google Play</string>
     <string name="update_failed">Update failed: %1$s</string>

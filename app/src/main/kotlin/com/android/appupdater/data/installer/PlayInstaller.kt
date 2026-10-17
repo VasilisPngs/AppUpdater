@@ -6,6 +6,7 @@ import com.android.appupdater.data.api.SharedHttpClient
 import com.android.appupdater.data.isStableRelease
 import com.android.appupdater.data.play.PlayCatalog
 import com.android.appupdater.data.play.PlayHttpClient
+import com.android.appupdater.data.play.deliveryFailure
 import com.android.appupdater.data.play.playCertificateHash
 import com.aurora.gplayapi.data.models.PlayFile
 import com.aurora.gplayapi.exceptions.GooglePlayException
@@ -86,7 +87,7 @@ class PlayInstaller(
                 certificateHash = certificate
             )
         } catch (exception: GooglePlayException) {
-            throw IllegalStateException("Google Play does not offer $packageName $versionCode.", exception)
+            throw exception.deliveryFailure(packageName, versionCode)
         }
         return files.filter { it.type == PlayFile.Type.BASE || it.type == PlayFile.Type.SPLIT }
             .ifEmpty { throw IllegalStateException("Google Play returned no installable file.") }

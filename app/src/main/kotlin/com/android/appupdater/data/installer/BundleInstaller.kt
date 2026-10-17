@@ -1,10 +1,12 @@
 package com.android.appupdater.data.installer
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.util.DisplayMetrics
+import com.android.appupdater.data.appLabel
 import com.android.appupdater.data.model.InstallState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -26,10 +28,10 @@ class BundleInstaller(private val context: Context) {
                 onState(InstallState.Installing(label))
                 copyToCache(uri, archive)
 
-                ZipFile(archive).use { zip ->
+                val packageName = ZipFile(archive).use { zip ->
                     packageInstaller.install(sources(zip, archive)).getOrThrow()
                 }
-                onState(InstallState.Success(label))
+                onState(context.packageManager.installedApp(packageName, label))
             } catch (exception: CancellationException) {
                 throw exception
             } catch (_: ZipException) {
@@ -55,14 +57,15 @@ class BundleInstaller(private val context: Context) {
         }
     }
 
-    private fun selectSplits(entries: List<ZipEntry>): List<ZipEntry> {
+    internal fun selectSplits(entries: List<ZipEntry>): List<ZipEntry> {
         val required = mutableListOf<ZipEntry>()
         val abis = mutableMapOf<String, MutableList<ZipEntry>>()
         val densities = mutableMapOf<String, MutableList<ZipEntry>>()
         val languages = mutableMapOf<String, MutableList<ZipEntry>>()
+        val splitNames = entries.mapTo(HashSet()) { splitName(it.name) }
 
         entries.forEach { entry ->
-            val qualifier = configQualifier(entry.name)
+            val qualifier = configQualifier(splitName(entry.name), splitNames)
             when {
                 qualifier == null -> required += entry
                 qualifier in ABIS -> abis.getOrPut(qualifier, ::mutableListOf) += entry
@@ -76,11 +79,14 @@ class BundleInstaller(private val context: Context) {
         return required + pickAbi(abis) + pickDensity(densities) + pickLanguages(languages)
     }
 
-    private fun configQualifier(name: String): String? {
-        val fileName = name.substringAfterLast('/').dropLast(APK_SUFFIX.length)
+    private fun splitName(entryName: String): String = entryName.substringAfterLast('/').dropLast(APK_SUFFIX.length)
+
+    private fun configQualifier(fileName: String, splitNames: Set<String>): String? {
+        val module = fileName.substringBeforeLast(MODULE_CONFIG_INFIX, "")
         val qualifier = when {
             fileName.startsWith(SPLIT_CONFIG_PREFIX) -> fileName.removePrefix(SPLIT_CONFIG_PREFIX)
             fileName.startsWith(CONFIG_PREFIX) -> fileName.removePrefix(CONFIG_PREFIX)
+            module.isNotEmpty() && module in splitNames -> fileName.substringAfterLast(MODULE_CONFIG_INFIX)
             fileName.contains('-') -> fileName.substringAfterLast('-')
             else -> return null
         }
@@ -135,6 +141,7 @@ class BundleInstaller(private val context: Context) {
         const val BASE_APK = "base.apk"
         const val SPLIT_CONFIG_PREFIX = "split_config."
         const val CONFIG_PREFIX = "config."
+        const val MODULE_CONFIG_INFIX = ".config."
         const val MASTER_SPLIT = "master"
         const val NO_DENSITY = "nodpi"
         const val FALLBACK_LANGUAGE = "en"
@@ -151,3 +158,9 @@ class BundleInstaller(private val context: Context) {
         val LANGUAGE_PATTERN = Regex("[a-z]{2,3}(_[a-z0-9]{2,8})*")
     }
 }
+
+internal fun PackageManager.installedApp(packageName: String, fallbackName: String): InstallState.Success =
+    runCatching { getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0)) }
+        .getOrNull()
+        ?.let { InstallState.Success(appLabel(packageName), updated = it.lastUpdateTime > it.firstInstallTime) }
+        ?: InstallState.Success(fallbackName, updated = false)

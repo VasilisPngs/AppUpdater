@@ -4,6 +4,6 @@ sealed interface InstallState {
     val appName: String
 
     data class Installing(override val appName: String) : InstallState
-    data class Success(override val appName: String) : InstallState
+    data class Success(override val appName: String, val updated: Boolean) : InstallState
     data class Error(override val appName: String, val message: String) : InstallState
 }

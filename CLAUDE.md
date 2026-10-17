@@ -83,6 +83,8 @@
 - Canonical layouts: https://developer.android.com/develop/ui/compose/layouts/adaptive/canonical-layouts
 - Adaptive navigation: https://developer.android.com/develop/ui/compose/layouts/adaptive/build-adaptive-navigation
 - Navigation suite API reference: https://developer.android.com/reference/kotlin/androidx/compose/material3/adaptive/navigationsuite/package-summary
+- Activity Compose API reference: https://developer.android.com/reference/kotlin/androidx/activity/compose/package-summary
+- BringIntoViewSpec: https://developer.android.com/reference/kotlin/androidx/compose/foundation/gestures/BringIntoViewSpec
 
 ### Material 3 Expressive
 - Building with M3 Expressive: https://m3.material.io/blog/building-with-m3-expressive
@@ -149,6 +151,8 @@
 - Notifications: https://developer.android.com/develop/ui/compose/notifications
 - Notification runtime permission: https://developer.android.com/develop/ui/compose/notifications/notification-permission
 - Widgets with Jetpack Glance: https://developer.android.com/develop/ui/compose/glance
+- OpenGL ES: https://developer.android.com/develop/ui/views/graphics/opengl/about-opengl
+- Theme.DeviceDefault.DayNight: https://developer.android.com/reference/android/R.style#Theme_DeviceDefault_DayNight
 
 ### Platform behavior
 - Permissions: https://developer.android.com/guide/topics/permissions/overview
@@ -177,6 +181,28 @@
 - Security checklist: https://developer.android.com/privacy-and-security/security-tips
 - Android 17 behavior changes for all apps: https://developer.android.com/about/versions/17/behavior-changes-all
 - Android 17 behavior changes for apps targeting it: https://developer.android.com/about/versions/17/behavior-changes-17
+- PackageManager: https://developer.android.com/reference/android/content/pm/PackageManager
+- PackageInfo: https://developer.android.com/reference/android/content/pm/PackageInfo
+- SigningInfo: https://developer.android.com/reference/android/content/pm/SigningInfo
+- PackageInstaller.SessionParams: https://developer.android.com/reference/android/content/pm/PackageInstaller.SessionParams
+- PendingIntent: https://developer.android.com/reference/android/app/PendingIntent
+- Manifest permissions: https://developer.android.com/reference/android/Manifest.permission
+- App Bundle format: https://developer.android.com/guide/app-bundle/app-bundle-format
+- bundletool: https://developer.android.com/tools/bundletool
+- APK Signature Scheme v3: https://source.android.com/docs/security/features/apksigning/v3
+- Background activity launches: https://developer.android.com/guide/components/activities/secure-bal
+- Auto Backup: https://developer.android.com/identity/data/autobackup
+- Android ABIs: https://developer.android.com/ndk/guides/abis
+- Pixel densities: https://developer.android.com/training/multiscreen/screendensities
+- Kotlin coroutines guide: https://kotlinlang.org/docs/coroutines-guide.html
+- Coroutines best practices: https://developer.android.com/kotlin/coroutines/coroutines-best-practices
+- StateFlow and SharedFlow: https://developer.android.com/kotlin/flow/stateflow-and-sharedflow
+
+### Libraries and services
+- OkHttp: https://lysine.dev/okhttp/
+- GPlayApi: https://gitlab.com/AuroraOSS/gplayapi
+- Aurora Dispenser: https://gitlab.com/AuroraOSS/aurora-dispenser
+- Protocol Buffers Java Lite: https://github.com/protocolbuffers/protobuf/blob/main/java/lite.md
 
 ### Architecture, quality and testing
 - Guide to app architecture: https://developer.android.com/topic/architecture
@@ -199,6 +225,13 @@
 - JUnit user guide: https://docs.junit.org/current/user-guide/
 - JUnit 4: https://junit.org/junit4/
 - Lint: https://developer.android.com/studio/write/lint
+- Lifecycle-aware coroutines: https://developer.android.com/topic/libraries/architecture/coroutines
+- Compose v2 testing APIs: https://developer.android.com/develop/ui/compose/testing/migrate-v2
+- Gradle JVM testing: https://docs.gradle.org/current/userguide/java_testing.html
+- Robolectric compatibility: https://robolectric.org/compatibility_table/
+- Robolectric shadows: https://robolectric.org/extending/
+- Robolectric device configuration: https://robolectric.org/device-configuration/
+- Robolectric GraphicsMode: https://robolectric.org/javadoc/latest/org/robolectric/annotation/GraphicsMode.html
 
 ### Television
 - Android TV: https://developer.android.com/training/tv
@@ -229,6 +262,40 @@
 - Kotlin Early Access Preview: https://kotlinlang.org/docs/eap.html
 - Gradle distributions: https://services.gradle.org/distributions/
 - OpenJDK builds: https://jdk.java.net/
+- Android 17 QPR2: https://developer.android.com/about/versions/17/qpr2
+- Version your app: https://developer.android.com/studio/publish/versioning
+- Android Gradle plugin preview release notes: https://developer.android.com/build/releases/agp-preview
+- Android Gradle plugin API reference: https://developer.android.com/reference/tools/gradle-api
+- Compose Compiler Gradle plugin: https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler
+- Compose BOM: https://developer.android.com/develop/ui/compose/bom
+- Choose libraries wisely: https://developer.android.com/topic/performance/app-optimization/choose-libraries-wisely
+- Fix optimization problems: https://developer.android.com/topic/performance/app-optimization/troubleshoot-the-optimization
+- Google Maven repository: https://maven.google.com/web/index.html
+- Activity release notes: https://developer.android.com/jetpack/androidx/releases/activity
+- Lifecycle release notes: https://developer.android.com/jetpack/androidx/releases/lifecycle
+- Compose Foundation release notes: https://developer.android.com/jetpack/androidx/releases/compose-foundation
+- Gradle release notes: https://docs.gradle.org/current/release-notes.html
+- Gradle Wrapper: https://docs.gradle.org/current/userguide/gradle_wrapper.html
+- Gradle build environment: https://docs.gradle.org/current/userguide/build_environment.html
+- Gradle configuration cache: https://docs.gradle.org/current/userguide/configuration_cache.html
+- Gradle compatibility matrix: https://docs.gradle.org/current/userguide/compatibility.html
+- Kotlin compiler execution strategy: https://kotlinlang.org/docs/compiler-execution-strategy.html
+- Kotlin Gradle plugin compatibility: https://kotlinlang.org/docs/gradle-configure-project.html#apply-the-plugin
+- kotlinx.coroutines releases: https://github.com/Kotlin/kotlinx.coroutines/releases
+- kotlinx.serialization releases: https://github.com/Kotlin/kotlinx.serialization/releases
+- OkHttp changelog: https://lysine.dev/okhttp/changelogs/changelog/
+- GPlayApi changelog: https://gitlab.com/AuroraOSS/gplayapi/-/blob/master/CHANGELOG
+- ASM versions: https://asm.ow2.io/versions.html
+- JUnit release notes: https://docs.junit.org/current/release-notes.html
+- Robolectric releases: https://github.com/robolectric/robolectric/releases
+- GitHub Actions workflow syntax: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+- GitHub Actions runner images: https://github.com/actions/runner-images
+- actions/checkout: https://github.com/actions/checkout
+- actions/setup-java: https://github.com/actions/setup-java
+- setup-gradle: https://github.com/gradle/actions/blob/main/docs/setup-gradle.md
+- GitHub CLI releases: https://cli.github.com/manual/gh_release
+- Git references REST API: https://docs.github.com/en/rest/git/refs#update-a-reference
+- OpenSSL enc: https://docs.openssl.org/master/man1/openssl-enc/
 
 ### AI agents
 - Android tools for agents: https://developer.android.com/tools/agents

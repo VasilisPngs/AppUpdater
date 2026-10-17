@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.withLock
 
 class PackageInstallerManager(private val context: Context) {
 
-    suspend fun install(sources: List<ApkSource>): Result<Unit> = sessionLock.withLock {
+    suspend fun install(sources: List<ApkSource>): Result<String> = sessionLock.withLock {
         if (sources.isEmpty()) return Result.failure(IllegalArgumentException("No APK files to install."))
 
         val installer = context.packageManager.packageInstaller
@@ -33,12 +33,13 @@ class PackageInstallerManager(private val context: Context) {
             return Result.failure(exception)
         }
 
-        val result = CompletableDeferred<Result<Unit>>()
+        val result = CompletableDeferred<Result<String>>()
         val action = "${context.packageName}.PACKAGE_INSTALL_$sessionId"
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(receiverContext: Context, intent: Intent) {
                 when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
-                    PackageInstaller.STATUS_SUCCESS -> result.complete(Result.success(Unit))
+                    PackageInstaller.STATUS_SUCCESS ->
+                        result.complete(Result.success(intent.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME).orEmpty()))
                     PackageInstaller.STATUS_PENDING_USER_ACTION ->
                         intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
                             ?.let(InstallConfirmation::request)

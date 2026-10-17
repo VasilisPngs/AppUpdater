@@ -32,9 +32,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 sealed interface InstallEvent {
+    data class Installed(val appName: String) : InstallEvent
+    data class InstallFailed(val message: String) : InstallEvent
     data class Finished(val appName: String) : InstallEvent
     data class FinishedFromPlay(val appName: String, val versionName: String) : InstallEvent
     data class Failed(val message: String) : InstallEvent
@@ -63,6 +67,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     private val _events = Channel<InstallEvent>(Channel.BUFFERED)
     private val pendingBundles = mutableSetOf<String>()
     private val packageChanges = Channel<String>(Channel.UNLIMITED)
+    private val installedAppsLock = Mutex()
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != Intent.ACTION_PACKAGE_REPLACED && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return
@@ -89,10 +94,12 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         )
         viewModelScope.launch {
             packageChanges.receiveAsFlow().collect { packageName ->
-                val app = repository.getInstalledApp(packageName)
-                _uiState.update { state ->
-                    val apps = state.installedApps.filterNot { it.packageName == packageName } + listOfNotNull(app)
-                    state.copy(installedApps = apps, updates = state.updates.pending(apps))
+                installedAppsLock.withLock {
+                    val app = repository.getInstalledApp(packageName)
+                    _uiState.update { state ->
+                        val apps = state.installedApps.filterNot { it.packageName == packageName } + listOfNotNull(app)
+                        state.copy(installedApps = apps, updates = state.updates.pending(apps))
+                    }
                 }
             }
         }
@@ -145,8 +152,10 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             bundleInstaller.install(uri) { state ->
                 when (state) {
-                    is InstallState.Success -> _events.trySend(InstallEvent.Finished(state.appName))
-                    is InstallState.Error -> _events.trySend(InstallEvent.Failed(state.message))
+                    is InstallState.Success -> _events.trySend(
+                        if (state.updated) InstallEvent.Finished(state.appName) else InstallEvent.Installed(state.appName)
+                    )
+                    is InstallState.Error -> _events.trySend(InstallEvent.InstallFailed(state.message))
                     else -> Unit
                 }
                 _uiState.update { it.copy(installs = it.installs + (key to state)) }
@@ -196,10 +205,10 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch(Dispatchers.IO) { preferences.themeMode = mode }
     }
 
-    private suspend fun refreshInstalledApps(): List<InstalledApp> {
+    private suspend fun refreshInstalledApps(): List<InstalledApp> = installedAppsLock.withLock {
         val apps = repository.getInstalledApps()
         _uiState.update { state -> state.copy(installedApps = apps, updates = state.updates.pending(apps)) }
-        return apps
+        apps
     }
 
     private fun List<AppUpdateInfo>.pending(apps: List<InstalledApp>): List<AppUpdateInfo> {

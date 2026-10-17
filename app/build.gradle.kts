@@ -60,6 +60,7 @@ android {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
             it.useJUnitPlatform()
+            it.exclude("**/*\$ParkedPackageQuery.class")
             it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED", "--enable-native-access=ALL-UNNAMED")
         }
     }
