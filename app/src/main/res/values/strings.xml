@@ -4,11 +4,9 @@
     <string name="settings">Settings</string>
     <string name="refresh">Refresh</string>
     <string name="update">Update</string>
-    <string name="manual">Manual</string>
     <string name="source_apkmirror" translatable="false">APKMirror</string>
     <string name="source_play" translatable="false">Google Play</string>
     <string name="cancel">Cancel</string>
-    <string name="version_code">Version code</string>
     <string name="appearance">Appearance</string>
     <string name="theme">Theme</string>
     <string name="theme_system">System</string>

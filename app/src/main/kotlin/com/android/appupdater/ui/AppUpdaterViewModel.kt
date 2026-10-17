@@ -160,37 +160,21 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
 
     fun updateFromPlay(update: AppUpdateInfo) {
         val target = update.playUpdate ?: return
-        installFromPlay(update, manual = false) { onProgress ->
-            val result = playInstaller.install(update.packageName, target.code, onProgress)
-            if (target.code == update.newVersionCode) {
+        val packageName = update.packageName
+        if (packageName in _uiState.value.playInstalls) return
+
+        _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(null))) }
+        viewModelScope.launch {
+            val result = playInstaller.install(packageName, target.code) { progress ->
+                _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(progress))) }
+            }
+            val event = if (target.code == update.newVersionCode) {
                 result.toEvent(update.appName)
             } else {
                 result.fold(
                     onSuccess = { InstallEvent.FinishedFromPlay(update.appName, target.name) },
                     onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
                 )
-            }
-        }
-    }
-
-    fun installManually(update: AppUpdateInfo, versionCode: Long) {
-        installFromPlay(update, manual = true) { onProgress ->
-            playInstaller.install(update.packageName, versionCode, onProgress).toEvent(update.appName)
-        }
-    }
-
-    private fun installFromPlay(
-        update: AppUpdateInfo,
-        manual: Boolean,
-        install: suspend (onProgress: (Float?) -> Unit) -> InstallEvent
-    ) {
-        val packageName = update.packageName
-        if (packageName in _uiState.value.playInstalls) return
-
-        _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(manual, null))) }
-        viewModelScope.launch {
-            val event = install { progress ->
-                _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(manual, progress))) }
             }
 
             _uiState.update { it.copy(playInstalls = it.playInstalls - packageName) }

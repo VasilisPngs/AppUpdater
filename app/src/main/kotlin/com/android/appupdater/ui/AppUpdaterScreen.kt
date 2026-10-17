@@ -3,7 +3,6 @@
 package com.android.appupdater.ui
 
 import android.content.ActivityNotFoundException
-import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -21,7 +20,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +36,6 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,11 +48,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.InputTransformation
-import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.maxLengthTrim
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonDefaults
@@ -67,8 +59,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
@@ -97,7 +89,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -116,16 +107,9 @@ import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -140,23 +124,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
@@ -177,11 +152,9 @@ private val EmptyIconSize = 48.dp
 private val AppIconSize = 40.dp
 private val TvOverscanHorizontal = 48.dp
 private val TvOverscanVertical = 27.dp
-private const val MAX_VERSION_CODE_DIGITS = 19
-private const val APKMIRROR_SLOT = 0
-private const val PLAY_SLOT = 1
-private const val MANUAL_SLOT = 2
-private const val BUTTON_SLOTS = 3
+private const val PLAY_SLOT = 0
+private const val APKMIRROR_SLOT = 1
+private const val BUTTON_SLOTS = 2
 private const val TABULAR_FIGURES = "tnum"
 private const val FOCUS_PIVOT = 0.3f
 private const val FADE_THROUGH_SCALE = 0.92f
@@ -228,12 +201,7 @@ fun AppUpdaterScreen(
     val bundlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::installBundle)
     }
-    var manualPackage by rememberSaveable { mutableStateOf<String?>(null) }
     var themeDialog by rememberSaveable { mutableStateOf(false) }
-    val manualTarget = uiState.updates.firstOrNull { it.packageName == manualPackage }
-    LaunchedEffect(manualTarget == null) {
-        if (manualTarget == null) manualPackage = null
-    }
     BackHandler(enabled = selectedTab != AppTab.Updates) { selectedTab = AppTab.Updates }
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
@@ -400,7 +368,6 @@ fun AppUpdaterScreen(
                             playInstalls = uiState.playInstalls,
                             onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
                             onPlay = viewModel::updateFromPlay,
-                            onManual = { manualPackage = it.packageName },
                             onRefresh = viewModel::refresh
                         )
                         AppTab.Settings -> SettingsView(
@@ -425,17 +392,6 @@ fun AppUpdaterScreen(
                 }
             }
         }
-    }
-
-    manualTarget?.let { update ->
-        ManualDialog(
-            update = update,
-            onDismiss = { manualPackage = null },
-            onSubmit = { versionCode ->
-                manualPackage = null
-                viewModel.installManually(update, versionCode)
-            }
-        )
     }
 
     if (themeDialog) {
@@ -467,17 +423,9 @@ private fun UpdatesView(
     playInstalls: Map<String, PlayInstall>,
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
-    onManual: (AppUpdateInfo) -> Unit,
     onRefresh: () -> Unit
 ) {
     val pullState = rememberPullToRefreshState()
-    val buttonHeight = if (
-        currentWindowAdaptiveInfoV2().windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
-    ) {
-        ButtonDefaults.MinHeight
-    } else {
-        ButtonDefaults.ExtraSmallContainerHeight
-    }
     val motion = MaterialTheme.motionScheme
     val fade = motion.defaultEffectsSpec<Float>()
     val placement = motion.defaultSpatialSpec<IntOffset>()
@@ -498,7 +446,6 @@ private fun UpdatesView(
         val index = previous.indexOf(lost)
         val target = previous.subList(index + 1, previous.size).firstOrNull { it in present }
             ?: previous.subList(0, index.coerceAtLeast(0)).lastOrNull { it in present }
-        cards.codes = false
         val entry = target?.let(cards.entries::get) ?: target?.let { withFrameNanos { }; cards.entries[it] }
         if (entry?.requestFocus() != true) exitFocus.requestFocus()
     }
@@ -525,8 +472,7 @@ private fun UpdatesView(
                 .fillMaxSize()
                 .nestedScroll(nestedScroll)
                 .focusRequester(focus)
-                .focusRestorer()
-                .onFocusChanged { if (!it.hasFocus) cards.codes = false },
+                .focusRestorer(),
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(SmallSpacing)
         ) {
@@ -590,14 +536,9 @@ private fun UpdatesView(
                     app = pair.first,
                     update = pair.second,
                     install = playInstalls[pair.first.packageName],
-                    keyboard = keyboard,
                     cards = cards,
-                    first = index == 0,
-                    last = index == updates.lastIndex,
-                    buttonHeight = buttonHeight,
                     onApkMirror = onApkMirror,
                     onPlay = onPlay,
-                    onManual = onManual,
                     modifier = Modifier
                         .animateItem(fade, placement, fade)
                         .then(if (index == 0) reveal.modifier else Modifier)
@@ -705,48 +646,24 @@ private fun UpdateItem(
     app: InstalledApp,
     update: AppUpdateInfo,
     install: PlayInstall?,
-    keyboard: Boolean,
     cards: CardFocus,
-    first: Boolean,
-    last: Boolean,
-    buttonHeight: Dp,
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
-    onManual: (AppUpdateInfo) -> Unit,
     modifier: Modifier
 ) {
-    val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
-    val clipboard = LocalClipboard.current
-    val coroutineScope = rememberCoroutineScope()
     val packageName = app.packageName
-    val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
-    val toCode = if (ltr) Key.DirectionLeft else Key.DirectionRight
-    val toButtons = if (ltr) Key.DirectionRight else Key.DirectionLeft
-    val codeFocus = remember { FocusRequester() }
     val buttonFocus = remember { List(BUTTON_SLOTS) { FocusRequester() } }
-    var codeFocused by remember(keyboard) { mutableStateOf(false) }
-    var lastButton by remember { mutableIntStateOf(-1) }
     val slots = remember(update) {
         listOfNotNull(
-            APKMIRROR_SLOT.takeIf { update.apkMirrorUrl != null },
             PLAY_SLOT.takeIf { update.playUpdate != null },
-            MANUAL_SLOT.takeIf { update.playAvailable }
+            APKMIRROR_SLOT.takeIf { update.apkMirrorUrl != null }
         )
     }
-    val buttonModifiers = remember(cards) {
-        List(BUTTON_SLOTS) { slot ->
-            Modifier
-                .focusRequester(buttonFocus[slot])
-                .focusProperties { if (cards.codes) canFocus = false }
-                .onFocusChanged { if (it.isFocused) lastButton = slot }
-        }
+    val buttonModifiers = remember {
+        List(BUTTON_SLOTS) { slot -> Modifier.focusRequester(buttonFocus[slot]) }
     }
-    val entry = when {
-        install == null -> slots.firstOrNull()
-        install.manual -> MANUAL_SLOT
-        else -> PLAY_SLOT
-    }?.let(buttonFocus::get)
+    val entry = (if (install == null) slots.firstOrNull() else PLAY_SLOT)?.let(buttonFocus::get)
     val cardModifier = remember(cards, packageName) {
         Modifier.onFocusChanged {
             if (it.hasFocus) {
@@ -756,61 +673,9 @@ private fun UpdateItem(
             }
         }
     }
-    DisposableEffect(cards) {
-        onDispose { if (codeFocused) cards.codes = false }
-    }
     DisposableEffect(cards, packageName, entry) {
         if (entry != null) cards.entries[packageName] = entry
         onDispose { cards.entries.remove(packageName) }
-    }
-    val code = update.newVersionCode.toString()
-    val copyCode: () -> Unit = {
-        coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, code))) }
-    }
-    val codeModifier = remember(keyboard, cards, first, last, toButtons, slots, copyCode) {
-        if (keyboard) {
-            Modifier
-                .focusRequester(codeFocus)
-                .focusProperties {
-                    if (!cards.codes) canFocus = false
-                    up = if (first) FocusRequester.Cancel else FocusRequester.Default
-                    down = if (last) FocusRequester.Cancel else FocusRequester.Default
-                    start = FocusRequester.Cancel
-                }
-                .onKeyEvent { event ->
-                    if (event.key != toButtons || event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    val slot = lastButton.takeIf { it in slots } ?: slots.firstOrNull() ?: return@onKeyEvent true
-                    cards.codes = false
-                    buttonFocus[slot].requestFocus()
-                    true
-                }
-                .onFocusChanged { codeFocused = it.isFocused }
-                .clickable(interactionSource = null, indication = null, onClick = copyCode)
-        } else {
-            Modifier
-        }
-    }
-    val latestText = stringResource(R.string.version_latest, displayVersion(update.newVersionName), update.newVersionCode)
-    val latest = remember(latestText, code, colors, keyboard, codeFocused) {
-        val start = latestText.lastIndexOf(code)
-        val highlight = SpanStyle(color = colors.onPrimary, background = colors.primary)
-        buildAnnotatedString {
-            append(latestText)
-            if (start >= 0) {
-                if (!keyboard) {
-                    addLink(
-                        LinkAnnotation.Clickable(
-                            tag = code,
-                            styles = TextLinkStyles(focusedStyle = highlight, pressedStyle = highlight)
-                        ) { copyCode() },
-                        start,
-                        start + code.length
-                    )
-                } else if (codeFocused) {
-                    addStyle(highlight, start, start + code.length)
-                }
-            }
-        }
     }
     val iconSizePx = with(LocalDensity.current) { AppIconSize.roundToPx() }
     val iconBitmap by produceState(AppIconCache.peek(app.packageName), app.packageName) {
@@ -835,56 +700,38 @@ private fun UpdateItem(
                             stringResource(R.string.version_current, displayVersion(app.versionName), app.versionCode)
                         }
                     )
-                    Text(text = latest, modifier = codeModifier)
+                    Text(
+                        text = stringResource(
+                            R.string.version_latest,
+                            displayVersion(update.newVersionName),
+                            update.newVersionCode
+                        )
+                    )
                 }
                 FlowRow(
-                    modifier = Modifier.onKeyEvent { event ->
-                        if (!keyboard || event.key != toCode || event.type != KeyEventType.KeyDown ||
-                            lastButton != slots.firstOrNull()
-                        ) {
-                            return@onKeyEvent false
-                        }
-                        cards.codes = true
-                        codeFocus.requestFocus().also { if (!it) cards.codes = false }
-                    },
                     horizontalArrangement = Arrangement.spacedBy(SmallSpacing),
                     verticalArrangement = Arrangement.spacedBy(SmallSpacing)
                 ) {
-                    update.apkMirrorUrl?.let { url ->
-                        SourceButton(
-                            text = stringResource(R.string.update),
-                            icon = R.drawable.ic_source_apkmirror,
-                            source = stringResource(R.string.source_apkmirror),
-                            height = buttonHeight,
-                            enabled = install == null,
-                            onClick = { onApkMirror(url) },
-                            modifier = buttonModifiers[APKMIRROR_SLOT]
-                        )
-                    }
                     if (update.playUpdate != null) {
                         SourceButton(
                             text = stringResource(R.string.update),
                             icon = R.drawable.ic_source_play,
                             source = stringResource(R.string.source_play),
-                            height = buttonHeight,
                             enabled = install == null,
-                            busy = install?.manual == false,
+                            busy = install != null,
                             progress = install?.progress,
                             onClick = { onPlay(update) },
                             modifier = buttonModifiers[PLAY_SLOT]
                         )
                     }
-                    if (update.playAvailable) {
+                    update.apkMirrorUrl?.let { url ->
                         SourceButton(
-                            text = stringResource(R.string.manual),
-                            icon = R.drawable.ic_source_play,
-                            source = stringResource(R.string.source_play),
-                            height = buttonHeight,
+                            text = stringResource(R.string.update),
+                            icon = R.drawable.ic_source_apkmirror,
+                            source = stringResource(R.string.source_apkmirror),
                             enabled = install == null,
-                            busy = install?.manual == true,
-                            progress = install?.progress,
-                            onClick = { onManual(update) },
-                            modifier = buttonModifiers[MANUAL_SLOT]
+                            onClick = { onApkMirror(url) },
+                            modifier = buttonModifiers[APKMIRROR_SLOT]
                         )
                     }
                 }
@@ -915,7 +762,6 @@ private fun SourceButton(
     text: String,
     @DrawableRes icon: Int,
     source: String,
-    height: Dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -932,30 +778,27 @@ private fun SourceButton(
 
     FilledTonalButton(
         onClick = { if (active) onClick() },
-        shapes = ButtonDefaults.shapesFor(height),
-        modifier = modifier
-            .heightIn(min = height)
-            .semantics { if (busy) disabled() },
+        shapes = ButtonDefaults.shapes(),
+        modifier = modifier.semantics { if (busy) disabled() },
         enabled = enabled || busy,
-        contentPadding = ButtonDefaults.contentPaddingFor(height)
+        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
     ) {
         Icon(
             painter = painterResource(icon),
             contentDescription = source,
-            modifier = Modifier.size(ButtonDefaults.iconSizeFor(height))
+            modifier = Modifier.size(ButtonDefaults.IconSize)
         )
-        Spacer(modifier = Modifier.width(ButtonDefaults.iconSpacingFor(height)))
+        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = text,
-                style = ButtonDefaults.textStyleFor(height),
                 maxLines = 1,
                 modifier = Modifier.graphicsLayer { alpha = 1f - progressShown }
             )
             if (busy && progress != null) {
                 Text(
                     text = percent.format(progress),
-                    style = ButtonDefaults.textStyleFor(height).copy(fontFeatureSettings = TABULAR_FIGURES),
+                    style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES),
                     maxLines = 1,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -1002,49 +845,6 @@ private fun EmptyState(
         )
         if (action != null) Box(modifier = Modifier.padding(top = SmallSpacing)) { action() }
     }
-}
-
-@Composable
-private fun ManualDialog(
-    update: AppUpdateInfo,
-    onDismiss: () -> Unit,
-    onSubmit: (Long) -> Unit
-) {
-    val code = rememberTextFieldState()
-    val versionCode = code.text.toString().toLongOrNull()
-    val focus = remember { FocusRequester() }
-    val submit = { if (versionCode != null) onSubmit(versionCode) }
-
-    LaunchedEffect(Unit) { focus.requestFocus() }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = submit, shapes = ButtonDefaults.shapes(), enabled = versionCode != null) {
-                Text(text = stringResource(R.string.update))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
-                Text(text = stringResource(R.string.cancel))
-            }
-        },
-        title = { Text(text = update.appName, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-        text = {
-            DialogBlurBehind()
-            OutlinedTextField(
-                state = code,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focus),
-                label = { Text(text = stringResource(R.string.version_code)) },
-                inputTransformation = DigitsOnly.maxLengthTrim(MAX_VERSION_CODE_DIGITS),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                onKeyboardAction = { submit() },
-                lineLimits = TextFieldLineLimits.SingleLine
-            )
-        }
-    )
 }
 
 @Composable
@@ -1106,11 +906,6 @@ private fun DialogBlurBehind() {
     }
 }
 
-private val DigitsOnly = InputTransformation {
-    val digits = asCharSequence().filter(Char::isDigit)
-    if (digits.length != length) replace(0, length, digits)
-}
-
 private class TopReveal(scope: CoroutineScope, listState: LazyListState, barState: TopAppBarState) {
     val modifier = Modifier.onFocusEvent { state ->
         if (state.hasFocus) scope.reveal(listState, barState)
@@ -1131,7 +926,6 @@ private fun CoroutineScope.reveal(listState: LazyListState, barState: TopAppBarS
 }
 
 private class CardFocus {
-    var codes by mutableStateOf(false)
     var focused: String? = null
     var keys: List<String> = emptyList()
     val entries = HashMap<String, FocusRequester>()
