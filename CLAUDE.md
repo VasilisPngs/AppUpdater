@@ -9,7 +9,6 @@
 - Do not undo settled decisions or weaken requirements without a real technical reason.
 - Prefer root-cause fixes and the simplest architecture that fully satisfies the requirements.
 - Remove dead code, unused dependencies, resources, permissions and configuration.
-- Avoid unnecessary CPU, RAM, GPU, battery, storage, network use, allocations, I/O, polling and redundant state.
 - Keep code clean, direct, idiomatic and maintainable.
 - All code is written in English.
 - Do not add explanatory or redundant comments inside code.
@@ -19,24 +18,12 @@
 - Do not add a numeric product version to the visible product identity, release name, APK filename, release tag, or API User-Agent unless explicitly requested.
 
 ## Android
-- The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`.
-- Every colour comes from the device's dynamic colour scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`, which the minimum SDK always provides, so there is no fallback palette and no hand picked colour in code. The window background follows the same system colour resources, and the launcher icon is an adaptive icon with a monochrome layer for themed icons.
 - Build the interface from the official Material 3 components and their defaults, taking the Expressive variant where one exists (segmented list items, shape morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own mark where it names that third party.
-- Top-level navigation follows Google's adaptive guidance through `NavigationSuiteScaffold` with `NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())`, and selected destinations show the filled Material Symbol.
-- Take colours, type, shapes and motion only from `MaterialTheme`; do not introduce one-off colours, type styles, radii or animation specs, and keep spacing on Material's 4 dp grid.
-- Text always uses the device's own default font through `FontFamily.Default`, whatever the platform or the manufacturer sets; never bundle, download or name a font family, and let the platform render the type scale weights instead of forcing font variation axes.
-- Obtain values from the relevant official platform API whenever the system or the device can provide them at runtime, including device capabilities, application metadata such as icons, labels and package information, locales and configuration, instead of assuming manufacturer-specific behavior or duplicating them in resources and hardcoded mappings.
-- An intent that no installed app can handle shows a snackbar instead of failing silently or crashing; every other message is a Material snackbar too.
 - The app adds no accessibility code of its own: no content descriptions, roles, or selected, toggleable or disabled semantics; its own interactive elements use plain clickable, and Material components keep only what they build in.
 - Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules. Add a keep rule only for code that a missing rule demonstrably breaks.
-- Keep expensive work away from the UI thread.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
 - Draw edge to edge and let the window insets place the content, rather than reserving space manually.
 - Build visual effects with the official platform and Jetpack APIs only; never with a third party effect library.
-
-## Verification
-- Before considering a change complete, verify build/lint results, dependencies, resources, release configuration and relevant runtime behavior.
-- Lint keeps `androidLintTool(platform(libs.asm.bom))`, on the newest `org.ow2.asm:asm-bom`, while the Java target is newer than the ASM bundled with lint: without it lint still passes but skips every class with "Unsupported class file major version".
 
 ## Official references
 
