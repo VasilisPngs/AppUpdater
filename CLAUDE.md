@@ -71,6 +71,7 @@
 - Fonts and downloadable fonts in Compose: https://developer.android.com/develop/ui/compose/text/fonts
 - Text fields in Compose: https://developer.android.com/develop/ui/compose/text/user-input
 - Resources in Compose: https://developer.android.com/develop/ui/compose/resources
+- LocalResources: https://developer.android.com/reference/kotlin/androidx/compose/ui/platform/package-summary#LocalResources()
 - Icons in Compose: https://developer.android.com/develop/ui/compose/graphics/images/material
 - Focus in Compose: https://developer.android.com/develop/ui/compose/touch-input/focus
 - Accessibility in Compose: https://developer.android.com/develop/ui/compose/accessibility

@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -131,6 +132,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -211,12 +213,7 @@ fun AppUpdaterScreen(
     val bundlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::installBundle)
     }
-    val newInstallFormat = stringResource(R.string.app_installed)
-    val installFailedFormat = stringResource(R.string.install_failed)
-    val installedFormat = stringResource(R.string.update_installed)
-    val installedFromPlayFormat = stringResource(R.string.update_installed_play)
-    val versionFormat = stringResource(R.string.version_number)
-    val failedFormat = stringResource(R.string.update_failed)
+    val resources = LocalResources.current
     val noBrowser = stringResource(R.string.no_browser)
     val noFilePicker = stringResource(R.string.no_file_picker)
     val showMessage: (String) -> Unit = { message ->
@@ -231,18 +228,7 @@ fun AppUpdaterScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
-            showMessage(
-                when (event) {
-                    is InstallEvent.Installed -> newInstallFormat.format(event.appName)
-                    is InstallEvent.InstallFailed -> installFailedFormat.format(event.message)
-                    is InstallEvent.Finished -> installedFormat.format(event.appName)
-                    is InstallEvent.FinishedFromPlay ->
-                        installedFromPlayFormat.format(event.appName, displayVersion(event.versionName, versionFormat))
-                    is InstallEvent.Failed -> failedFormat.format(event.message)
-                }
-            )
-        }
+        viewModel.events.collect { event -> showMessage(event.text(resources)) }
     }
 
     AppUpdaterScreen(
@@ -1059,6 +1045,18 @@ private class FocusScroll(private val density: Density) : BringIntoViewSpec {
         if (offset >= top && offset + size <= end) return 0f
         return offset - (containerSize * FOCUS_PIVOT).coerceIn(top, maxOf(top, end - size))
     }
+}
+
+internal fun InstallEvent.text(resources: Resources): String = when (this) {
+    is InstallEvent.Installed -> resources.getString(R.string.app_installed, appName)
+    is InstallEvent.InstallFailed -> resources.getString(R.string.install_failed, message)
+    is InstallEvent.Finished -> resources.getString(R.string.update_installed, appName)
+    is InstallEvent.FinishedFromPlay -> resources.getString(
+        R.string.update_installed_play,
+        appName,
+        displayVersion(versionName, resources.getString(R.string.version_number))
+    )
+    is InstallEvent.Failed -> resources.getString(R.string.update_failed, message)
 }
 
 private fun displayVersion(name: String, numberFormat: String): String {

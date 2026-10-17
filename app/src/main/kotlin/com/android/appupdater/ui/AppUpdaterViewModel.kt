@@ -44,6 +44,12 @@ sealed interface InstallEvent {
     data class Failed(val message: String) : InstallEvent
 }
 
+internal fun InstallState.installEvent(): InstallEvent? = when (this) {
+    is InstallState.Installing -> null
+    is InstallState.Success -> if (updated) InstallEvent.Finished(appName) else InstallEvent.Installed(appName)
+    is InstallState.Error -> InstallEvent.InstallFailed(message)
+}
+
 data class AppUpdaterUiState(
     val scanning: Boolean = true,
     val loaded: Boolean = false,
@@ -151,13 +157,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
 
         viewModelScope.launch {
             bundleInstaller.install(uri) { state ->
-                when (state) {
-                    is InstallState.Success -> _events.trySend(
-                        if (state.updated) InstallEvent.Finished(state.appName) else InstallEvent.Installed(state.appName)
-                    )
-                    is InstallState.Error -> _events.trySend(InstallEvent.InstallFailed(state.message))
-                    else -> Unit
-                }
+                state.installEvent()?.let(_events::trySend)
                 _uiState.update { it.copy(installs = it.installs + (key to state)) }
             }
 

@@ -38,15 +38,10 @@ class PackageInstallerManager(private val context: Context) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(receiverContext: Context, intent: Intent) {
                 when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
-                    PackageInstaller.STATUS_SUCCESS ->
-                        result.complete(Result.success(intent.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME).orEmpty()))
                     PackageInstaller.STATUS_PENDING_USER_ACTION ->
                         intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
                             ?.let(InstallConfirmation::request)
-                    else -> {
-                        val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
-                        result.complete(Result.failure(IllegalStateException(failureMessage(message))))
-                    }
+                    else -> result.complete(installResult(intent))
                 }
             }
         }
@@ -82,6 +77,13 @@ class PackageInstallerManager(private val context: Context) {
             runCatching { context.unregisterReceiver(receiver) }
         }
     }
+
+    internal fun installResult(status: Intent): Result<String> =
+        if (status.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE) == PackageInstaller.STATUS_SUCCESS) {
+            Result.success(status.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME).orEmpty())
+        } else {
+            Result.failure(IllegalStateException(failureMessage(status.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))))
+        }
 
     private fun failureMessage(message: String?): String {
         val library = message?.let { MISSING_LIBRARY_PATTERN.find(it)?.groupValues?.get(1) }
