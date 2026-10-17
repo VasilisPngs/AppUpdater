@@ -133,6 +133,8 @@
 - Window insets: https://developer.android.com/develop/ui/compose/system/insets
 - System bars: https://developer.android.com/develop/ui/compose/system/system-bars
 - Edge to edge in Compose: https://developer.android.com/develop/ui/compose/system/setup-e2e
+- Edge-to-edge design: https://developer.android.com/design/ui/mobile/guides/layout-and-content/edge-to-edge
+- System bars design: https://developer.android.com/design/ui/mobile/guides/foundations/system-bars
 - Predictive back in Compose: https://developer.android.com/develop/ui/compose/system/predictive-back
 - Adaptive icons: https://developer.android.com/develop/ui/compose/system/icon_design_adaptive
 - System color resources: https://developer.android.com/reference/android/R.color

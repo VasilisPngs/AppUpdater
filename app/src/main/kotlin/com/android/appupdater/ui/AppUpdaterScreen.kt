@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -261,6 +263,9 @@ fun AppUpdaterScreen(
     val navigationSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
     val navigationBar = navigationSuiteType == NavigationSuiteType.ShortNavigationBarCompact ||
         navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
+    val window = LocalActivity.current?.window
+    val navigationBarScrim = !navigationBar && WindowInsets.navigationBars.getBottom(LocalDensity.current) > 0
+    SideEffect { window?.isNavigationBarContrastEnforced = navigationBarScrim }
     val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
 
     val television = LocalConfiguration.current.uiMode and Configuration.UI_MODE_TYPE_MASK ==
