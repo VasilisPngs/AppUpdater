@@ -23,6 +23,7 @@
 - The product design is strictly Google's latest Material 3 Expressive, never Material 2 or earlier Material 3: the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`, always the Expressive overload or variant where one exists, keeping the components' defaults, Google's rounded shapes included. The framework has no Material 3 Expressive window theme, so the platform theme is `Theme.DeviceDefault.DayNight`, never the Material Design 1 `Theme.Material`.
 - Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code.
 - Each screen has a single-row `TopAppBar` with the plain screen name as its title, and every list entry is its own fully rounded Material 3 Expressive `SegmentedListItem` in the surface container color of Google's samples, spaced apart rather than joined into a group.
+- Frontend, UI and UX keep uniform, symmetric and consistent geometry with correct alignment, as Material 3's layout guidance defines it: each breakpoint's window margins, the top app bar's title and actions on the same edges as the content, and one alignment line for text and controls.
 - Icons come from Material Symbols Rounded, except a third party's own logo where the interface names that third party.
 - Text uses Google Sans from Google Fonts through Compose downloadable fonts.
 - Use Google's blur and transparency effects wherever Google's guidance uses them, such as the window blur behind dialogs.
@@ -113,6 +114,9 @@
 - Motion: https://m3.material.io/styles/motion/overview/how-it-works
 - Motion transition patterns: https://m3.material.io/styles/motion/transitions/transition-patterns
 - Spacing: https://m3.material.io/styles/spacing/overview
+- Layout: https://m3.material.io/foundations/layout/layout-overview/overview
+- Applying layout: https://m3.material.io/foundations/layout/applying-layout
+- Breakpoints: https://m3.material.io/foundations/layout/breakpoints/compact
 - Icons: https://m3.material.io/styles/icons/overview
 - Accessibility: https://m3.material.io/foundations/overview
 - Material Symbols guide: https://developers.google.com/fonts/docs/material_symbols

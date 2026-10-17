@@ -145,6 +145,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
@@ -159,6 +160,8 @@ import java.text.NumberFormat
 import java.util.function.Consumer
 
 private val ContentMargin = 16.dp
+private val CompactMargin = 16.dp
+private val WideMargin = 24.dp
 private val SmallSpacing = 8.dp
 private val VersionSpacing = 4.dp
 private val EmptyPadding = 48.dp
@@ -263,7 +266,14 @@ fun AppUpdaterScreen(
             coroutineScope.reveal(activeListState, activeBarState)
         }
     }
-    val navigationSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())
+    val windowInfo = currentWindowAdaptiveInfoV2()
+    val navigationSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(windowInfo)
+    val margin = if (windowInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)) {
+        WideMargin
+    } else {
+        CompactMargin
+    }
+    val barMargin = margin - CompactMargin
     val navigationBar = navigationSuiteType == NavigationSuiteType.ShortNavigationBarCompact ||
         navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
     val window = LocalActivity.current?.window
@@ -349,7 +359,9 @@ fun AppUpdaterScreen(
                             )
                         }
                     },
-                    windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.End)),
+                    windowInsets = TopAppBarDefaults.windowInsets
+                        .add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                        .add(WindowInsets(left = barMargin, right = barMargin)),
                     scrollBehavior = scrollBehavior
                 )
             },
@@ -359,10 +371,10 @@ fun AppUpdaterScreen(
             val layoutDirection = LocalLayoutDirection.current
             val density = LocalDensity.current
             val contentPadding = PaddingValues(
-                start = padding.calculateStartPadding(layoutDirection) + ContentMargin,
+                start = padding.calculateStartPadding(layoutDirection) + margin,
                 top = padding.calculateTopPadding(),
-                end = padding.calculateEndPadding(layoutDirection) + ContentMargin,
-                bottom = padding.calculateBottomPadding() + ContentMargin
+                end = padding.calculateEndPadding(layoutDirection) + margin,
+                bottom = padding.calculateBottomPadding() + margin
             )
             val focusScroll = remember(density) { FocusScroll(density) }
             val motion = MaterialTheme.motionScheme
