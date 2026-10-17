@@ -213,6 +213,7 @@ fun AppUpdaterScreen(
     }
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
+    val versionFormat = stringResource(R.string.version_number)
     val failedFormat = stringResource(R.string.update_failed)
     val noBrowser = stringResource(R.string.no_browser)
     val noFilePicker = stringResource(R.string.no_file_picker)
@@ -232,7 +233,8 @@ fun AppUpdaterScreen(
             showMessage(
                 when (event) {
                     is InstallEvent.Finished -> installedFormat.format(event.appName)
-                    is InstallEvent.FinishedFromPlay -> installedFromPlayFormat.format(event.appName, displayVersion(event.versionName))
+                    is InstallEvent.FinishedFromPlay ->
+                        installedFromPlayFormat.format(event.appName, displayVersion(event.versionName, versionFormat))
                     is InstallEvent.Failed -> failedFormat.format(event.message)
                 }
             )
@@ -816,17 +818,22 @@ private fun UpdateItem(
         supportingContent = {
             Column(modifier = Modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(SmallSpacing)) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(VersionSpacing)) {
+                    val versionFormat = stringResource(R.string.version_number)
                     Text(
                         text = if (app.versionName.isEmpty()) {
                             stringResource(R.string.version_current_code, app.versionCode)
                         } else {
-                            stringResource(R.string.version_current, displayVersion(app.versionName), app.versionCode)
+                            stringResource(
+                                R.string.version_current,
+                                displayVersion(app.versionName, versionFormat),
+                                app.versionCode
+                            )
                         }
                     )
                     Text(
                         text = stringResource(
                             R.string.version_latest,
-                            displayVersion(update.newVersionName),
+                            displayVersion(update.newVersionName, versionFormat),
                             update.newVersionCode
                         )
                     )
@@ -1050,8 +1057,10 @@ private class FocusScroll(private val density: Density) : BringIntoViewSpec {
     }
 }
 
-private fun displayVersion(name: String): String =
-    if (name.length > 1 && name[0].lowercaseChar() == 'v' && name[1].isDigit()) name.substring(1) else name
+private fun displayVersion(name: String, numberFormat: String): String {
+    val version = if (name.length > 1 && name[0].lowercaseChar() == 'v' && name[1].isDigit()) name.substring(1) else name
+    return if (version.firstOrNull()?.isDigit() == true) numberFormat.format(version) else version
+}
 
 private fun openUrlInBrowser(context: Context, url: String): Boolean = try {
     context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))

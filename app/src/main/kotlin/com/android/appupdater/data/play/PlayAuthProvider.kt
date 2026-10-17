@@ -48,7 +48,7 @@ class PlayAuthProvider(private val context: Context, val httpClient: PlayHttpCli
             httpClient.postAuth(DISPENSER_URL, payload)
         } catch (exception: UnknownHostException) {
             throw IllegalStateException(
-                "This device could not resolve $DISPENSER_HOST. A VPN, private DNS or content blocker is filtering it.",
+                "This device could not resolve $DISPENSER_HOST. Check the connection and any VPN, private DNS or content blocker.",
                 exception
             )
         }

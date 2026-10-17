@@ -64,8 +64,16 @@ class AppUpdaterScreenTest {
         show(loaded(entry("Chrome", current = "141.0", latest = "142.0")))
 
         compose.onNodeWithText("Chrome").assertIsDisplayed()
-        compose.onNodeWithText(string(R.string.version_current, "141.0", INSTALLED_CODE)).assertIsDisplayed()
-        compose.onNodeWithText(string(R.string.version_latest, "142.0", LATEST_CODE)).assertIsDisplayed()
+        compose.onNodeWithText("Current: v141.0 ($INSTALLED_CODE)").assertIsDisplayed()
+        compose.onNodeWithText("Latest: v142.0 ($LATEST_CODE)").assertIsDisplayed()
+    }
+
+    @Test
+    fun `shows a version name that does not start with a number without a v prefix`() {
+        show(loaded(entry("Poweramp", current = "build-984-bundle-play", latest = "build-985-bundle-play")))
+
+        compose.onNodeWithText("Current: build-984-bundle-play ($INSTALLED_CODE)").assertIsDisplayed()
+        compose.onNodeWithText("Latest: build-985-bundle-play ($LATEST_CODE)").assertIsDisplayed()
     }
 
     @Test
@@ -188,7 +196,7 @@ class AppUpdaterScreenTest {
         assertEquals(alpha.top, beta.top)
         assertEquals(alpha.bottom, beta.bottom)
         assertEquals(SPACING, beta.left - alpha.right)
-        val latest = compose.onAllNodesWithText(string(R.string.version_latest, "2.0", LATEST_CODE), useUnmergedTree = true)
+        val latest = compose.onAllNodesWithText("Latest: v2.0 ($LATEST_CODE)", useUnmergedTree = true)
         assertTrue(latest[0].getBoundsInRoot().bottom > latest[1].getBoundsInRoot().bottom)
         val buttons = compose.onAllNodesWithContentDescription(string(R.string.source_apkmirror))
         assertEquals(buttons[0].getBoundsInRoot().bottom, buttons[1].getBoundsInRoot().bottom)

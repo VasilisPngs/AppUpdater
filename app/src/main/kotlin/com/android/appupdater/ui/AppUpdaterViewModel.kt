@@ -1,7 +1,6 @@
 package com.android.appupdater.ui
 
 import android.app.Application
-import android.app.UiModeManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -99,7 +98,7 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         }
         viewModelScope.launch {
             val (includeDisabledApps, themeMode) = withContext(Dispatchers.IO) {
-                preferences.includeDisabledApps to preferences.themeMode
+                preferences.includeDisabledApps to preferences.restoreThemeMode()
             }
             _themeMode.value = themeMode
             _uiState.update { it.copy(includeDisabledApps = includeDisabledApps) }
@@ -195,7 +194,6 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         if (_themeMode.value == mode) return
         _themeMode.value = mode
         viewModelScope.launch(Dispatchers.IO) { preferences.themeMode = mode }
-        getApplication<Application>().getSystemService(UiModeManager::class.java).setApplicationNightMode(mode.nightMode)
     }
 
     private suspend fun refreshInstalledApps(): List<InstalledApp> {
