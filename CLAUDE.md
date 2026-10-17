@@ -13,22 +13,22 @@
 - All code is written in English.
 - Do not add explanatory or redundant comments inside code.
 - Use the latest appropriate official technologies, APIs, libraries and tools, tracking the newest published build in any release channel, including preview, alpha, beta, release candidate and canary.
-- A newer toolchain is only acceptable while the signed release APK still installs on a release device; never compile against a preview Android platform, which stamps the package as preview built and makes it unparseable on release builds.
+- A newer toolchain is only acceptable while the signed release APK still installs on a release device; never compile against a preview Android platform, which stamps the package as preview-built and makes it unparseable on release builds.
 - Verify current versions from official sources rather than relying on outdated examples.
 - Do not add a numeric product version to the visible product identity, release name, APK filename, release tag, or API User-Agent unless explicitly requested.
 
 ## Android
 - The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`.
-- Every colour comes from the device's dynamic colour scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`, which the minimum SDK always provides, so there is no fallback palette and no hand picked colour in code. The window background follows the same system colour resources, and the launcher icon is an adaptive icon with a monochrome layer for themed icons.
-- Build the interface from the official Material 3 components and their defaults, taking the Expressive variant where one exists (segmented list items, shape morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own mark where it names that third party.
-- The app adds no accessibility code of its own: no content descriptions, roles, or selected, toggleable or disabled semantics; its own interactive elements use plain clickable, and Material components keep only what they build in.
-- Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules. Add a keep rule only for code that a missing rule demonstrably breaks.
+- Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code. The window background follows the same system color resources, and the launcher icon is an adaptive icon with a monochrome layer for themed icons.
+- Build the interface from the official Material 3 components and their defaults, taking the Expressive variant where one exists (segmented list items, shape-morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own logo where the interface names that third party.
+- The app adds no accessibility code of its own: no content descriptions, roles, or selected, toggleable or disabled semantics; its own interactive elements use plain `clickable`, and Material components keep only what they build in.
+- Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules; add a keep rule only for code that a missing rule demonstrably breaks.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
 - Draw edge to edge and let the window insets place the content, rather than reserving space manually.
-- Build visual effects with the official platform and Jetpack APIs only; never with a third party effect library.
+- Build visual effects with the official platform and Jetpack APIs only; never with a third-party effect library.
 
 ## Verification
-- Lint keeps `androidLintTool(platform(libs.asm.bom))`, on the newest `org.ow2.asm:asm-bom`, while the Java target is newer than the ASM bundled with lint: without it lint still passes but skips every class with "Unsupported class file major version".
+- While the Java target is newer than the ASM bundled with lint, the build adds `androidLintTool(platform(...))` with the newest `org.ow2.asm:asm-bom` from the version catalog; without it lint still passes but skips every class with "Unsupported class file major version".
 
 ## Official references
 
