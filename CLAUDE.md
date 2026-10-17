@@ -24,7 +24,9 @@
 - Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code. The window background follows the same system color resources, and the launcher icon is an adaptive icon with a monochrome layer for themed icons.
 - Top-level navigation follows Material's adaptive navigation: `NavigationSuiteScaffold` with the type from `NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())`, which shows the Expressive short navigation bar on compact windows and the navigation rail on larger windows and televisions.
 - Each screen has a single-row `TopAppBar` whose title is the plain screen name and whose actions hold the screen's actions; lists are flat `ListItem` rows on the surface color rather than segmented, grouped containers.
-- Build the interface from the official Material 3 components and their defaults, shapes included, taking the Expressive variant where one exists (shape-morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own logo where the interface names that third party.
+- Build the interface from the official Material 3 components and their defaults, taking the Expressive variant where one exists (shape-morphing buttons, loading and wavy progress indicators), rather than drawing components by hand.
+- Everything is rounded the way Google rounds it: the components keep their own Material 3 Expressive shapes, never squared off or reshaped by hand, and icons come from Material Symbols Rounded, except a third party's own logo where the interface names that third party.
+- Text uses Google's official Material typography: the default Material 3 type scale on the system sans-serif, Roboto, and never a font from outside Google.
 - Accessibility follows Google's guidance: icons and images that carry meaning get a `contentDescription` from string resources, decorative ones and icons beside a visible label get `null`, the app's own interactive elements declare their role and state with `selectable`, `toggleable` or `semantics`, section titles are headings, and Material components keep the semantics they build in.
 - Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules; add a keep rule only for code that a missing rule demonstrably breaks.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
@@ -99,6 +101,8 @@
 - Color roles: https://m3.material.io/styles/color/roles
 - Dynamic color: https://m3.material.io/styles/color/dynamic/choosing-a-source
 - Typography: https://m3.material.io/styles/typography/overview
+- Typography fonts: https://m3.material.io/styles/typography/fonts
+- Roboto: https://fonts.google.com/specimen/Roboto
 - Shape: https://m3.material.io/styles/shape/overview-principles
 - Shape morph: https://m3.material.io/styles/shape/shape-morph
 - Motion: https://m3.material.io/styles/motion/overview/how-it-works
