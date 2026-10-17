@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 
 package com.android.appupdater.ui
 
@@ -51,6 +51,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -61,6 +62,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
@@ -70,6 +72,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
@@ -82,6 +87,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -212,6 +218,13 @@ fun AppUpdaterScreen(
     val showMessage: (String) -> Unit = { message ->
         coroutineScope.launch { snackbarHostState.showSnackbar(message) }
     }
+    val pickBundle = {
+        try {
+            bundlePicker.launch(arrayOf("*/*"))
+        } catch (_: ActivityNotFoundException) {
+            showMessage(noFilePicker)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -313,16 +326,19 @@ fun AppUpdaterScreen(
                     title = { Text(text = stringResource(selectedTab.labelRes)) },
                     actions = {
                         if (selectedTab == AppTab.Updates) {
-                            IconButton(
+                            val toUpdates = Modifier.focusProperties { down = updatesFocus }
+                            BarAction(
+                                icon = R.drawable.ic_apk_install,
+                                label = stringResource(R.string.install_bundle),
+                                onClick = pickBundle,
+                                modifier = toUpdates
+                            )
+                            BarAction(
+                                icon = R.drawable.ic_refresh,
+                                label = stringResource(R.string.refresh),
                                 onClick = viewModel::refresh,
-                                shapes = IconButtonDefaults.shapes(),
-                                modifier = Modifier.focusProperties { down = updatesFocus }
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_refresh),
-                                    contentDescription = stringResource(R.string.refresh)
-                                )
-                            }
+                                modifier = toUpdates
+                            )
                         }
                     },
                     windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.End)),
@@ -380,14 +396,7 @@ fun AppUpdaterScreen(
                             themeMode = themeMode,
                             includeDisabledApps = uiState.includeDisabledApps,
                             onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                            onTheme = { themeDialog = true },
-                            onPickBundle = {
-                                try {
-                                    bundlePicker.launch(arrayOf("*/*"))
-                                } catch (_: ActivityNotFoundException) {
-                                    showMessage(noFilePicker)
-                                }
-                            }
+                            onTheme = { themeDialog = true }
                         )
                     }
                 }
@@ -568,8 +577,7 @@ private fun SettingsView(
     themeMode: ThemeMode,
     includeDisabledApps: Boolean,
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
-    onTheme: () -> Unit,
-    onPickBundle: () -> Unit
+    onTheme: () -> Unit
 ) {
     val reveal = rememberTopReveal(listState, barState)
     LazyColumn(
@@ -614,15 +622,23 @@ private fun SettingsView(
                 Text(text = stringResource(R.string.disabled_apps))
             }
         }
+    }
+}
 
-        item(key = "install-bundle") {
-            SegmentedListItem(
-                onClick = onPickBundle,
-                shapes = ListItemDefaults.segmentedShapes(0, 1),
-                colors = listItemColors()
-            ) {
-                Text(text = stringResource(R.string.install_bundle))
-            }
+@Composable
+private fun BarAction(
+    @DrawableRes icon: Int,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+        tooltip = { PlainTooltip { Text(text = label) } },
+        state = rememberTooltipState()
+    ) {
+        IconButton(onClick = onClick, shapes = IconButtonDefaults.shapes(), modifier = modifier) {
+            Icon(painter = painterResource(icon), contentDescription = label)
         }
     }
 }

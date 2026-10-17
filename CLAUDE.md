@@ -52,12 +52,14 @@
 - Navigation bar in Compose: https://developer.android.com/develop/ui/compose/components/navigation-bar
 - Navigation rail in Compose: https://developer.android.com/develop/ui/compose/components/navigation-rail
 - Badges in Compose: https://developer.android.com/develop/ui/compose/components/badges
+- Tooltips in Compose: https://developer.android.com/develop/ui/compose/components/tooltip
 - Floating action button in Compose: https://developer.android.com/develop/ui/compose/components/fab
 - State and Jetpack Compose: https://developer.android.com/develop/ui/compose/state
 - Side effects in Compose: https://developer.android.com/develop/ui/compose/side-effects
 - Lazy lists and grids: https://developer.android.com/develop/ui/compose/lists
 - Flow layouts in Compose: https://developer.android.com/develop/ui/compose/layouts/flow
 - Compose Material 3 list samples: https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-main/compose/material3/material3/samples/src/main/java/androidx/compose/material3/samples/ListSamples.kt
+- Compose Material 3 app bar samples: https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-main/compose/material3/material3/samples/src/main/java/androidx/compose/material3/samples/AppBarSamples.kt
 - Animations in Compose: https://developer.android.com/develop/ui/compose/animation/quick-guide
 - Animation composables and AnimatedContent: https://developer.android.com/develop/ui/compose/animation/composables-modifiers#animatedcontent
 - MotionScheme API reference: https://developer.android.com/reference/kotlin/androidx/compose/material3/MotionScheme
@@ -70,6 +72,7 @@
 - Accessibility in Compose: https://developer.android.com/develop/ui/compose/accessibility
 - Semantics in Compose: https://developer.android.com/develop/ui/compose/accessibility/semantics
 - Copy and paste in Compose: https://developer.android.com/develop/ui/compose/touch-input/copy-and-paste
+- Settings pattern: https://developer.android.com/design/ui/mobile/guides/patterns/settings
 - Adaptive apps: https://developer.android.com/develop/ui/compose/layouts/adaptive/get-started-with-adaptive-apps
 - Support different display sizes: https://developer.android.com/develop/ui/compose/layouts/adaptive/support-different-display-sizes
 - Window size classes: https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes
@@ -85,6 +88,7 @@
 - Navigation bar: https://m3.material.io/components/navigation-bar/overview
 - Navigation rail: https://m3.material.io/components/navigation-rail/overview
 - Badges: https://m3.material.io/components/badges/overview
+- Tooltips: https://m3.material.io/components/tooltips/overview
 - Buttons: https://m3.material.io/components/buttons/overview
 - Icon buttons: https://m3.material.io/components/icon-buttons/overview
 - Lists: https://m3.material.io/components/lists/overview
