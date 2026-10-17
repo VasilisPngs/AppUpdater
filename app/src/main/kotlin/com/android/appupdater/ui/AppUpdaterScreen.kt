@@ -568,7 +568,9 @@ private fun UpdatesView(
             visible = loading,
             enter = fadeIn(motion.defaultEffectsSpec()),
             exit = fadeOut(motion.defaultEffectsSpec()),
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(contentPadding)
         ) {
             LoadingIndicator()
         }
