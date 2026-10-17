@@ -42,7 +42,6 @@ android {
                 enable = true
                 keepRules {
                     ignoreFrom("com.auroraoss:gplayapi")
-                    files.add(file("proguard-rules.pro"))
                 }
             }
         }
