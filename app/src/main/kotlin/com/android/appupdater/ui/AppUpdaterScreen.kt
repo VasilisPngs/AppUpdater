@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -30,13 +31,18 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -56,6 +62,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
@@ -64,6 +71,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -118,6 +126,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
@@ -164,6 +173,8 @@ private val SmallSpacing = 8.dp
 private val EmptyPadding = 48.dp
 private val EmptyIconSize = 48.dp
 private val AppIconSize = 40.dp
+private val TvOverscanHorizontal = 48.dp
+private val TvOverscanVertical = 27.dp
 private const val MAX_VERSION_CODE_DIGITS = 19
 private const val APKMIRROR_SLOT = 0
 private const val PLAY_SLOT = 1
@@ -268,6 +279,14 @@ fun AppUpdaterScreen(
         navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
     val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
 
+    val television = LocalConfiguration.current.uiMode and Configuration.UI_MODE_TYPE_MASK ==
+        Configuration.UI_MODE_TYPE_TELEVISION
+    val overscan = if (television) {
+        WindowInsets(TvOverscanHorizontal, TvOverscanVertical, TvOverscanHorizontal, TvOverscanVertical)
+    } else {
+        WindowInsets(0)
+    }
+
     NavigationSuiteScaffold(
         navigationItems = {
             AppTab.entries.forEach { tab ->
@@ -313,7 +332,7 @@ fun AppUpdaterScreen(
                 )
             }
         },
-        modifier = modifier,
+        modifier = modifier.windowInsetsPadding(overscan.only(WindowInsetsSides.Start)),
         navigationSuiteType = navigationSuiteType
     ) {
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(activeBarState)
@@ -325,6 +344,7 @@ fun AppUpdaterScreen(
                         if (selectedTab == AppTab.Updates) {
                             IconButton(
                                 onClick = viewModel::refresh,
+                                shapes = IconButtonDefaults.shapes(),
                                 modifier = Modifier.focusProperties { down = updatesFocus }
                             ) {
                                 Icon(
@@ -334,10 +354,12 @@ fun AppUpdaterScreen(
                             }
                         }
                     },
+                    windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.End)),
                     scrollBehavior = scrollBehavior
                 )
             },
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets.add(overscan.only(WindowInsetsSides.Bottom + WindowInsetsSides.End))
         ) { padding ->
             val layoutDirection = LocalLayoutDirection.current
             val density = LocalDensity.current
@@ -654,7 +676,7 @@ private fun SettingsView(
 }
 
 @Composable
-private fun listItemColors() = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+private fun listItemColors() = ListItemDefaults.segmentedColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
 
 @Composable
 private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
@@ -974,12 +996,12 @@ private fun ManualDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = submit, enabled = versionCode != null) {
+            TextButton(onClick = submit, shapes = ButtonDefaults.shapes(), enabled = versionCode != null) {
                 Text(text = stringResource(R.string.update))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
                 Text(text = stringResource(R.string.cancel))
             }
         },
@@ -1017,7 +1039,7 @@ private fun ThemeDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
                 Text(text = stringResource(R.string.cancel))
             }
         },

@@ -20,7 +20,7 @@
 - Do not add a numeric product version to the visible product identity, release name, APK filename, release tag, or API User-Agent unless explicitly requested.
 
 ## Android
-- The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`, taking the Expressive variant where one exists and keeping the components' defaults, Google's rounded shapes included.
+- The product design is strictly Google's latest Material 3 Expressive, never Material 2 or earlier Material 3: the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`, always the Expressive overload or variant where one exists, keeping the components' defaults, Google's rounded shapes included. The framework has no Material 3 Expressive window theme, so the platform theme is `Theme.DeviceDefault.DayNight`, never the Material Design 1 `Theme.Material`.
 - Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code.
 - Each screen has a single-row `TopAppBar` with the plain screen name as its title, and every list entry is its own fully rounded Material 3 Expressive `SegmentedListItem` in the surface container color of Google's samples, spaced apart rather than joined into a group.
 - Icons come from Material Symbols Rounded, except a third party's own logo where the interface names that third party.
@@ -132,6 +132,7 @@
 - Adaptive icons: https://developer.android.com/develop/ui/compose/system/icon_design_adaptive
 - System color resources: https://developer.android.com/reference/android/R.color
 - Splash screens: https://developer.android.com/develop/ui/views/launch/splash-screen
+- Styles and themes: https://developer.android.com/develop/ui/views/theming/themes
 - Notifications: https://developer.android.com/develop/ui/compose/notifications
 - Notification runtime permission: https://developer.android.com/develop/ui/compose/notifications/notification-permission
 - Widgets with Jetpack Glance: https://developer.android.com/develop/ui/compose/glance
@@ -185,6 +186,7 @@
 - Android TV: https://developer.android.com/training/tv
 - Compose on Android TV: https://developer.android.com/training/tv/playback/compose
 - Adaptive apps for TV: https://developer.android.com/develop/adaptive-apps/guides/tv/build-adaptive-apps-for-tv
+- TV layouts and overscan: https://developer.android.com/design/ui/tv/guides/styles/layouts
 - TV app icons and banners: https://developer.android.com/design/ui/tv/guides/system/tv-app-icon-guidelines
 - TV app quality: https://developer.android.com/docs/quality-guidelines/tv-app-quality
 
