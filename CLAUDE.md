@@ -56,6 +56,7 @@
 - State and Jetpack Compose: https://developer.android.com/develop/ui/compose/state
 - Side effects in Compose: https://developer.android.com/develop/ui/compose/side-effects
 - Lazy lists and grids: https://developer.android.com/develop/ui/compose/lists
+- Flow layouts in Compose: https://developer.android.com/develop/ui/compose/layouts/flow
 - Compose Material 3 list samples: https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-main/compose/material3/material3/samples/src/main/java/androidx/compose/material3/samples/ListSamples.kt
 - Animations in Compose: https://developer.android.com/develop/ui/compose/animation/quick-guide
 - Animation composables and AnimatedContent: https://developer.android.com/develop/ui/compose/animation/composables-modifiers#animatedcontent

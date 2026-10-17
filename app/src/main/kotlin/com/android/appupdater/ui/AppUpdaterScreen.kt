@@ -27,7 +27,7 @@ import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -66,7 +67,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -149,12 +149,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
@@ -469,6 +471,13 @@ private fun UpdatesView(
     onRefresh: () -> Unit
 ) {
     val pullState = rememberPullToRefreshState()
+    val buttonHeight = if (
+        currentWindowAdaptiveInfoV2().windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+    ) {
+        ButtonDefaults.MinHeight
+    } else {
+        ButtonDefaults.ExtraSmallContainerHeight
+    }
     val motion = MaterialTheme.motionScheme
     val fade = motion.defaultEffectsSpec<Float>()
     val placement = motion.defaultSpatialSpec<IntOffset>()
@@ -585,6 +594,7 @@ private fun UpdatesView(
                     cards = cards,
                     first = index == 0,
                     last = index == updates.lastIndex,
+                    buttonHeight = buttonHeight,
                     onApkMirror = onApkMirror,
                     onPlay = onPlay,
                     onManual = onManual,
@@ -699,6 +709,7 @@ private fun UpdateItem(
     cards: CardFocus,
     first: Boolean,
     last: Boolean,
+    buttonHeight: Dp,
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
     onManual: (AppUpdateInfo) -> Unit,
@@ -726,7 +737,6 @@ private fun UpdateItem(
     val buttonModifiers = remember(cards) {
         List(BUTTON_SLOTS) { slot ->
             Modifier
-                .fillMaxWidth()
                 .focusRequester(buttonFocus[slot])
                 .focusProperties { if (cards.codes) canFocus = false }
                 .onFocusChanged { if (it.isFocused) lastButton = slot }
@@ -815,7 +825,76 @@ private fun UpdateItem(
         shapes = ListItemDefaults.segmentedShapes(0, 1),
         colors = listItemColors(),
         modifier = modifier.then(cardModifier),
-        leadingContent = {
+        supportingContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(SmallSpacing)) {
+                Column {
+                    Text(
+                        text = if (app.versionName.isEmpty()) {
+                            stringResource(R.string.version_current_code, app.versionCode)
+                        } else {
+                            stringResource(R.string.version_current, displayVersion(app.versionName), app.versionCode)
+                        }
+                    )
+                    Text(text = latest, modifier = codeModifier)
+                }
+                FlowRow(
+                    modifier = Modifier.onKeyEvent { event ->
+                        if (!keyboard || event.key != toCode || event.type != KeyEventType.KeyDown ||
+                            lastButton != slots.firstOrNull()
+                        ) {
+                            return@onKeyEvent false
+                        }
+                        cards.codes = true
+                        codeFocus.requestFocus().also { if (!it) cards.codes = false }
+                    },
+                    horizontalArrangement = Arrangement.spacedBy(SmallSpacing),
+                    verticalArrangement = Arrangement.spacedBy(SmallSpacing)
+                ) {
+                    update.apkMirrorUrl?.let { url ->
+                        SourceButton(
+                            text = stringResource(R.string.update),
+                            icon = R.drawable.ic_source_apkmirror,
+                            source = stringResource(R.string.source_apkmirror),
+                            height = buttonHeight,
+                            enabled = install == null,
+                            onClick = { onApkMirror(url) },
+                            modifier = buttonModifiers[APKMIRROR_SLOT]
+                        )
+                    }
+                    if (update.playUpdate != null) {
+                        SourceButton(
+                            text = stringResource(R.string.update),
+                            icon = R.drawable.ic_source_play,
+                            source = stringResource(R.string.source_play),
+                            height = buttonHeight,
+                            enabled = install == null,
+                            busy = install?.manual == false,
+                            progress = install?.progress,
+                            onClick = { onPlay(update) },
+                            modifier = buttonModifiers[PLAY_SLOT]
+                        )
+                    }
+                    if (update.playAvailable) {
+                        SourceButton(
+                            text = stringResource(R.string.manual),
+                            icon = R.drawable.ic_source_play,
+                            source = stringResource(R.string.source_play),
+                            height = buttonHeight,
+                            enabled = install == null,
+                            busy = install?.manual == true,
+                            progress = install?.progress,
+                            onClick = { onManual(update) },
+                            modifier = buttonModifiers[MANUAL_SLOT]
+                        )
+                    }
+                }
+            }
+        }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ContentMargin)
+        ) {
             Box(modifier = Modifier.size(AppIconSize)) {
                 iconBitmap?.let { bitmap ->
                     Image(
@@ -826,70 +905,8 @@ private fun UpdateItem(
                     )
                 }
             }
-        },
-        supportingContent = {
-            Column {
-                Text(
-                    text = if (app.versionName.isEmpty()) {
-                        stringResource(R.string.version_current_code, app.versionCode)
-                    } else {
-                        stringResource(R.string.version_current, displayVersion(app.versionName), app.versionCode)
-                    }
-                )
-                Text(text = latest, modifier = codeModifier)
-            }
-        },
-        trailingContent = {
-            Column(
-                modifier = Modifier
-                    .width(IntrinsicSize.Max)
-                    .onKeyEvent { event ->
-                        if (!keyboard || event.key != toCode || event.type != KeyEventType.KeyDown) {
-                            return@onKeyEvent false
-                        }
-                        cards.codes = true
-                        codeFocus.requestFocus().also { if (!it) cards.codes = false }
-                    },
-                verticalArrangement = Arrangement.spacedBy(SmallSpacing)
-            ) {
-                update.apkMirrorUrl?.let { url ->
-                    SourceButton(
-                        text = stringResource(R.string.update),
-                        icon = R.drawable.ic_source_apkmirror,
-                        source = stringResource(R.string.source_apkmirror),
-                        enabled = install == null,
-                        onClick = { onApkMirror(url) },
-                        modifier = buttonModifiers[APKMIRROR_SLOT]
-                    )
-                }
-                if (update.playUpdate != null) {
-                    SourceButton(
-                        text = stringResource(R.string.update),
-                        icon = R.drawable.ic_source_play,
-                        source = stringResource(R.string.source_play),
-                        enabled = install == null,
-                        busy = install?.manual == false,
-                        progress = install?.progress,
-                        onClick = { onPlay(update) },
-                        modifier = buttonModifiers[PLAY_SLOT]
-                    )
-                }
-                if (update.playAvailable) {
-                    SourceButton(
-                        text = stringResource(R.string.manual),
-                        icon = R.drawable.ic_source_play,
-                        source = stringResource(R.string.source_play),
-                        enabled = install == null,
-                        busy = install?.manual == true,
-                        progress = install?.progress,
-                        onClick = { onManual(update) },
-                        modifier = buttonModifiers[MANUAL_SLOT]
-                    )
-                }
-            }
+            Text(text = update.appName, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-    ) {
-        Text(text = update.appName, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -898,6 +915,7 @@ private fun SourceButton(
     text: String,
     @DrawableRes icon: Int,
     source: String,
+    height: Dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -914,23 +932,30 @@ private fun SourceButton(
 
     FilledTonalButton(
         onClick = { if (active) onClick() },
-        shapes = ButtonDefaults.shapes(),
-        modifier = modifier.semantics { if (busy) disabled() },
+        shapes = ButtonDefaults.shapesFor(height),
+        modifier = modifier
+            .heightIn(min = height)
+            .semantics { if (busy) disabled() },
         enabled = enabled || busy,
-        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+        contentPadding = ButtonDefaults.contentPaddingFor(height)
     ) {
-        Icon(painter = painterResource(icon), contentDescription = source)
-        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = source,
+            modifier = Modifier.size(ButtonDefaults.iconSizeFor(height))
+        )
+        Spacer(modifier = Modifier.width(ButtonDefaults.iconSpacingFor(height)))
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = text,
+                style = ButtonDefaults.textStyleFor(height),
                 maxLines = 1,
                 modifier = Modifier.graphicsLayer { alpha = 1f - progressShown }
             )
             if (busy && progress != null) {
                 Text(
                     text = percent.format(progress),
-                    style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES),
+                    style = ButtonDefaults.textStyleFor(height).copy(fontFeatureSettings = TABULAR_FIGURES),
                     maxLines = 1,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
