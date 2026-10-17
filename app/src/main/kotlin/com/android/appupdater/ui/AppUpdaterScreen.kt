@@ -12,10 +12,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -137,6 +140,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
@@ -167,6 +171,7 @@ private const val MANUAL_SLOT = 2
 private const val BUTTON_SLOTS = 3
 private const val TABULAR_FIGURES = "tnum"
 private const val FOCUS_PIVOT = 0.3f
+private const val FADE_THROUGH_SCALE = 0.92f
 private const val BLUR_BEHIND_RADIUS = 20
 private const val DIM_WITH_BLUR = 0.1f
 private const val DIM_WITHOUT_BLUR = 0.4f
@@ -343,47 +348,56 @@ fun AppUpdaterScreen(
                 bottom = padding.calculateBottomPadding() + ContentMargin
             )
             val focusScroll = remember(density) { FocusScroll(density) }
+            val motion = MaterialTheme.motionScheme
             SideEffect { focusScroll.padding = contentPadding }
 
             CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
-                when (selectedTab) {
-                    AppTab.Updates -> UpdatesView(
-                        listState = updatesListState,
-                        barState = updatesBarState,
-                        nestedScroll = scrollBehavior.nestedScrollConnection,
-                        focus = updatesFocus,
-                        exitFocus = navigationFocus,
-                        contentPadding = contentPadding,
-                        loaded = uiState.loaded,
-                        loading = uiState.scanning && !uiState.loaded,
-                        refreshing = uiState.scanning && uiState.loaded,
-                        notice = uiState.notice,
-                        updates = updates,
-                        installs = uiState.installs,
-                        playInstalls = uiState.playInstalls,
-                        onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
-                        onPlay = viewModel::updateFromPlay,
-                        onManual = { manualPackage = it.packageName },
-                        onRefresh = viewModel::refresh
-                    )
-                    AppTab.Settings -> SettingsView(
-                        listState = settingsListState,
-                        barState = settingsBarState,
-                        nestedScroll = scrollBehavior.nestedScrollConnection,
-                        focus = settingsFocus,
-                        contentPadding = contentPadding,
-                        themeMode = themeMode,
-                        includeDisabledApps = uiState.includeDisabledApps,
-                        onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                        onTheme = { themeDialog = true },
-                        onPickBundle = {
-                            try {
-                                bundlePicker.launch(arrayOf("*/*"))
-                            } catch (_: ActivityNotFoundException) {
-                                showMessage(noFilePicker)
+                AnimatedContent(
+                    targetState = selectedTab,
+                    transitionSpec = {
+                        (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), FADE_THROUGH_SCALE))
+                            .togetherWith(fadeOut(motion.fastEffectsSpec()))
+                    }
+                ) { tab ->
+                    when (tab) {
+                        AppTab.Updates -> UpdatesView(
+                            listState = updatesListState,
+                            barState = updatesBarState,
+                            nestedScroll = scrollBehavior.nestedScrollConnection,
+                            focus = updatesFocus,
+                            exitFocus = navigationFocus,
+                            contentPadding = contentPadding,
+                            loaded = uiState.loaded,
+                            loading = uiState.scanning && !uiState.loaded,
+                            refreshing = uiState.scanning && uiState.loaded,
+                            notice = uiState.notice,
+                            updates = updates,
+                            installs = uiState.installs,
+                            playInstalls = uiState.playInstalls,
+                            onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
+                            onPlay = viewModel::updateFromPlay,
+                            onManual = { manualPackage = it.packageName },
+                            onRefresh = viewModel::refresh
+                        )
+                        AppTab.Settings -> SettingsView(
+                            listState = settingsListState,
+                            barState = settingsBarState,
+                            nestedScroll = scrollBehavior.nestedScrollConnection,
+                            focus = settingsFocus,
+                            contentPadding = contentPadding,
+                            themeMode = themeMode,
+                            includeDisabledApps = uiState.includeDisabledApps,
+                            onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
+                            onTheme = { themeDialog = true },
+                            onPickBundle = {
+                                try {
+                                    bundlePicker.launch(arrayOf("*/*"))
+                                } catch (_: ActivityNotFoundException) {
+                                    showMessage(noFilePicker)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -433,6 +447,9 @@ private fun UpdatesView(
     onRefresh: () -> Unit
 ) {
     val pullState = rememberPullToRefreshState()
+    val motion = MaterialTheme.motionScheme
+    val fade = motion.defaultEffectsSpec<Float>()
+    val placement = motion.defaultSpatialSpec<IntOffset>()
     val reveal = rememberTopReveal(listState, barState)
     val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
     val cards = remember(keyboard) { CardFocus() }
@@ -487,7 +504,7 @@ private fun UpdatesView(
                     SegmentedListItem(
                         shapes = ListItemDefaults.segmentedShapes(0, 1),
                         colors = listItemColors(),
-                        modifier = Modifier.animateItem()
+                        modifier = Modifier.animateItem(fade, placement, fade)
                     ) {
                         Text(
                             text = notice,
@@ -502,7 +519,7 @@ private fun UpdatesView(
                 SegmentedListItem(
                     shapes = ListItemDefaults.segmentedShapes(0, 1),
                     colors = listItemColors(),
-                    modifier = Modifier.animateItem(),
+                    modifier = Modifier.animateItem(fade, placement, fade),
                     supportingContent = { LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth()) }
                 ) {
                     Text(text = state.appName, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -516,14 +533,14 @@ private fun UpdatesView(
                             symbol = R.drawable.ic_up_to_date,
                             title = stringResource(R.string.all_up_to_date),
                             message = stringResource(R.string.all_up_to_date_note),
-                            modifier = Modifier.animateItem()
+                            modifier = Modifier.animateItem(fade, placement, fade)
                         )
                     } else {
                         EmptyState(
                             symbol = R.drawable.ic_warning,
                             title = stringResource(R.string.check_failed),
                             message = notice,
-                            modifier = Modifier.animateItem()
+                            modifier = Modifier.animateItem(fade, placement, fade)
                         ) {
                             FilledTonalButton(
                                 onClick = onRefresh,
@@ -550,7 +567,7 @@ private fun UpdatesView(
                     onPlay = onPlay,
                     onManual = onManual,
                     modifier = Modifier
-                        .animateItem()
+                        .animateItem(fade, placement, fade)
                         .then(if (index == 0) reveal.modifier else Modifier)
                 )
             }
@@ -558,8 +575,8 @@ private fun UpdatesView(
 
         AnimatedVisibility(
             visible = loading,
-            enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
-            exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
+            enter = fadeIn(motion.defaultEffectsSpec()),
+            exit = fadeOut(motion.defaultEffectsSpec()),
             modifier = Modifier.align(Alignment.Center)
         ) {
             LoadingIndicator()

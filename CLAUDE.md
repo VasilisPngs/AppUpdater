@@ -58,6 +58,8 @@
 - Lazy lists and grids: https://developer.android.com/develop/ui/compose/lists
 - Compose Material 3 list samples: https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-main/compose/material3/material3/samples/src/main/java/androidx/compose/material3/samples/ListSamples.kt
 - Animations in Compose: https://developer.android.com/develop/ui/compose/animation/quick-guide
+- Animation composables and AnimatedContent: https://developer.android.com/develop/ui/compose/animation/composables-modifiers#animatedcontent
+- MotionScheme API reference: https://developer.android.com/reference/kotlin/androidx/compose/material3/MotionScheme
 - Text in Compose: https://developer.android.com/develop/ui/compose/text
 - Fonts and downloadable fonts in Compose: https://developer.android.com/develop/ui/compose/text/fonts
 - Text fields in Compose: https://developer.android.com/develop/ui/compose/text/user-input
@@ -105,6 +107,7 @@
 - Shape: https://m3.material.io/styles/shape/overview-principles
 - Shape morph: https://m3.material.io/styles/shape/shape-morph
 - Motion: https://m3.material.io/styles/motion/overview/how-it-works
+- Motion transition patterns: https://m3.material.io/styles/motion/transitions/transition-patterns
 - Spacing: https://m3.material.io/styles/spacing/overview
 - Icons: https://m3.material.io/styles/icons/overview
 - Accessibility: https://m3.material.io/foundations/overview
