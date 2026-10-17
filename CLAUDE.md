@@ -5,7 +5,7 @@
 - Publish every completed change set as exactly one commit.
 
 ## General rules
-- Follow only Google's official guidance and rules: Material Design, the Android developer documentation and Google's own libraries and samples. When the user asks for something beyond them, first say plainly that it departs from Google and which guideline it breaks, and go ahead only once they confirm.
+- Follow only Google's official guidance and rules: Material Design, the Android developer documentation and Google's own libraries and samples. When the user asks for something beyond them, first say plainly that it departs from Google and which guideline it breaks, and go ahead only once they confirm. A confirmed departure changes the code only, never this file, which stays on Google's guidance by default; a departure already in the code is the user's settled decision, so ask before reverting it.
 - Do the work end to end.
 - Do not undo settled decisions or weaken requirements without a real technical reason.
 - Prefer root-cause fixes and the simplest architecture that fully satisfies the requirements.
