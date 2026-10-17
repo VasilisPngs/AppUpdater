@@ -3,6 +3,7 @@
 ## Git & repository workflow
 - Push changes directly to `main`; do not open pull requests.
 - Publish every completed change set as exactly one commit.
+- This file is shared by VasilisPngs/AppUpdater and VasilisPngs/Adblock: every change to it is made identically in both repositories at the same time.
 
 ## General rules
 - Follow only Google's official guidance and rules: Material Design, the Android developer documentation and Google's own libraries and samples. When the user asks for something beyond them, first say plainly that it departs from Google and which guideline it breaks, and go ahead only once they confirm. A confirmed departure changes the code only, never this file, which stays on Google's guidance by default; a departure already in the code is the user's settled decision, so ask before reverting it.
@@ -151,6 +152,7 @@
 - Styles and themes: https://developer.android.com/develop/ui/views/theming/themes
 - Notifications: https://developer.android.com/develop/ui/compose/notifications
 - Notification runtime permission: https://developer.android.com/develop/ui/compose/notifications/notification-permission
+- Notification channels: https://developer.android.com/develop/ui/views/notifications/channels
 - Widgets with Jetpack Glance: https://developer.android.com/develop/ui/compose/glance
 - OpenGL ES: https://developer.android.com/develop/ui/views/graphics/opengl/about-opengl
 - Theme.DeviceDefault.DayNight: https://developer.android.com/reference/android/R.style#Theme_DeviceDefault_DayNight
@@ -164,6 +166,9 @@
 - Background tasks: https://developer.android.com/develop/background-work/background-tasks
 - Task scheduling with WorkManager: https://developer.android.com/develop/background-work/background-tasks/persistent
 - Foreground services: https://developer.android.com/develop/background-work/services/fgs
+- Foreground service types: https://developer.android.com/develop/background-work/services/fgs/service-types
+- Doze and App Standby: https://developer.android.com/training/monitoring-device-state/doze-standby
+- PowerManager: https://developer.android.com/reference/android/os/PowerManager
 - Configuration changes: https://developer.android.com/guide/topics/resources/runtime-changes
 - UiModeManager: https://developer.android.com/reference/android/app/UiModeManager
 - PackageInstaller: https://developer.android.com/reference/android/content/pm/PackageInstaller
@@ -179,6 +184,17 @@
 - Room: https://developer.android.com/training/data-storage/room
 - Photo picker: https://developer.android.com/training/data-storage/shared/photo-picker
 - Connect to the network: https://developer.android.com/develop/connectivity/network-ops/connecting
+- VPN: https://developer.android.com/develop/connectivity/vpn
+- VpnService: https://developer.android.com/reference/android/net/VpnService
+- VpnService.Builder: https://developer.android.com/reference/android/net/VpnService.Builder
+- HttpEngine: https://developer.android.com/reference/android/net/http/HttpEngine
+- UrlRequest: https://developer.android.com/reference/android/net/http/UrlRequest
+- ConnectivityManager: https://developer.android.com/reference/android/net/ConnectivityManager
+- LinkProperties: https://developer.android.com/reference/android/net/LinkProperties
+- ParcelFileDescriptor: https://developer.android.com/reference/android/os/ParcelFileDescriptor
+- OsConstants: https://developer.android.com/reference/android/system/OsConstants
+- Intent: https://developer.android.com/reference/android/content/Intent
+- Settings: https://developer.android.com/reference/android/provider/Settings
 - Security checklist: https://developer.android.com/privacy-and-security/security-tips
 - Android 17 behavior changes for all apps: https://developer.android.com/about/versions/17/behavior-changes-all
 - Android 17 behavior changes for apps targeting it: https://developer.android.com/about/versions/17/behavior-changes-17
@@ -205,10 +221,17 @@
 - Aurora Dispenser: https://gitlab.com/AuroraOSS/aurora-dispenser
 - Protocol Buffers Java Lite: https://github.com/protocolbuffers/protobuf/blob/main/java/lite.md
 
+### Networking protocols
+- DNS Queries over HTTPS (RFC 8484): https://www.rfc-editor.org/rfc/rfc8484
+- Domain names (RFC 1035): https://www.rfc-editor.org/rfc/rfc1035
+- Internet Protocol (RFC 791): https://www.rfc-editor.org/rfc/rfc791
+- User Datagram Protocol (RFC 768): https://www.rfc-editor.org/rfc/rfc768
+
 ### Architecture, quality and testing
 - Guide to app architecture: https://developer.android.com/topic/architecture
 - Architecture recommendations: https://developer.android.com/topic/architecture/recommendations
 - ViewModel: https://developer.android.com/topic/libraries/architecture/viewmodel
+- ViewModel factories: https://developer.android.com/topic/libraries/architecture/viewmodel/viewmodel-factories
 - Lifecycle in Compose: https://developer.android.com/topic/libraries/architecture/lifecycle
 - Navigation 3: https://developer.android.com/guide/navigation/navigation-3
 - Core app quality guidelines: https://developer.android.com/docs/quality-guidelines/core-app-quality
