@@ -15,6 +15,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,6 +41,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -53,6 +55,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -65,6 +68,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
@@ -80,6 +84,7 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
+import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -159,6 +164,7 @@ private val VersionSpacing = 4.dp
 private val EmptyPadding = 48.dp
 private val EmptyIconSize = 48.dp
 private val AppIconSize = 40.dp
+private val InstallingIconSize = 28.dp
 private val TvOverscanHorizontal = 48.dp
 private val TvOverscanVertical = 27.dp
 private const val TABULAR_FIGURES = "tnum"
@@ -706,12 +712,36 @@ private fun UpdateItem(
         colors = listItemColors(),
         modifier = modifier.then(cardModifier),
         leadingContent = {
-            Box(modifier = Modifier.size(AppIconSize)) {
+            val motion = MaterialTheme.motionScheme
+            val iconSize by animateDpAsState(
+                targetValue = if (install == null) AppIconSize else InstallingIconSize,
+                animationSpec = motion.defaultSpatialSpec(),
+                label = "icon"
+            )
+            Box(modifier = Modifier.size(AppIconSize), contentAlignment = Alignment.Center) {
+                AnimatedVisibility(
+                    visible = install != null,
+                    modifier = Modifier.requiredSize(WavyProgressIndicatorDefaults.CircularContainerSize),
+                    enter = fadeIn(motion.defaultEffectsSpec()),
+                    exit = fadeOut(motion.defaultEffectsSpec())
+                ) {
+                    val progress = install?.progress
+                    if (progress == null) {
+                        CircularWavyProgressIndicator()
+                    } else {
+                        val animatedProgress by animateFloatAsState(
+                            targetValue = progress,
+                            animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
+                            label = "progress"
+                        )
+                        CircularWavyProgressIndicator(progress = { animatedProgress })
+                    }
+                }
                 iconBitmap?.let { bitmap ->
                     Image(
                         bitmap = bitmap.asImageBitmap(),
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.size(iconSize),
                         contentScale = ContentScale.Fit
                     )
                 }
