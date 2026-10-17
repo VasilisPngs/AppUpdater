@@ -168,24 +168,21 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
             val result = playInstaller.install(packageName, target.code) { progress ->
                 _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(progress))) }
             }
-            val event = if (target.code == update.newVersionCode) {
-                result.toEvent(update.appName)
-            } else {
-                result.fold(
-                    onSuccess = { InstallEvent.FinishedFromPlay(update.appName, target.name) },
-                    onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
-                )
-            }
+            val event = result.fold(
+                onSuccess = {
+                    if (target.code == update.newVersionCode) {
+                        InstallEvent.Finished(update.appName)
+                    } else {
+                        InstallEvent.FinishedFromPlay(update.appName, target.name)
+                    }
+                },
+                onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
+            )
 
             _uiState.update { it.copy(playInstalls = it.playInstalls - packageName) }
             _events.trySend(event)
         }
     }
-
-    private fun Result<Unit>.toEvent(appName: String): InstallEvent = fold(
-        onSuccess = { InstallEvent.Finished(appName) },
-        onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
-    )
 
     fun setIncludeDisabledApps(include: Boolean) {
         if (_uiState.value.includeDisabledApps == include) return

@@ -161,9 +161,6 @@ private val EmptyIconSize = 48.dp
 private val AppIconSize = 40.dp
 private val TvOverscanHorizontal = 48.dp
 private val TvOverscanVertical = 27.dp
-private const val PLAY_SLOT = 0
-private const val APKMIRROR_SLOT = 1
-private const val BUTTON_SLOTS = 2
 private const val TABULAR_FIGURES = "tnum"
 private const val FOCUS_PIVOT = 0.3f
 private const val FADE_THROUGH_SCALE = 0.92f
@@ -675,17 +672,13 @@ private fun UpdateItem(
 ) {
     val context = LocalContext.current
     val packageName = app.packageName
-    val buttonFocus = remember { List(BUTTON_SLOTS) { FocusRequester() } }
-    val slots = remember(update) {
-        listOfNotNull(
-            PLAY_SLOT.takeIf { update.playUpdate != null },
-            APKMIRROR_SLOT.takeIf { update.apkMirrorUrl != null }
-        )
+    val playFocus = remember { FocusRequester() }
+    val apkMirrorFocus = remember { FocusRequester() }
+    val entry = when {
+        update.playUpdate != null -> playFocus
+        update.apkMirrorUrl != null -> apkMirrorFocus
+        else -> null
     }
-    val buttonModifiers = remember {
-        List(BUTTON_SLOTS) { slot -> Modifier.focusRequester(buttonFocus[slot]) }
-    }
-    val entry = (if (install == null) slots.firstOrNull() else PLAY_SLOT)?.let(buttonFocus::get)
     val cardModifier = remember(cards, packageName) {
         Modifier.onFocusChanged {
             if (it.hasFocus) {
@@ -752,11 +745,10 @@ private fun UpdateItem(
                             text = stringResource(R.string.update),
                             icon = R.drawable.ic_source_play,
                             source = stringResource(R.string.source_play),
-                            enabled = install == null,
                             busy = install != null,
                             progress = install?.progress,
                             onClick = { onPlay(update) },
-                            modifier = buttonModifiers[PLAY_SLOT]
+                            modifier = Modifier.focusRequester(playFocus)
                         )
                     }
                     update.apkMirrorUrl?.let { url ->
@@ -766,7 +758,7 @@ private fun UpdateItem(
                             source = stringResource(R.string.source_apkmirror),
                             enabled = install == null,
                             onClick = { onApkMirror(url) },
-                            modifier = buttonModifiers[APKMIRROR_SLOT]
+                            modifier = Modifier.focusRequester(apkMirrorFocus)
                         )
                     }
                 }

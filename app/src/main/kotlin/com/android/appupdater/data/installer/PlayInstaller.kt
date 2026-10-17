@@ -32,9 +32,6 @@ class PlayInstaller(
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val directory = File(context.cacheDir, "play_$packageName")
         try {
-            require(versionCode > installedVersionCode(packageName)) {
-                "The version code must be newer than the installed version."
-            }
             onProgress(null)
             directory.deleteRecursively()
 
@@ -134,9 +131,6 @@ class PlayInstaller(
 
     private fun source(file: Pair<PlayFile, File>): ApkSource =
         ApkSource(file.second.name, file.second.length()) { file.second.inputStream() }
-
-    private fun installedVersionCode(packageName: String): Long =
-        packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0)).longVersionCode
 
     private fun isSharedLibraryInstalled(packageName: String, versionCode: Long): Boolean =
         packageManager.getSharedLibraries(PackageManager.PackageInfoFlags.of(0))

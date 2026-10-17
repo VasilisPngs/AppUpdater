@@ -39,11 +39,8 @@ sealed interface ScanStatus {
     data class Error(val message: String, val partialUpdates: List<AppUpdateInfo>) : ScanStatus
 }
 
-class AppUpdateRepository(
-    context: Context,
-    private val playCatalog: PlayCatalog,
-    private val client: ApkMirrorClient = ApkMirrorClient(context.packageName)
-) {
+class AppUpdateRepository(context: Context, private val playCatalog: PlayCatalog) {
+    private val client = ApkMirrorClient(context.packageName)
     private val packageManager = context.packageManager
     private val isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
     private val packageFlags = PackageManager.PackageInfoFlags.of(

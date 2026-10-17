@@ -108,7 +108,6 @@
 - Typography: https://m3.material.io/styles/typography/overview
 - Typography fonts: https://m3.material.io/styles/typography/fonts
 - Google Sans: https://fonts.google.com/specimen/Google+Sans
-- Roboto: https://fonts.google.com/specimen/Roboto
 - Shape: https://m3.material.io/styles/shape/overview-principles
 - Shape morph: https://m3.material.io/styles/shape/shape-morph
 - Motion: https://m3.material.io/styles/motion/overview/how-it-works
