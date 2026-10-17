@@ -39,6 +39,7 @@
 - Get started with Jetpack Compose: https://developer.android.com/develop/ui/compose/documentation
 - Material components in Compose: https://developer.android.com/develop/ui/compose/components
 - App bars: https://developer.android.com/develop/ui/compose/components/app-bars
+- Floating action button in Compose: https://developer.android.com/develop/ui/compose/components/fab
 - State and Jetpack Compose: https://developer.android.com/develop/ui/compose/state
 - Side effects in Compose: https://developer.android.com/develop/ui/compose/side-effects
 - Lazy lists and grids: https://developer.android.com/develop/ui/compose/lists
@@ -59,6 +60,9 @@
 - M3 Expressive motion: https://m3.material.io/blog/m3-expressive-motion-theming
 - Material components: https://m3.material.io/components
 - Toolbars: https://m3.material.io/components/toolbars/overview
+- Toolbars guidelines: https://m3.material.io/components/toolbars/guidelines
+- Toolbars specs: https://m3.material.io/components/toolbars/specs
+- Floating action button: https://m3.material.io/components/floating-action-button/overview
 - Color roles: https://m3.material.io/styles/color/roles
 - Dynamic color: https://m3.material.io/styles/color/dynamic/choosing-a-source
 - Typography: https://m3.material.io/styles/typography/overview
