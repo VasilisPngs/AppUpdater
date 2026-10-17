@@ -16,7 +16,7 @@
 - Use the latest appropriate official technologies, APIs, libraries and tools, tracking the newest published build in any release channel, including preview, alpha, beta, release candidate and canary.
 - A newer toolchain is only acceptable while the signed release APK still installs on a release device; never compile against a preview Android platform, which stamps the package as preview-built and makes it unparseable on release builds.
 - Verify current versions from official sources rather than relying on outdated examples.
-- Every change that introduces a library, API, component, platform feature or tool also adds its official documentation to Official references in the same commit: Google's own pages (developer.android.com, m3.material.io, fonts.google.com) or, for a library outside Google, its maintainers' documentation, each checked to load the right page.
+- Every change that introduces a library, API, component, platform feature or tool also adds its official documentation to Official references in the same commit: Google's own pages (developer.android.com, source.android.com, m3.material.io, fonts.google.com) or, for a library outside Google, its maintainers' documentation, each checked to load the right page.
 - Do not add a numeric product version to the visible product identity, release name, APK filename, release tag, or API User-Agent unless explicitly requested.
 
 ## Android
@@ -31,7 +31,7 @@
 - Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules; add a keep rule only for code that a missing rule demonstrably breaks.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
 - Draw edge to edge and let the window insets place the content, rather than reserving space manually.
-- Build visual effects with the official platform and Jetpack APIs only; never with a third-party effect library.
+- Use Google's blur and transparency effects wherever Google's guidance uses them, such as the window blur behind dialogs, with the official platform and Jetpack APIs only.
 
 ## Verification
 - While the Java target is newer than the ASM bundled with lint, the build adds `androidLintTool(platform(...))` with the newest `org.ow2.asm:asm-bom` from the version catalog; without it lint still passes but skips every class with "Unsupported class file major version".
@@ -118,6 +118,12 @@
 ### Graphics and system surfaces
 - Graphics in Compose: https://developer.android.com/develop/ui/compose/graphics/draw/overview
 - Graphics modifiers: https://developer.android.com/develop/ui/compose/graphics/draw/modifiers
+- Window blurs: https://source.android.com/docs/core/display/window-blurs
+- Blur behind a window: https://developer.android.com/reference/android/view/WindowManager.LayoutParams#setBlurBehindRadius(int)
+- Window background blur: https://developer.android.com/reference/android/view/Window#setBackgroundBlurRadius(int)
+- RenderEffect: https://developer.android.com/reference/android/graphics/RenderEffect
+- Blur in Compose: https://developer.android.com/develop/ui/compose/graphics/images/customize#blur-image
+- Dialog window in Compose: https://developer.android.com/reference/kotlin/androidx/compose/ui/window/DialogWindowProvider
 - Shapes in Compose: https://developer.android.com/develop/ui/compose/graphics/draw/shapes
 - Window insets: https://developer.android.com/develop/ui/compose/system/insets
 - System bars: https://developer.android.com/develop/ui/compose/system/system-bars

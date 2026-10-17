@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -115,6 +116,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -134,6 +136,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.appupdater.R
@@ -147,6 +150,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
+import java.util.function.Consumer
 
 private val ContentMargin = 16.dp
 private val SmallSpacing = 8.dp
@@ -160,6 +164,9 @@ private const val MANUAL_SLOT = 2
 private const val BUTTON_SLOTS = 3
 private const val TABULAR_FIGURES = "tnum"
 private const val FOCUS_PIVOT = 0.3f
+private const val BLUR_BEHIND_RADIUS = 20
+private const val DIM_WITH_BLUR = 0.1f
+private const val DIM_WITHOUT_BLUR = 0.4f
 
 private enum class AppTab(
     @StringRes val labelRes: Int,
@@ -930,6 +937,7 @@ private fun ManualDialog(
         },
         title = { Text(text = update.appName, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         text = {
+            DialogBlurBehind()
             OutlinedTextField(
                 state = code,
                 modifier = Modifier
@@ -967,6 +975,7 @@ private fun ThemeDialog(
         },
         title = { Text(text = stringResource(R.string.theme)) },
         text = {
+            DialogBlurBehind()
             Column(modifier = Modifier.selectableGroup()) {
                 ThemeMode.entries.forEach { mode ->
                     val selected = mode == current
@@ -986,6 +995,21 @@ private fun ThemeDialog(
             }
         }
     )
+}
+
+@Composable
+private fun DialogBlurBehind() {
+    val window = (LocalView.current.parent as? DialogWindowProvider)?.window ?: return
+    DisposableEffect(window) {
+        val windowManager = window.windowManager
+        val listener = Consumer<Boolean> { enabled ->
+            window.setDimAmount(if (enabled) DIM_WITH_BLUR else DIM_WITHOUT_BLUR)
+        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        window.attributes = window.attributes.apply { blurBehindRadius = BLUR_BEHIND_RADIUS }
+        windowManager.addCrossWindowBlurEnabledListener(listener)
+        onDispose { windowManager.removeCrossWindowBlurEnabledListener(listener) }
+    }
 }
 
 private val DigitsOnly = InputTransformation {
