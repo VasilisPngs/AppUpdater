@@ -19,7 +19,6 @@
 - Do not add a numeric product version to the visible product identity, release name, APK filename, release tag, or API User-Agent unless explicitly requested.
 
 ## Android
-- Use the latest appropriate official Kotlin, Jetpack Compose, AndroidX, Android SDK, Android Gradle Plugin, Gradle and supported JDK.
 - The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`.
 - Every colour comes from the device's dynamic colour scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`, which the minimum SDK always provides, so there is no fallback palette and no hand picked colour in code. The window background follows the same system colour resources, and the launcher icon is an adaptive icon with a monochrome layer for themed icons.
 - Build the interface from the official Material 3 components and their defaults, taking the Expressive variant where one exists (segmented list items, shape morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own mark where it names that third party.
@@ -43,8 +42,6 @@
 
 ### Design and UI
 - Material Design 3 in Compose: https://developer.android.com/develop/ui/compose/designsystems/material3
-- Dynamic color in Compose: https://developer.android.com/develop/ui/compose/designsystems/material3#dynamic_color_schemes
-- Color schemes and dark theme in Compose: https://developer.android.com/develop/ui/compose/designsystems/material3#color-scheme
 - Compose Material 3 API reference: https://developer.android.com/reference/kotlin/androidx/compose/material3/package-summary
 - Get started with Jetpack Compose: https://developer.android.com/develop/ui/compose/documentation
 - Material components in Compose: https://developer.android.com/develop/ui/compose/components
@@ -104,7 +101,6 @@
 - Foreground services: https://developer.android.com/develop/background-work/services/fgs
 - Configuration changes: https://developer.android.com/guide/topics/resources/runtime-changes
 - Per-app language preferences: https://developer.android.com/guide/topics/resources/app-languages
-- Predictive back gesture: https://developer.android.com/guide/navigation/custom-back/predictive-back-gesture
 - Kotlin coroutines on Android: https://developer.android.com/kotlin/coroutines
 - Kotlin flows on Android: https://developer.android.com/kotlin/flow
 - Data and file storage: https://developer.android.com/training/data-storage
@@ -158,7 +154,6 @@
 - Android Gradle Plugin release notes: https://developer.android.com/build/releases/gradle-plugin
 - Kotlin releases: https://kotlinlang.org/docs/releases.html
 - Kotlin Early Access Preview: https://kotlinlang.org/docs/eap.html
-- Gradle releases: https://gradle.org/releases/
 - Gradle distributions: https://services.gradle.org/distributions/
 - OpenJDK builds: https://jdk.java.net/
 
