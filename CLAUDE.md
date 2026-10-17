@@ -5,6 +5,7 @@
 - Publish every completed change set as exactly one commit.
 
 ## General rules
+- Follow only Google's official guidance and rules: Material Design, the Android developer documentation and Google's own libraries and samples. When the user asks for something beyond them, first say plainly that it departs from Google and which guideline it breaks, and go ahead only once they confirm.
 - Do the work end to end.
 - Do not undo settled decisions or weaken requirements without a real technical reason.
 - Prefer root-cause fixes and the simplest architecture that fully satisfies the requirements.
@@ -21,8 +22,9 @@
 ## Android
 - The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`.
 - Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code. The window background follows the same system color resources, and the launcher icon is an adaptive icon with a monochrome layer for themed icons.
-- Top-level navigation is a Material 3 Expressive floating toolbar rather than a docked navigation bar, a deliberate departure from Material's guidance, which keeps toolbars for actions: `HorizontalFloatingToolbar` at the bottom on compact widths or heights and `VerticalFloatingToolbar` at the start on larger windows, chosen with `currentWindowAdaptiveInfoV2()`, with the screen's main action as an adjacent floating action button.
-- Build the interface from the official Material 3 components and their defaults, taking the Expressive variant where one exists (segmented list items, shape-morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own logo where the interface names that third party.
+- Top-level navigation follows Material's adaptive navigation: `NavigationSuiteScaffold` with the type from `NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())`, which shows the Expressive short navigation bar on compact windows and the navigation rail on larger windows and televisions.
+- Each screen has a single-row `TopAppBar` whose title is the plain screen name and whose actions hold the screen's actions; lists are flat `ListItem` rows on the surface color rather than segmented, grouped containers.
+- Build the interface from the official Material 3 components and their defaults, shapes included, taking the Expressive variant where one exists (shape-morphing buttons, loading and wavy progress indicators), rather than drawing components by hand. Icons are Material Symbols Rounded from Google, except a third party's own logo where the interface names that third party.
 - The app adds no accessibility code of its own: no content descriptions, roles, or selected, toggleable or disabled semantics; its own interactive elements use plain `clickable`, and Material components keep only what they build in.
 - Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules; add a keep rule only for code that a missing rule demonstrably breaks.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
@@ -49,6 +51,8 @@
 - Progress indicators in Compose: https://developer.android.com/develop/ui/compose/components/progress
 - Pull to refresh in Compose: https://developer.android.com/develop/ui/compose/components/pull-to-refresh
 - App bars: https://developer.android.com/develop/ui/compose/components/app-bars
+- Navigation bar in Compose: https://developer.android.com/develop/ui/compose/components/navigation-bar
+- Navigation rail in Compose: https://developer.android.com/develop/ui/compose/components/navigation-rail
 - Floating action button in Compose: https://developer.android.com/develop/ui/compose/components/fab
 - State and Jetpack Compose: https://developer.android.com/develop/ui/compose/state
 - Side effects in Compose: https://developer.android.com/develop/ui/compose/side-effects
@@ -72,6 +76,8 @@
 - M3 Expressive motion: https://m3.material.io/blog/m3-expressive-motion-theming
 - Material components: https://m3.material.io/components
 - Top app bar: https://m3.material.io/components/app-bars/overview
+- Navigation bar: https://m3.material.io/components/navigation-bar/overview
+- Navigation rail: https://m3.material.io/components/navigation-rail/overview
 - Buttons: https://m3.material.io/components/buttons/overview
 - Icon buttons: https://m3.material.io/components/icon-buttons/overview
 - Lists: https://m3.material.io/components/lists/overview
@@ -107,6 +113,7 @@
 - Edge to edge in Compose: https://developer.android.com/develop/ui/compose/system/setup-e2e
 - Predictive back in Compose: https://developer.android.com/develop/ui/compose/system/predictive-back
 - Adaptive icons: https://developer.android.com/develop/ui/compose/system/icon_design_adaptive
+- System color resources: https://developer.android.com/reference/android/R.color
 - Splash screens: https://developer.android.com/develop/ui/views/launch/splash-screen
 - Notifications: https://developer.android.com/develop/ui/compose/notifications
 - Notification runtime permission: https://developer.android.com/develop/ui/compose/notifications/notification-permission
