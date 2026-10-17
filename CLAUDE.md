@@ -20,18 +20,14 @@
 - Do not add a numeric product version to the visible product identity, release name, APK filename, release tag, or API User-Agent unless explicitly requested.
 
 ## Android
-- The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`.
-- Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code. The window background follows the same system color resources, and the launcher icon is an adaptive icon with a monochrome layer for themed icons.
-- Top-level navigation follows Material's adaptive navigation: `NavigationSuiteScaffold` with the type from `NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfoV2())`, which shows the Expressive short navigation bar on compact windows and the navigation rail on larger windows and televisions.
-- Each screen has a single-row `TopAppBar` whose title is the plain screen name and whose actions hold the screen's actions; lists are flat `ListItem` rows on the surface color rather than segmented, grouped containers.
-- Build the interface from the official Material 3 components and their defaults, taking the Expressive variant where one exists (shape-morphing buttons, loading and wavy progress indicators), rather than drawing components by hand.
-- Everything is rounded the way Google rounds it: the components keep their own Material 3 Expressive shapes, never squared off or reshaped by hand, and icons come from Material Symbols Rounded, except a third party's own logo where the interface names that third party.
-- Text uses Google Sans, the typeface of Google's own apps, from Google Fonts through Compose downloadable fonts, applied to every Material 3 type style with `Typography(fontFamily)`.
-- Accessibility follows Google's guidance: icons and images that carry meaning get a `contentDescription` from string resources, decorative ones and icons beside a visible label get `null`, the app's own interactive elements declare their role and state with `selectable`, `toggleable` or `semantics`, section titles are headings, and Material components keep the semantics they build in.
-- Release builds run R8 through the `optimization` DSL, with the default Android rules and the libraries' consumer rules; add a keep rule only for code that a missing rule demonstrably breaks.
+- The product design is Google's Material 3 Expressive, built from the official Compose Material 3 components inside `MaterialExpressiveTheme` with `MotionScheme.expressive()`, taking the Expressive variant where one exists and keeping the components' defaults, Google's rounded shapes included.
+- Every color comes from the device's dynamic color scheme, `dynamicLightColorScheme` or `dynamicDarkColorScheme`. The minimum SDK is at least 31 (Android 12), so dynamic color is always available and there is no fallback palette and no hand-picked color in code.
+- Each screen has a single-row `TopAppBar` with the plain screen name as its title, and lists are flat `ListItem` rows rather than segmented containers.
+- Icons come from Material Symbols Rounded, except a third party's own logo where the interface names that third party.
+- Text uses Google Sans from Google Fonts through Compose downloadable fonts.
+- Use Google's blur and transparency effects wherever Google's guidance uses them, such as the window blur behind dialogs.
+- Add an R8 keep rule only for code that a missing rule demonstrably breaks.
 - Prefer current Android APIs and remove obsolete compatibility layers and workarounds.
-- Draw edge to edge and let the window insets place the content, rather than reserving space manually.
-- Use Google's blur and transparency effects wherever Google's guidance uses them, such as the window blur behind dialogs, with the official platform and Jetpack APIs only.
 
 ## Verification
 - While the Java target is newer than the ASM bundled with lint, the build adds `androidLintTool(platform(...))` with the newest `org.ow2.asm:asm-bom` from the version catalog; without it lint still passes but skips every class with "Unsupported class file major version".
