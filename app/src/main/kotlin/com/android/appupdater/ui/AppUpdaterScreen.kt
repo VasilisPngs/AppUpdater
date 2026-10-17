@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -52,13 +54,14 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -67,7 +70,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
+import androidx.compose.material3.WideNavigationRailDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
@@ -306,7 +311,13 @@ fun AppUpdaterScreen(
             }
         },
         modifier = modifier,
-        navigationSuiteType = navigationSuiteType
+        navigationSuiteType = navigationSuiteType,
+        navigationSuiteColors = NavigationSuiteDefaults.colors(
+            wideNavigationRailColors = WideNavigationRailDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            )
+        ),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     ) {
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(activeBarState)
         Scaffold(
@@ -326,12 +337,24 @@ fun AppUpdaterScreen(
                             }
                         }
                     },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ),
                     scrollBehavior = scrollBehavior
                 )
             },
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-        ) { contentPadding ->
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ) { padding ->
+            val layoutDirection = LocalLayoutDirection.current
             val density = LocalDensity.current
+            val contentPadding = PaddingValues(
+                start = padding.calculateStartPadding(layoutDirection) + ContentMargin,
+                top = padding.calculateTopPadding(),
+                end = padding.calculateEndPadding(layoutDirection) + ContentMargin,
+                bottom = padding.calculateBottomPadding() + ContentMargin
+            )
             val focusScroll = remember(density) { FocusScroll(density) }
             SideEffect { focusScroll.padding = contentPadding }
 
@@ -469,11 +492,15 @@ private fun UpdatesView(
                 .focusRequester(focus)
                 .focusRestorer()
                 .onFocusChanged { if (!it.hasFocus) cards.codes = false },
-            contentPadding = contentPadding
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(SmallSpacing)
         ) {
             if (notice != null && updates.isNotEmpty()) {
                 item(key = "notice") {
-                    ListItem(modifier = Modifier.animateItem()) {
+                    SegmentedListItem(
+                        shapes = ListItemDefaults.segmentedShapes(0, 1),
+                        modifier = Modifier.animateItem()
+                    ) {
                         Text(
                             text = notice,
                             style = MaterialTheme.typography.bodyMedium,
@@ -484,7 +511,8 @@ private fun UpdatesView(
             }
 
             items(installList, key = { it.key }) { (_, state) ->
-                ListItem(
+                SegmentedListItem(
+                    shapes = ListItemDefaults.segmentedShapes(0, 1),
                     modifier = Modifier.animateItem(),
                     supportingContent = { LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth()) }
                 ) {
@@ -571,15 +599,17 @@ private fun SettingsView(
             .nestedScroll(nestedScroll)
             .focusRequester(focus)
             .focusRestorer(),
-        contentPadding = contentPadding
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(SmallSpacing)
     ) {
         item(key = "appearance") {
             SectionHeader(text = stringResource(R.string.appearance))
         }
 
         item(key = "theme") {
-            ListItem(
+            SegmentedListItem(
                 onClick = onTheme,
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
                 modifier = reveal.modifier,
                 supportingContent = { Text(text = stringResource(themeMode.labelRes)) }
             ) {
@@ -592,9 +622,10 @@ private fun SettingsView(
         }
 
         item(key = "disabled-apps") {
-            ListItem(
+            SegmentedListItem(
                 checked = includeDisabledApps,
                 onCheckedChange = onIncludeDisabledAppsChange,
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
                 supportingContent = { Text(text = stringResource(R.string.disabled_apps_description)) },
                 trailingContent = { Switch(checked = includeDisabledApps, onCheckedChange = null) }
             ) {
@@ -603,7 +634,10 @@ private fun SettingsView(
         }
 
         item(key = "install-bundle") {
-            ListItem(onClick = onPickBundle) {
+            SegmentedListItem(
+                onClick = onPickBundle,
+                shapes = ListItemDefaults.segmentedShapes(0, 1)
+            ) {
                 Text(text = stringResource(R.string.install_bundle))
             }
         }
@@ -743,7 +777,8 @@ private fun UpdateItem(
         }
     }
 
-    ListItem(
+    SegmentedListItem(
+        shapes = ListItemDefaults.segmentedShapes(0, 1),
         modifier = modifier.then(cardModifier),
         verticalAlignment = Alignment.CenterVertically,
         leadingContent = {
