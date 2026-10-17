@@ -57,7 +57,11 @@ android {
     }
 
     testOptions {
-        unitTests.all { it.useJUnitPlatform() }
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.useJUnitPlatform()
+            it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED", "--enable-native-access=ALL-UNNAMED")
+        }
     }
 }
 
@@ -75,7 +79,13 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.aurora.gplayapi)
     androidLintTool(platform(libs.asm.bom))
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }

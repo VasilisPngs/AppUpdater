@@ -190,6 +190,11 @@
 - Test apps on Android: https://developer.android.com/training/testing
 - Local unit tests: https://developer.android.com/training/testing/local-tests
 - Test Compose layouts: https://developer.android.com/develop/ui/compose/testing
+- Compose testing APIs: https://developer.android.com/develop/ui/compose/testing/apis
+- Robolectric strategies: https://developer.android.com/training/testing/local-tests/robolectric
+- Robolectric: https://robolectric.org/
+- JUnit user guide: https://docs.junit.org/current/user-guide/
+- JUnit 4: https://junit.org/junit4/
 - Lint: https://developer.android.com/studio/write/lint
 
 ### Television

@@ -205,23 +205,12 @@ fun AppUpdaterScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-    var selectedTab by rememberSaveable { mutableStateOf(AppTab.Updates) }
-    val updatesListState = rememberLazyListState()
-    val settingsListState = rememberLazyListState()
-    val updatesBarState = rememberTopAppBarState()
-    val settingsBarState = rememberTopAppBarState()
-    val updatesFocus = remember { FocusRequester() }
-    val settingsFocus = remember { FocusRequester() }
-    val navigationFocus = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
-    val inputModeManager = LocalInputModeManager.current
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val bundlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::installBundle)
     }
-    var themeDialog by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = selectedTab != AppTab.Updates) { selectedTab = AppTab.Updates }
     val installedFormat = stringResource(R.string.update_installed)
     val installedFromPlayFormat = stringResource(R.string.update_installed_play)
     val failedFormat = stringResource(R.string.update_failed)
@@ -249,6 +238,47 @@ fun AppUpdaterScreen(
             )
         }
     }
+
+    AppUpdaterScreen(
+        uiState = uiState,
+        themeMode = themeMode,
+        snackbarHostState = snackbarHostState,
+        onRefresh = viewModel::refresh,
+        onPickBundle = pickBundle,
+        onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
+        onPlay = viewModel::updateFromPlay,
+        onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
+        onThemeChange = viewModel::setThemeMode,
+        modifier = modifier
+    )
+}
+
+@Composable
+internal fun AppUpdaterScreen(
+    uiState: AppUpdaterUiState,
+    themeMode: ThemeMode,
+    snackbarHostState: SnackbarHostState,
+    onRefresh: () -> Unit,
+    onPickBundle: () -> Unit,
+    onApkMirror: (String) -> Unit,
+    onPlay: (AppUpdateInfo) -> Unit,
+    onIncludeDisabledAppsChange: (Boolean) -> Unit,
+    onThemeChange: (ThemeMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var selectedTab by rememberSaveable { mutableStateOf(AppTab.Updates) }
+    val updatesListState = rememberLazyListState()
+    val settingsListState = rememberLazyListState()
+    val updatesBarState = rememberTopAppBarState()
+    val settingsBarState = rememberTopAppBarState()
+    val updatesFocus = remember { FocusRequester() }
+    val settingsFocus = remember { FocusRequester() }
+    val navigationFocus = remember { FocusRequester() }
+    val inputModeManager = LocalInputModeManager.current
+    val coroutineScope = rememberCoroutineScope()
+    var themeDialog by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = selectedTab != AppTab.Updates) { selectedTab = AppTab.Updates }
+
     LaunchedEffect(Unit) {
         if (inputModeManager.inputMode == InputMode.Keyboard) navigationFocus.requestFocus()
     }
@@ -357,13 +387,13 @@ fun AppUpdaterScreen(
                             BarAction(
                                 icon = R.drawable.ic_apk_install,
                                 label = stringResource(R.string.install_bundle),
-                                onClick = pickBundle,
+                                onClick = onPickBundle,
                                 modifier = toUpdates
                             )
                             BarAction(
                                 icon = R.drawable.ic_refresh,
                                 label = stringResource(R.string.refresh),
-                                onClick = viewModel::refresh,
+                                onClick = onRefresh,
                                 modifier = toUpdates
                             )
                         }
@@ -412,9 +442,9 @@ fun AppUpdaterScreen(
                             updates = updates,
                             installs = uiState.installs,
                             playInstalls = uiState.playInstalls,
-                            onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
-                            onPlay = viewModel::updateFromPlay,
-                            onRefresh = viewModel::refresh,
+                            onApkMirror = onApkMirror,
+                            onPlay = onPlay,
+                            onRefresh = onRefresh,
                             columns = columns
                         )
                         AppTab.Settings -> SettingsView(
@@ -425,7 +455,7 @@ fun AppUpdaterScreen(
                             contentPadding = contentPadding,
                             themeMode = themeMode,
                             includeDisabledApps = uiState.includeDisabledApps,
-                            onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
+                            onIncludeDisabledAppsChange = onIncludeDisabledAppsChange,
                             onTheme = { themeDialog = true }
                         )
                     }
@@ -440,7 +470,7 @@ fun AppUpdaterScreen(
             onDismiss = { themeDialog = false },
             onSelect = { mode ->
                 themeDialog = false
-                viewModel.setThemeMode(mode)
+                onThemeChange(mode)
             }
         )
     }
