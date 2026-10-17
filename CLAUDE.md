@@ -15,6 +15,7 @@
 - Use the latest appropriate official technologies, APIs, libraries and tools, tracking the newest published build in any release channel, including preview, alpha, beta, release candidate and canary.
 - A newer toolchain is only acceptable while the signed release APK still installs on a release device; never compile against a preview Android platform, which stamps the package as preview-built and makes it unparseable on release builds.
 - Verify current versions from official sources rather than relying on outdated examples.
+- Every change that introduces a library, API, component, platform feature or tool also adds its official documentation to Official references in the same commit: Google's own pages (developer.android.com, m3.material.io, fonts.google.com) or, for a library outside Google, its maintainers' documentation, each checked to load the right page.
 - Do not add a numeric product version to the visible product identity, release name, APK filename, release tag, or API User-Agent unless explicitly requested.
 
 ## Android
@@ -38,6 +39,15 @@
 - Compose Material 3 API reference: https://developer.android.com/reference/kotlin/androidx/compose/material3/package-summary
 - Get started with Jetpack Compose: https://developer.android.com/develop/ui/compose/documentation
 - Material components in Compose: https://developer.android.com/develop/ui/compose/components
+- Scaffold: https://developer.android.com/develop/ui/compose/components/scaffold
+- Buttons in Compose: https://developer.android.com/develop/ui/compose/components/button
+- Icon buttons in Compose: https://developer.android.com/develop/ui/compose/components/icon-button
+- Switch in Compose: https://developer.android.com/develop/ui/compose/components/switch
+- Radio button in Compose: https://developer.android.com/develop/ui/compose/components/radio-button
+- Dialogs in Compose: https://developer.android.com/develop/ui/compose/components/dialog
+- Snackbar in Compose: https://developer.android.com/develop/ui/compose/components/snackbar
+- Progress indicators in Compose: https://developer.android.com/develop/ui/compose/components/progress
+- Pull to refresh in Compose: https://developer.android.com/develop/ui/compose/components/pull-to-refresh
 - App bars: https://developer.android.com/develop/ui/compose/components/app-bars
 - Floating action button in Compose: https://developer.android.com/develop/ui/compose/components/fab
 - State and Jetpack Compose: https://developer.android.com/develop/ui/compose/state
@@ -45,9 +55,11 @@
 - Lazy lists and grids: https://developer.android.com/develop/ui/compose/lists
 - Animations in Compose: https://developer.android.com/develop/ui/compose/animation/quick-guide
 - Text in Compose: https://developer.android.com/develop/ui/compose/text
+- Text fields in Compose: https://developer.android.com/develop/ui/compose/text/user-input
 - Resources in Compose: https://developer.android.com/develop/ui/compose/resources
 - Icons in Compose: https://developer.android.com/develop/ui/compose/graphics/images/material
 - Focus in Compose: https://developer.android.com/develop/ui/compose/touch-input/focus
+- Copy and paste in Compose: https://developer.android.com/develop/ui/compose/touch-input/copy-and-paste
 - Adaptive apps: https://developer.android.com/develop/ui/compose/layouts/adaptive/get-started-with-adaptive-apps
 - Support different display sizes: https://developer.android.com/develop/ui/compose/layouts/adaptive/support-different-display-sizes
 - Window size classes: https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes
@@ -59,6 +71,17 @@
 - Building with M3 Expressive: https://m3.material.io/blog/building-with-m3-expressive
 - M3 Expressive motion: https://m3.material.io/blog/m3-expressive-motion-theming
 - Material components: https://m3.material.io/components
+- Top app bar: https://m3.material.io/components/app-bars/overview
+- Buttons: https://m3.material.io/components/buttons/overview
+- Icon buttons: https://m3.material.io/components/icon-buttons/overview
+- Lists: https://m3.material.io/components/lists/overview
+- Loading indicator: https://m3.material.io/components/loading-indicator/overview
+- Progress indicators: https://m3.material.io/components/progress-indicators/overview
+- Dialogs: https://m3.material.io/components/dialogs/overview
+- Text fields: https://m3.material.io/components/text-fields/overview
+- Switch: https://m3.material.io/components/switch/overview
+- Radio button: https://m3.material.io/components/radio-button/overview
+- Snackbar: https://m3.material.io/components/snackbar/overview
 - Toolbars: https://m3.material.io/components/toolbars/overview
 - Toolbars guidelines: https://m3.material.io/components/toolbars/guidelines
 - Toolbars specs: https://m3.material.io/components/toolbars/specs
@@ -93,15 +116,21 @@
 - Permissions: https://developer.android.com/guide/topics/permissions/overview
 - Package visibility: https://developer.android.com/training/package-visibility
 - Intents and intent filters: https://developer.android.com/guide/components/intents-filters
+- Get a result from an activity: https://developer.android.com/training/basics/intents/result
 - Broadcasts: https://developer.android.com/develop/background-work/background-tasks/broadcasts
 - Background tasks: https://developer.android.com/develop/background-work/background-tasks
 - Task scheduling with WorkManager: https://developer.android.com/develop/background-work/background-tasks/persistent
 - Foreground services: https://developer.android.com/develop/background-work/services/fgs
 - Configuration changes: https://developer.android.com/guide/topics/resources/runtime-changes
+- UiModeManager: https://developer.android.com/reference/android/app/UiModeManager
+- PackageInstaller: https://developer.android.com/reference/android/content/pm/PackageInstaller
 - Per-app language preferences: https://developer.android.com/guide/topics/resources/app-languages
 - Kotlin coroutines on Android: https://developer.android.com/kotlin/coroutines
 - Kotlin flows on Android: https://developer.android.com/kotlin/flow
+- Kotlin serialization: https://kotlinlang.org/docs/serialization.html
 - Data and file storage: https://developer.android.com/training/data-storage
+- SharedPreferences: https://developer.android.com/training/data-storage/shared-preferences
+- Documents and files from shared storage: https://developer.android.com/training/data-storage/shared/documents-files
 - DataStore: https://developer.android.com/topic/libraries/architecture/datastore
 - Room: https://developer.android.com/training/data-storage/room
 - Photo picker: https://developer.android.com/training/data-storage/shared/photo-picker
