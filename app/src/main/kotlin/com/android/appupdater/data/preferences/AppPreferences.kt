@@ -3,7 +3,6 @@ package com.android.appupdater.data.preferences
 import android.app.UiModeManager
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -12,12 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.android.appupdater.data.model.ThemeMode
 import kotlinx.coroutines.flow.first
 
-private const val NAME = "app_preferences"
-
-private val Context.appPreferences: DataStore<Preferences> by preferencesDataStore(
-    name = NAME,
-    produceMigrations = { context -> listOf(SharedPreferencesMigration(context, NAME)) }
-)
+private val Context.appPreferences: DataStore<Preferences> by preferencesDataStore(name = "app_preferences")
 
 class AppPreferences(
     private val context: Context,
