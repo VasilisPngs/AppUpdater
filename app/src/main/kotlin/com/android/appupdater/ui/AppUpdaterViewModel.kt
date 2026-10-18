@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.android.appupdater.AppUpdaterApplication
 import com.android.appupdater.data.installer.InstallRepository
+import com.android.appupdater.data.model.Appearance
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.InstallState
@@ -65,13 +66,13 @@ class AppUpdaterViewModel(
             .onStart { start() }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), AppUpdaterUiState())
 
-    val themeMode: StateFlow<ThemeMode> =
-        preferences.themeMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ThemeMode.System)
+    val appearance: StateFlow<Appearance?> = preferences.appearance
+        .onStart { preferences.restoreThemeMode() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     private fun start() {
         if (started) return
         started = true
-        viewModelScope.launch { preferences.restoreThemeMode() }
         viewModelScope.launch {
             repository.packageChanges.collect { packageName ->
                 AppIconCache.evict(packageName)
@@ -140,8 +141,13 @@ class AppUpdaterViewModel(
     }
 
     fun setThemeMode(mode: ThemeMode) {
-        if (themeMode.value == mode) return
+        if (appearance.value?.themeMode == mode) return
         viewModelScope.launch { preferences.setThemeMode(mode) }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        if (appearance.value?.dynamicColor == enabled) return
+        viewModelScope.launch { preferences.setDynamicColor(enabled) }
     }
 
     fun messageShown(id: Long) {

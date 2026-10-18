@@ -12,6 +12,7 @@ import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import com.android.appupdater.R
+import com.android.appupdater.data.model.Appearance
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
@@ -58,6 +60,7 @@ class AppUpdaterScreenTest {
     private val played = mutableListOf<AppUpdateInfo>()
     private val opened = mutableListOf<String>()
     private val themes = mutableListOf<ThemeMode>()
+    private val dynamicColors = mutableListOf<Boolean>()
     private val disabledApps = mutableListOf<Boolean>()
     private var refreshes = 0
     private var bundlePicks = 0
@@ -161,10 +164,21 @@ class AppUpdaterScreenTest {
         show(loaded())
 
         compose.onNodeWithText(string(R.string.settings)).performClick()
+        compose.onNodeWithText(string(R.string.theme_system)).assertIsDisplayed()
         compose.onNodeWithText(string(R.string.theme)).performClick()
         compose.onNodeWithText(string(R.string.theme_dark)).performClick()
 
         assertEquals(listOf(ThemeMode.Dark), themes)
+    }
+
+    @Test
+    fun `turns dynamic color on from settings`() {
+        show(loaded())
+
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+        compose.onNodeWithText(string(R.string.dynamic_color)).assertIsOff().performClick()
+
+        assertEquals(listOf(true), dynamicColors)
     }
 
     @Test
@@ -268,14 +282,15 @@ class AppUpdaterScreenTest {
             AppUpdaterTheme {
                 AppUpdaterScreen(
                     uiState = state,
-                    themeMode = ThemeMode.System,
+                    appearance = Appearance(ThemeMode.System, dynamicColor = false),
                     snackbarHostState = remember { SnackbarHostState() },
                     onRefresh = { refreshes++ },
                     onPickBundle = { bundlePicks++ },
                     onApkMirror = { opened += it },
                     onPlay = { played += it },
                     onIncludeDisabledAppsChange = { disabledApps += it },
-                    onThemeChange = { themes += it }
+                    onThemeChange = { themes += it },
+                    onDynamicColorChange = { dynamicColors += it }
                 )
             }
         }

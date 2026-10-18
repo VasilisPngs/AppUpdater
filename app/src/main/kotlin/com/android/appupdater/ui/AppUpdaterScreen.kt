@@ -152,6 +152,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
+import com.android.appupdater.data.model.Appearance
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.InstallState
@@ -208,10 +209,10 @@ private val ThemeMode.labelRes: Int
 @Composable
 fun AppUpdaterScreen(
     viewModel: AppUpdaterViewModel,
+    appearance: Appearance,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -248,7 +249,7 @@ fun AppUpdaterScreen(
 
     AppUpdaterScreen(
         uiState = uiState,
-        themeMode = themeMode,
+        appearance = appearance,
         snackbarHostState = snackbarHostState,
         onRefresh = viewModel::refresh,
         onPickBundle = pickBundle,
@@ -256,6 +257,7 @@ fun AppUpdaterScreen(
         onPlay = viewModel::updateFromPlay,
         onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
         onThemeChange = viewModel::setThemeMode,
+        onDynamicColorChange = viewModel::setDynamicColor,
         modifier = modifier
     )
 }
@@ -263,7 +265,7 @@ fun AppUpdaterScreen(
 @Composable
 internal fun AppUpdaterScreen(
     uiState: AppUpdaterUiState,
-    themeMode: ThemeMode,
+    appearance: Appearance,
     snackbarHostState: SnackbarHostState,
     onRefresh: () -> Unit,
     onPickBundle: () -> Unit,
@@ -271,6 +273,7 @@ internal fun AppUpdaterScreen(
     onPlay: (AppUpdateInfo) -> Unit,
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
+    onDynamicColorChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(AppTab.Updates) }
@@ -459,10 +462,11 @@ internal fun AppUpdaterScreen(
                             nestedScroll = scrollBehavior.nestedScrollConnection,
                             focus = settingsFocus,
                             contentPadding = contentPadding,
-                            themeMode = themeMode,
+                            appearance = appearance,
                             includeDisabledApps = uiState.includeDisabledApps,
                             onIncludeDisabledAppsChange = onIncludeDisabledAppsChange,
-                            onTheme = { themeDialog = true }
+                            onTheme = { themeDialog = true },
+                            onDynamicColorChange = onDynamicColorChange
                         )
                     }
                 }
@@ -472,7 +476,7 @@ internal fun AppUpdaterScreen(
 
     if (themeDialog) {
         ThemeDialog(
-            current = themeMode,
+            current = appearance.themeMode,
             onDismiss = { themeDialog = false },
             onSelect = { mode ->
                 themeDialog = false
@@ -659,10 +663,11 @@ private fun SettingsView(
     nestedScroll: NestedScrollConnection,
     focus: FocusRequester,
     contentPadding: PaddingValues,
-    themeMode: ThemeMode,
+    appearance: Appearance,
     includeDisabledApps: Boolean,
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
-    onTheme: () -> Unit
+    onTheme: () -> Unit,
+    onDynamicColorChange: (Boolean) -> Unit
 ) {
     val reveal = rememberTopReveal(listState, barState)
     LazyColumn(
@@ -685,9 +690,23 @@ private fun SettingsView(
                 shapes = ListItemDefaults.segmentedShapes(0, 1),
                 colors = listItemColors(),
                 modifier = reveal.modifier,
-                supportingContent = { Text(text = stringResource(themeMode.labelRes)) }
+                supportingContent = { Text(text = stringResource(appearance.themeMode.labelRes)) }
             ) {
                 Text(text = stringResource(R.string.theme))
+            }
+        }
+
+        item(key = "dynamic-color") {
+            SegmentedListItem(
+                checked = appearance.dynamicColor,
+                onCheckedChange = onDynamicColorChange,
+                modifier = Modifier.semantics { role = Role.Switch },
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                colors = listItemColors(),
+                supportingContent = { Text(text = stringResource(R.string.dynamic_color_description)) },
+                trailingContent = { Switch(checked = appearance.dynamicColor, onCheckedChange = null) }
+            ) {
+                Text(text = stringResource(R.string.dynamic_color))
             }
         }
 

@@ -2,6 +2,7 @@ package com.android.appupdater.data.preferences
 
 import android.app.UiModeManager
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.android.appupdater.data.model.Appearance
 import com.android.appupdater.data.model.ThemeMode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -24,6 +25,23 @@ class AppPreferencesTest {
 
     private val context = RuntimeEnvironment.getApplication()
     private val uiModeManager = context.getSystemService(UiModeManager::class.java)
+
+    @Test
+    fun `starts with the system theme and without dynamic color`() = runTest {
+        assertEquals(Appearance(ThemeMode.System, dynamicColor = false), preferences().appearance.first())
+    }
+
+    @Test
+    fun `remembers the theme and dynamic color apart`() = runTest {
+        val preferences = preferences()
+        preferences.setDynamicColor(true)
+        preferences.setThemeMode(ThemeMode.Dark)
+
+        assertEquals(Appearance(ThemeMode.Dark, dynamicColor = true), preferences.appearance.first())
+
+        preferences.setDynamicColor(false)
+        assertEquals(Appearance(ThemeMode.Dark, dynamicColor = false), preferences.appearance.first())
+    }
 
     @Test
     fun `applies the chosen theme`() = runTest {
