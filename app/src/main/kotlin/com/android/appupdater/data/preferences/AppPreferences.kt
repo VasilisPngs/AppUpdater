@@ -2,35 +2,51 @@ package com.android.appupdater.data.preferences
 
 import android.app.UiModeManager
 import android.content.Context
-import androidx.core.content.edit
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.SharedPreferencesMigration
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import com.android.appupdater.data.model.ThemeMode
+import kotlinx.coroutines.flow.first
 
-class AppPreferences(private val context: Context) {
-    private val preferences by lazy {
-        context.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+private const val NAME = "app_preferences"
+
+private val Context.appPreferences: DataStore<Preferences> by preferencesDataStore(
+    name = NAME,
+    produceMigrations = { context -> listOf(SharedPreferencesMigration(context, NAME)) }
+)
+
+class AppPreferences(
+    private val context: Context,
+    private val store: DataStore<Preferences> = context.appPreferences
+) {
+    suspend fun includeDisabledApps(): Boolean = store.data.first()[INCLUDE_DISABLED_APPS] ?: false
+
+    suspend fun setIncludeDisabledApps(value: Boolean) {
+        store.edit { it[INCLUDE_DISABLED_APPS] = value }
     }
 
-    var includeDisabledApps: Boolean
-        get() = preferences.getBoolean(KEY_INCLUDE_DISABLED_APPS, false)
-        set(value) = preferences.edit { putBoolean(KEY_INCLUDE_DISABLED_APPS, value) }
+    suspend fun setThemeMode(mode: ThemeMode) {
+        store.edit { it[THEME_MODE] = mode.name }
+        applyNightMode(mode)
+    }
 
-    var themeMode: ThemeMode
-        get() = preferences.getString(KEY_THEME_MODE, null)
-            ?.let { stored -> ThemeMode.entries.firstOrNull { it.name == stored } }
-            ?: ThemeMode.System
-        set(value) {
-            preferences.edit { putString(KEY_THEME_MODE, value.name) }
-            applyNightMode(value)
-        }
+    suspend fun restoreThemeMode(): ThemeMode = themeMode().also(::applyNightMode)
 
-    fun restoreThemeMode(): ThemeMode = themeMode.also(::applyNightMode)
+    private suspend fun themeMode(): ThemeMode {
+        val stored = store.data.first()[THEME_MODE]
+        return ThemeMode.entries.firstOrNull { it.name == stored } ?: ThemeMode.System
+    }
 
     private fun applyNightMode(mode: ThemeMode) {
         context.getSystemService(UiModeManager::class.java).setApplicationNightMode(mode.nightMode)
     }
 
-    companion object {
-        private const val KEY_INCLUDE_DISABLED_APPS = "include_disabled_apps"
-        private const val KEY_THEME_MODE = "theme_mode"
+    private companion object {
+        val INCLUDE_DISABLED_APPS = booleanPreferencesKey("include_disabled_apps")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 }

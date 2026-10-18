@@ -22,7 +22,6 @@ import com.android.appupdater.data.play.PlayHttpClient
 import com.android.appupdater.data.preferences.AppPreferences
 import com.android.appupdater.data.repository.AppUpdateRepository
 import com.android.appupdater.data.repository.ScanStatus
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -34,7 +33,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 sealed interface InstallEvent {
     data class Installed(val appName: String) : InstallEvent
@@ -110,10 +108,8 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
         viewModelScope.launch {
-            val (includeDisabledApps, themeMode) = withContext(Dispatchers.IO) {
-                preferences.includeDisabledApps to preferences.restoreThemeMode()
-            }
-            _themeMode.value = themeMode
+            val includeDisabledApps = preferences.includeDisabledApps()
+            _themeMode.value = preferences.restoreThemeMode()
             _uiState.update { it.copy(includeDisabledApps = includeDisabledApps) }
             scanForUpdates()
         }
@@ -195,14 +191,14 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
     fun setIncludeDisabledApps(include: Boolean) {
         if (_uiState.value.includeDisabledApps == include) return
         _uiState.update { it.copy(includeDisabledApps = include) }
-        viewModelScope.launch(Dispatchers.IO) { preferences.includeDisabledApps = include }
+        viewModelScope.launch { preferences.setIncludeDisabledApps(include) }
         scanForUpdates()
     }
 
     fun setThemeMode(mode: ThemeMode) {
         if (_themeMode.value == mode) return
         _themeMode.value = mode
-        viewModelScope.launch(Dispatchers.IO) { preferences.themeMode = mode }
+        viewModelScope.launch { preferences.setThemeMode(mode) }
     }
 
     private suspend fun refreshInstalledApps(): List<InstalledApp> = installedAppsLock.withLock {
