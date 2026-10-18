@@ -94,7 +94,6 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -170,6 +169,7 @@ private val ContentMargin = 16.dp
 private val CompactMargin = 16.dp
 private val WideMargin = 24.dp
 private val SmallSpacing = 8.dp
+private val OptionHeight = 56.dp
 private val VersionSpacing = 4.dp
 private val EmptyPadding = 48.dp
 private val EmptyIconSize = 48.dp
@@ -1021,8 +1021,8 @@ private fun ThemeDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(if (selected) Modifier.focusRequester(focus) else Modifier)
-                            .selectable(selected = selected, onClick = { onSelect(mode) }, role = Role.RadioButton)
-                            .minimumInteractiveComponentSize(),
+                            .height(OptionHeight)
+                            .selectable(selected = selected, onClick = { onSelect(mode) }, role = Role.RadioButton),
                         horizontalArrangement = Arrangement.spacedBy(ContentMargin),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

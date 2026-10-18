@@ -259,14 +259,45 @@ class AppUpdaterScreenTest {
         compose.onAllNodesWithContentDescription(string(R.string.source_apkmirror))[1].assertIsFocused()
     }
 
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `measures the settings by Google's list and app bar tokens`() {
+        show(loaded())
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+        val heading = text(string(R.string.appearance))
+        val themeItem = compose.onNodeWithText(string(R.string.theme)).getBoundsInRoot()
+        val themeTitle = text(string(R.string.theme))
+        val dynamicItem = compose.onNodeWithText(string(R.string.dynamic_color)).getBoundsInRoot()
+        val title = text(string(R.string.settings))
+
+        assertEquals(16.dp, title.left)
+        assertEquals(themeTitle.left, heading.left)
+        assertEquals(themeItem.left + 16.dp, themeTitle.left)
+        assertEquals(72.dp, themeItem.bottom - themeItem.top)
+        assertEquals(72.dp, dynamicItem.bottom - dynamicItem.top)
+        assertEquals(themeItem.left, dynamicItem.left)
+        assertEquals(themeItem.right, dynamicItem.right)
+        assertEquals(8.dp, dynamicItem.top - themeItem.bottom)
+
+        compose.onNodeWithText(string(R.string.theme)).performClick()
+        val light = compose.onNodeWithText(string(R.string.theme_light)).getBoundsInRoot()
+        val dark = compose.onNodeWithText(string(R.string.theme_dark)).getBoundsInRoot()
+        assertEquals(56.dp, light.bottom - light.top)
+        assertEquals(light.bottom, dark.top)
+    }
+
+    private fun text(value: String): DpRect {
+        val nodes = compose.onAllNodesWithText(value, useUnmergedTree = true)
+        return List(nodes.fetchSemanticsNodes().size) { nodes[it].getBoundsInRoot() }.minBy { it.top }
+    }
+
     private fun assertContentEdge(margin: Dp) {
         show(loaded(entry("Alpha"), entry("Beta")))
 
         val width = compose.onRoot().getBoundsInRoot().right
         val cards = listOf(bounds("Alpha"), bounds("Beta"))
         val refresh = compose.onNodeWithContentDescription(string(R.string.refresh), useUnmergedTree = true).getBoundsInRoot()
-        val titles = compose.onAllNodesWithText(string(R.string.updates), useUnmergedTree = true)
-        val title = List(titles.fetchSemanticsNodes().size) { titles[it].getBoundsInRoot() }.minBy { it.top }
+        val title = text(string(R.string.updates))
         assertEquals(width - margin, cards.maxOf { it.right })
         assertEquals(width - margin, refresh.right)
         assertEquals(cards.minOf { it.left }, title.left)
