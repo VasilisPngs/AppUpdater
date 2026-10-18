@@ -1,6 +1,8 @@
 package com.android.appupdater.ui
 
+import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.InstallState
+import com.android.appupdater.data.model.installEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

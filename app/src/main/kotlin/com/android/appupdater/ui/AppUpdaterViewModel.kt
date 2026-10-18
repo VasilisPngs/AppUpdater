@@ -1,52 +1,38 @@
 package com.android.appupdater.ui
 
-import android.app.Application
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
-import com.android.appupdater.data.installer.BundleInstaller
-import com.android.appupdater.data.installer.INSTALLATION_FAILED
-import com.android.appupdater.data.installer.PlayInstaller
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.android.appupdater.AppUpdaterApplication
+import com.android.appupdater.data.installer.InstallRepository
 import com.android.appupdater.data.model.AppUpdateInfo
+import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
 import com.android.appupdater.data.model.ThemeMode
-import com.android.appupdater.data.play.PlayAuthProvider
-import com.android.appupdater.data.play.PlayCatalog
-import com.android.appupdater.data.play.PlayHttpClient
 import com.android.appupdater.data.preferences.AppPreferences
 import com.android.appupdater.data.repository.AppUpdateRepository
 import com.android.appupdater.data.repository.ScanStatus
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-sealed interface InstallEvent {
-    data class Installed(val appName: String) : InstallEvent
-    data class InstallFailed(val message: String) : InstallEvent
-    data class Finished(val appName: String) : InstallEvent
-    data class FinishedFromPlay(val appName: String, val versionName: String) : InstallEvent
-    data class Failed(val message: String) : InstallEvent
-}
+private const val STOP_TIMEOUT_MILLIS = 5_000L
 
-internal fun InstallState.installEvent(): InstallEvent? = when (this) {
-    is InstallState.Installing -> null
-    is InstallState.Success -> if (updated) InstallEvent.Finished(appName) else InstallEvent.Installed(appName)
-    is InstallState.Error -> InstallEvent.InstallFailed(message)
-}
+data class UserMessage(val id: Long, val event: InstallEvent)
 
 data class AppUpdaterUiState(
     val scanning: Boolean = true,
@@ -56,79 +42,76 @@ data class AppUpdaterUiState(
     val updates: List<AppUpdateInfo> = emptyList(),
     val includeDisabledApps: Boolean = false,
     val installs: Map<String, InstallState> = emptyMap(),
-    val playInstalls: Map<String, PlayInstall> = emptyMap()
+    val playInstalls: Map<String, PlayInstall> = emptyMap(),
+    val messages: List<UserMessage> = emptyList(),
+    val confirmation: Intent? = null
 )
 
-class AppUpdaterViewModel(application: Application) : AndroidViewModel(application) {
-    private val preferences = AppPreferences(application.applicationContext)
-    private val playHttpClient = PlayHttpClient(application.packageName)
-    private val playCatalog = PlayCatalog(PlayAuthProvider(application.applicationContext, playHttpClient))
-    private val repository = AppUpdateRepository(application.applicationContext, playCatalog)
-    private val bundleInstaller = BundleInstaller(application.applicationContext)
-    private val playInstaller = PlayInstaller(application.applicationContext, playCatalog, playHttpClient)
-    private val _uiState = MutableStateFlow(AppUpdaterUiState())
-    private val _themeMode = MutableStateFlow(ThemeMode.System)
-    private val _events = Channel<InstallEvent>(Channel.BUFFERED)
-    private val pendingBundles = mutableSetOf<String>()
-    private val packageChanges = Channel<String>(Channel.UNLIMITED)
+class AppUpdaterViewModel(
+    private val repository: AppUpdateRepository,
+    private val installs: InstallRepository,
+    private val preferences: AppPreferences
+) : ViewModel() {
+    private val state = MutableStateFlow(AppUpdaterUiState())
     private val installedAppsLock = Mutex()
-    private val packageReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action != Intent.ACTION_PACKAGE_REPLACED && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return
-            val packageName = intent.data?.schemeSpecificPart ?: return
-            AppIconCache.evict(packageName)
-            packageChanges.trySend(packageName)
-        }
-    }
+    private var started = false
+    private var nextMessageId = 0L
     private var scanJob: Job? = null
 
-    val uiState: StateFlow<AppUpdaterUiState> = _uiState.asStateFlow()
-    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
-    val events: Flow<InstallEvent> = _events.receiveAsFlow()
+    val uiState: StateFlow<AppUpdaterUiState> =
+        combine(state, installs.bundles, installs.play, installs.confirmation) { state, bundles, play, confirmation ->
+            state.copy(installs = bundles, playInstalls = play, confirmation = confirmation)
+        }
+            .onStart { start() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), AppUpdaterUiState())
 
-    init {
-        application.registerReceiver(
-            packageReceiver,
-            IntentFilter().apply {
-                addAction(Intent.ACTION_PACKAGE_ADDED)
-                addAction(Intent.ACTION_PACKAGE_REPLACED)
-                addAction(Intent.ACTION_PACKAGE_REMOVED)
-                addDataScheme(PACKAGE_SCHEME)
-            }
-        )
+    val themeMode: StateFlow<ThemeMode> =
+        preferences.themeMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ThemeMode.System)
+
+    private fun start() {
+        if (started) return
+        started = true
+        viewModelScope.launch { preferences.restoreThemeMode() }
         viewModelScope.launch {
-            packageChanges.receiveAsFlow().collect { packageName ->
+            repository.packageChanges.collect { packageName ->
+                AppIconCache.evict(packageName)
                 installedAppsLock.withLock {
                     val app = repository.getInstalledApp(packageName)
-                    _uiState.update { state ->
-                        val apps = state.installedApps.filterNot { it.packageName == packageName } + listOfNotNull(app)
-                        state.copy(installedApps = apps, updates = state.updates.pending(apps))
+                    state.update { current ->
+                        val apps = current.installedApps.filterNot { it.packageName == packageName } + listOfNotNull(app)
+                        current.copy(installedApps = apps, updates = current.updates.pending(apps))
                     }
                 }
             }
         }
         viewModelScope.launch {
-            val includeDisabledApps = preferences.includeDisabledApps()
-            _themeMode.value = preferences.restoreThemeMode()
-            _uiState.update { it.copy(includeDisabledApps = includeDisabledApps) }
-            scanForUpdates()
+            installs.results.collect { event ->
+                val message = UserMessage(nextMessageId++, event)
+                state.update { it.copy(messages = it.messages + message) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.includeDisabledApps.collect { include ->
+                state.update { it.copy(includeDisabledApps = include) }
+                scanForUpdates()
+            }
         }
     }
 
     fun refresh() {
-        if (!_uiState.value.scanning) scanForUpdates()
+        if (!state.value.scanning) scanForUpdates()
     }
 
     private fun scanForUpdates() {
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
-            _uiState.update { it.copy(scanning = true) }
+            state.update { it.copy(scanning = true) }
             val apps = refreshInstalledApps()
-            val includeDisabledApps = _uiState.value.includeDisabledApps
+            val includeDisabledApps = state.value.includeDisabledApps
             val appsToCheck = apps.filter { includeDisabledApps || it.isEnabled }
 
             val status = repository.scanForUpdates(appsToCheck)
-            _uiState.update { current ->
+            state.update { current ->
                 when (status) {
                     is ScanStatus.Success -> current.copy(
                         scanning = false,
@@ -147,63 +130,29 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun installBundle(uri: Uri) {
-        val key = uri.toString()
-        if (!pendingBundles.add(key)) return
+    fun installBundle(uri: Uri) = installs.installBundle(uri)
 
-        viewModelScope.launch {
-            bundleInstaller.install(uri) { state ->
-                state.installEvent()?.let(_events::trySend)
-                _uiState.update { it.copy(installs = it.installs + (key to state)) }
-            }
-
-            pendingBundles.remove(key)
-            _uiState.update { it.copy(installs = it.installs - key) }
-        }
-    }
-
-    fun updateFromPlay(update: AppUpdateInfo) {
-        val target = update.playUpdate ?: return
-        val packageName = update.packageName
-        if (packageName in _uiState.value.playInstalls) return
-
-        _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(null))) }
-        viewModelScope.launch {
-            val result = playInstaller.install(packageName, target.code) { progress ->
-                _uiState.update { it.copy(playInstalls = it.playInstalls + (packageName to PlayInstall(progress))) }
-            }
-            val event = result.fold(
-                onSuccess = {
-                    if (target.code == update.newVersionCode) {
-                        InstallEvent.Finished(update.appName)
-                    } else {
-                        InstallEvent.FinishedFromPlay(update.appName, target.name)
-                    }
-                },
-                onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
-            )
-
-            _uiState.update { it.copy(playInstalls = it.playInstalls - packageName) }
-            _events.trySend(event)
-        }
-    }
+    fun updateFromPlay(update: AppUpdateInfo) = installs.updateFromPlay(update)
 
     fun setIncludeDisabledApps(include: Boolean) {
-        if (_uiState.value.includeDisabledApps == include) return
-        _uiState.update { it.copy(includeDisabledApps = include) }
+        if (state.value.includeDisabledApps == include) return
         viewModelScope.launch { preferences.setIncludeDisabledApps(include) }
-        scanForUpdates()
     }
 
     fun setThemeMode(mode: ThemeMode) {
-        if (_themeMode.value == mode) return
-        _themeMode.value = mode
+        if (themeMode.value == mode) return
         viewModelScope.launch { preferences.setThemeMode(mode) }
     }
 
+    fun messageShown(id: Long) {
+        state.update { current -> current.copy(messages = current.messages.filterNot { it.id == id }) }
+    }
+
+    fun confirmationShown(intent: Intent) = installs.confirmationShown(intent)
+
     private suspend fun refreshInstalledApps(): List<InstalledApp> = installedAppsLock.withLock {
         val apps = repository.getInstalledApps()
-        _uiState.update { state -> state.copy(installedApps = apps, updates = state.updates.pending(apps)) }
+        state.update { current -> current.copy(installedApps = apps, updates = current.updates.pending(apps)) }
         apps
     }
 
@@ -212,9 +161,12 @@ class AppUpdaterViewModel(application: Application) : AndroidViewModel(applicati
         return filter { update -> versions[update.packageName]?.let { update.newVersionCode > it } == true }
     }
 
-    override fun onCleared() {
-        getApplication<Application>().unregisterReceiver(packageReceiver)
+    companion object {
+        val Factory = viewModelFactory {
+            initializer {
+                val container = (this[APPLICATION_KEY] as AppUpdaterApplication).container
+                AppUpdaterViewModel(container.updates, container.installs, container.preferences)
+            }
+        }
     }
 }
-
-private const val PACKAGE_SCHEME = "package"

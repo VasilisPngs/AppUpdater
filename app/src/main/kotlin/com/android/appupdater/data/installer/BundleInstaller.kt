@@ -9,6 +9,7 @@ import android.util.DisplayMetrics
 import com.android.appupdater.data.appLabel
 import com.android.appupdater.data.model.InstallState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -16,12 +17,13 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipException
 import java.util.zip.ZipFile
 
-class BundleInstaller(private val context: Context) {
-
-    private val packageInstaller = PackageInstallerManager(context)
-
+class BundleInstaller(
+    private val context: Context,
+    private val packageInstaller: PackageInstallerManager,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
     suspend fun install(uri: Uri, onState: (InstallState) -> Unit) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val label = displayName(uri)
             val archive = File(context.cacheDir, "$ARCHIVE_PREFIX${System.nanoTime()}")
             try {

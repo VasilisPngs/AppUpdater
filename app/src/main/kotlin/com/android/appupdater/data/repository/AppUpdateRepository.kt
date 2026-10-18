@@ -1,7 +1,9 @@
 package com.android.appupdater.data.repository
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.Signature
@@ -18,10 +20,14 @@ import com.android.appupdater.data.play.PlayCatalog
 import com.android.appupdater.data.play.playCertificateHash
 import com.aurora.gplayapi.data.models.App
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -39,7 +45,11 @@ sealed interface ScanStatus {
     data class Error(val message: String, val partialUpdates: List<AppUpdateInfo>) : ScanStatus
 }
 
-class AppUpdateRepository(context: Context, private val playCatalog: PlayCatalog) {
+class AppUpdateRepository(
+    private val context: Context,
+    private val playCatalog: PlayCatalog,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
     private val client = ApkMirrorClient(context.packageName)
     private val packageManager = context.packageManager
     private val isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
@@ -54,13 +64,30 @@ class AppUpdateRepository(context: Context, private val playCatalog: PlayCatalog
         isAutomotive = packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
     )
 
-    suspend fun getInstalledApps(): List<InstalledApp> = withContext(Dispatchers.IO) {
+    val packageChanges: Flow<String> = callbackFlow {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action != Intent.ACTION_PACKAGE_REPLACED && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return
+                intent.data?.schemeSpecificPart?.let(::trySend)
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addDataScheme(PACKAGE_SCHEME)
+        }
+        context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+        awaitClose { context.unregisterReceiver(receiver) }
+    }
+
+    suspend fun getInstalledApps(): List<InstalledApp> = withContext(ioDispatcher) {
         val televisionLaunchers = if (isTelevision) televisionLaunchers() else emptySet()
         packageManager.getInstalledPackages(packageFlags)
             .mapNotNull { packageInfo -> runCatching { packageInfo.toInstalledApp(televisionLaunchers) }.getOrNull() }
     }
 
-    suspend fun getInstalledApp(packageName: String): InstalledApp? = withContext(Dispatchers.IO) {
+    suspend fun getInstalledApp(packageName: String): InstalledApp? = withContext(ioDispatcher) {
         val televisionLaunchers = if (isTelevision) televisionLaunchers(packageName) else emptySet()
         runCatching { packageManager.getPackageInfo(packageName, packageFlags).toInstalledApp(televisionLaunchers) }.getOrNull()
     }
@@ -72,7 +99,7 @@ class AppUpdateRepository(context: Context, private val playCatalog: PlayCatalog
         )
         .mapTo(HashSet()) { it.activityInfo.packageName }
 
-    suspend fun scanForUpdates(appsToCheck: List<InstalledApp>): ScanStatus = withContext(Dispatchers.IO) {
+    suspend fun scanForUpdates(appsToCheck: List<InstalledApp>): ScanStatus = withContext(ioDispatcher) {
         if (appsToCheck.isEmpty()) return@withContext ScanStatus.Success(emptyList())
 
         val batches = appsToCheck.chunked(API_BATCH_SIZE)
@@ -279,6 +306,7 @@ class AppUpdateRepository(context: Context, private val playCatalog: PlayCatalog
 
     private companion object {
         const val API_BATCH_SIZE = 100
+        const val PACKAGE_SCHEME = "package"
         const val APKMIRROR_URL = "https://www.apkmirror.com"
         val NEWEST_FIRST = compareByDescending<AppUpdateInfo> { it.publishedAt ?: Long.MIN_VALUE }
             .thenBy { it.appName.lowercase(Locale.ROOT) }

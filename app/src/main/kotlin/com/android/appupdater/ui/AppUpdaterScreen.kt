@@ -5,7 +5,7 @@ package com.android.appupdater.ui
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
+import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
@@ -127,7 +127,6 @@ import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
@@ -141,6 +140,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -153,6 +153,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.AppUpdateInfo
+import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
@@ -182,6 +183,10 @@ private const val FADE_THROUGH_SCALE = 0.92f
 private const val BLUR_BEHIND_RADIUS = 20
 private const val DIM_WITH_BLUR = 0.1f
 private const val DIM_WITHOUT_BLUR = 0.4f
+private const val NOTICE_KEY = "notice"
+private const val EMPTY_KEY = "empty"
+private const val INSTALL_TYPE = "install"
+private const val UPDATE_TYPE = "update"
 
 private enum class AppTab(
     @StringRes val labelRes: Int,
@@ -227,8 +232,18 @@ fun AppUpdaterScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.events.collect { event -> showMessage(event.text(resources)) }
+    uiState.messages.firstOrNull()?.let { message ->
+        LaunchedEffect(message.id) {
+            snackbarHostState.showSnackbar(message.event.text(resources))
+            viewModel.messageShown(message.id)
+        }
+    }
+
+    uiState.confirmation?.let { confirmation ->
+        LaunchedEffect(confirmation) {
+            viewModel.confirmationShown(confirmation)
+            runCatching { context.startActivity(confirmation) }
+        }
     }
 
     AppUpdaterScreen(
@@ -312,8 +327,8 @@ internal fun AppUpdaterScreen(
     SideEffect { window?.isNavigationBarContrastEnforced = navigationBarScrim }
     val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
 
-    val television = LocalConfiguration.current.uiMode and Configuration.UI_MODE_TYPE_MASK ==
-        Configuration.UI_MODE_TYPE_TELEVISION
+    val context = LocalContext.current
+    val television = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
     val overscan = if (television) {
         WindowInsets(TvOverscanHorizontal, TvOverscanVertical, TvOverscanHorizontal, TvOverscanVertical)
     } else {
@@ -390,9 +405,8 @@ internal fun AppUpdaterScreen(
                             )
                         }
                     },
-                    windowInsets = TopAppBarDefaults.windowInsets
-                        .add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                        .add(WindowInsets(left = barMargin, right = barMargin)),
+                    windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+                    contentPadding = PaddingValues(horizontal = barMargin),
                     scrollBehavior = scrollBehavior
                 )
             },
@@ -495,7 +509,8 @@ private fun UpdatesView(
     val reveal = rememberTopReveal(listState, barState)
     val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
     val cards = remember(keyboard) { CardFocus() }
-    val installList = installs.entries.toList()
+    val installList = remember(installs) { installs.entries.toList() }
+    val rows = remember(updates, columns) { updates.chunked(columns) }
 
     val previous = cards.keys
     val lost = cards.focused?.takeIf { key -> updates.none { it.first.packageName == key } }
@@ -540,7 +555,7 @@ private fun UpdatesView(
             verticalArrangement = Arrangement.spacedBy(SmallSpacing)
         ) {
             if (notice != null && updates.isNotEmpty()) {
-                item(key = "notice") {
+                item(key = NOTICE_KEY, contentType = NOTICE_KEY) {
                     SegmentedListItem(
                         shapes = ListItemDefaults.segmentedShapes(0, 1),
                         colors = listItemColors(),
@@ -555,7 +570,7 @@ private fun UpdatesView(
                 }
             }
 
-            items(installList, key = { it.key }) { (_, state) ->
+            items(installList, key = { it.key }, contentType = { INSTALL_TYPE }) { (_, state) ->
                 SegmentedListItem(
                     shapes = ListItemDefaults.segmentedShapes(0, 1),
                     colors = listItemColors(),
@@ -567,7 +582,7 @@ private fun UpdatesView(
             }
 
             if (updates.isEmpty() && loaded) {
-                item(key = "empty") {
+                item(key = EMPTY_KEY, contentType = EMPTY_KEY) {
                     if (notice == null) {
                         EmptyState(
                             symbol = R.drawable.ic_up_to_date,
@@ -594,7 +609,11 @@ private fun UpdatesView(
                 }
             }
 
-            itemsIndexed(items = updates.chunked(columns), key = { _, row -> row.first().first.packageName }) { index, row ->
+            itemsIndexed(
+                items = rows,
+                key = { _, row -> row.first().first.packageName },
+                contentType = { _, _ -> UPDATE_TYPE }
+            ) { index, row ->
                 Row(
                     modifier = Modifier
                         .animateItem(fade, placement, fade)
@@ -680,6 +699,7 @@ private fun SettingsView(
             SegmentedListItem(
                 checked = includeDisabledApps,
                 onCheckedChange = onIncludeDisabledAppsChange,
+                modifier = Modifier.semantics { role = Role.Switch },
                 shapes = ListItemDefaults.segmentedShapes(0, 1),
                 colors = listItemColors(),
                 supportingContent = { Text(text = stringResource(R.string.disabled_apps_description)) },
@@ -886,14 +906,14 @@ private fun SourceButton(
         shapes = ButtonDefaults.shapes(),
         modifier = modifier.semantics { if (busy) disabled() },
         enabled = enabled || busy,
-        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+        contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight, hasStartIcon = true)
     ) {
         Icon(
             painter = painterResource(icon),
             contentDescription = source,
-            modifier = Modifier.size(ButtonDefaults.IconSize)
+            modifier = Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.MinHeight))
         )
-        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+        Spacer(modifier = Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.MinHeight)))
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = text,

@@ -1,5 +1,6 @@
 package com.android.appupdater.ui
 
+import android.content.pm.PackageManager
 import androidx.annotation.StringRes
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import com.android.appupdater.R
 import com.android.appupdater.data.model.AppUpdateInfo
+import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
 import com.android.appupdater.data.model.PlayVersion
@@ -40,6 +42,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.text.NumberFormat
@@ -217,7 +220,17 @@ class AppUpdaterScreenTest {
     @Test
     @Config(qualifiers = "w960dp-h540dp-television")
     fun `keeps the margins inside the television overscan`() {
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, true)
         assertContentEdge(24.dp + 48.dp)
+    }
+
+    @Test
+    fun `shows a bundle install that starts while the updates are at the top`() {
+        show(loaded(entry("Alpha"), entry("Beta")))
+
+        state = state.copy(installs = mapOf(BUNDLE to InstallState.Installing(BUNDLE_NAME)))
+
+        compose.onNodeWithText(BUNDLE_NAME).assertIsDisplayed()
     }
 
     @Test
@@ -310,6 +323,8 @@ class AppUpdaterScreenTest {
         const val LATEST_CODE = 200L
         const val DOWNLOADED = 0.42f
         const val NOTICE = "Network unavailable"
+        const val BUNDLE = "content://downloads/bundle.apkm"
+        const val BUNDLE_NAME = "Bundle.apkm"
         const val LONG_VERSION = "141.0.7390.122.4567.890.12345.67890.1234.5678.9012.3456.7890.1234.5678"
         val SPACING = 8.dp
     }

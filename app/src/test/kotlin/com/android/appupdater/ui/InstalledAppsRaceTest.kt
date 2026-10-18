@@ -7,7 +7,11 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Looper
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.MutableCreationExtras
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,8 +41,10 @@ class InstalledAppsRaceTest {
         val store = ViewModelStore()
         val viewModel = ViewModelProvider.create(
             store,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(context)
+            AppUpdaterViewModel.Factory,
+            MutableCreationExtras().apply { set(APPLICATION_KEY, context) }
         )[AppUpdaterViewModel::class.java]
+        val collector = MainScope().launch { viewModel.uiState.collect {} }
 
         assertTrue(idleUntil { ParkedPackageQuery.parked.count == 0L })
         install(versionCode = 2)
@@ -49,6 +55,7 @@ class InstalledAppsRaceTest {
         idleUntil(timeoutMillis = 2_000) { viewModel.versionCode() == 2L }
 
         assertEquals(2L, viewModel.versionCode())
+        collector.cancel()
         store.clear()
     }
 

@@ -13,7 +13,7 @@ import java.util.zip.ZipEntry
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "en-rUS-xxhdpi")
 class SplitSelectionTest {
-    private val installer = BundleInstaller(RuntimeEnvironment.getApplication())
+    private val installer = RuntimeEnvironment.getApplication().let { BundleInstaller(it, PackageInstallerManager(it)) }
 
     @Before
     fun setUp() {

@@ -9,7 +9,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.android.appupdater.data.model.ThemeMode
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 private val Context.appPreferences: DataStore<Preferences> by preferencesDataStore(name = "app_preferences")
 
@@ -17,7 +20,11 @@ class AppPreferences(
     private val context: Context,
     private val store: DataStore<Preferences> = context.appPreferences
 ) {
-    suspend fun includeDisabledApps(): Boolean = store.data.first()[INCLUDE_DISABLED_APPS] ?: false
+    val includeDisabledApps: Flow<Boolean> = store.data.map { it[INCLUDE_DISABLED_APPS] ?: false }.distinctUntilChanged()
+
+    val themeMode: Flow<ThemeMode> = store.data
+        .map { preferences -> ThemeMode.entries.firstOrNull { it.name == preferences[THEME_MODE] } ?: ThemeMode.System }
+        .distinctUntilChanged()
 
     suspend fun setIncludeDisabledApps(value: Boolean) {
         store.edit { it[INCLUDE_DISABLED_APPS] = value }
@@ -28,12 +35,7 @@ class AppPreferences(
         applyNightMode(mode)
     }
 
-    suspend fun restoreThemeMode(): ThemeMode = themeMode().also(::applyNightMode)
-
-    private suspend fun themeMode(): ThemeMode {
-        val stored = store.data.first()[THEME_MODE]
-        return ThemeMode.entries.firstOrNull { it.name == stored } ?: ThemeMode.System
-    }
+    suspend fun restoreThemeMode(): ThemeMode = themeMode.first().also(::applyNightMode)
 
     private fun applyNightMode(mode: ThemeMode) {
         context.getSystemService(UiModeManager::class.java).setApplicationNightMode(mode.nightMode)

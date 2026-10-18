@@ -17,6 +17,7 @@
         tools:ignore="QueryAllPackagesPermission" />
 
     <application
+        android:name=".AppUpdaterApplication"
         android:banner="@drawable/banner"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

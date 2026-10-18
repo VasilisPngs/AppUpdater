@@ -3,6 +3,7 @@ package com.android.appupdater.data.preferences
 import android.app.UiModeManager
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.android.appupdater.data.model.ThemeMode
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -46,7 +47,7 @@ class AppPreferencesTest {
         val preferences = preferences()
         preferences.setIncludeDisabledApps(true)
 
-        assertTrue(preferences.includeDisabledApps())
+        assertTrue(preferences.includeDisabledApps.first())
     }
 
     private fun TestScope.preferences() = AppPreferences(

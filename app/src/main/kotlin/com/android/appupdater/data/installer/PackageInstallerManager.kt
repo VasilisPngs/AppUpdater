@@ -8,12 +8,33 @@ import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
-class PackageInstallerManager(private val context: Context) {
+class PackageInstallerManager(
+    private val context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
+    private val sessionLock = Mutex()
+    private val pendingConfirmation = MutableStateFlow<Intent?>(null)
+
+    val confirmation: StateFlow<Intent?> = pendingConfirmation.asStateFlow()
+
+    fun confirmationShown(intent: Intent) {
+        pendingConfirmation.compareAndSet(intent, null)
+    }
 
     suspend fun install(sources: List<ApkSource>): Result<String> = sessionLock.withLock {
+        withContext(ioDispatcher) { commit(sources) }
+    }
+
+    private suspend fun commit(sources: List<ApkSource>): Result<String> {
         if (sources.isEmpty()) return Result.failure(IllegalArgumentException("No APK files to install."))
 
         val installer = context.packageManager.packageInstaller
@@ -40,7 +61,7 @@ class PackageInstallerManager(private val context: Context) {
                 when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
                     PackageInstaller.STATUS_PENDING_USER_ACTION ->
                         intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
-                            ?.let(InstallConfirmation::request)
+                            ?.let { pendingConfirmation.value = it }
                     else -> result.complete(installResult(intent))
                 }
             }
@@ -73,7 +94,7 @@ class PackageInstallerManager(private val context: Context) {
             runCatching { session.abandon() }
             Result.failure(exception)
         } finally {
-            InstallConfirmation.clear()
+            pendingConfirmation.value = null
             runCatching { context.unregisterReceiver(receiver) }
         }
     }
@@ -95,7 +116,6 @@ class PackageInstallerManager(private val context: Context) {
     }
 
     private companion object {
-        val sessionLock = Mutex()
         val MISSING_LIBRARY_PATTERN = Regex("shared library ([^\\s;]+)")
     }
 }

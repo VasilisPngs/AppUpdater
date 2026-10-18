@@ -12,6 +12,7 @@ import com.aurora.gplayapi.data.models.PlayFile
 import com.aurora.gplayapi.exceptions.GooglePlayException
 import com.aurora.gplayapi.helpers.PurchaseHelper
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
@@ -21,16 +22,17 @@ import java.io.File
 class PlayInstaller(
     private val context: Context,
     private val catalog: PlayCatalog,
-    private val httpClient: PlayHttpClient
+    private val httpClient: PlayHttpClient,
+    private val packageInstaller: PackageInstallerManager,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-    private val packageInstaller = PackageInstallerManager(context)
     private val packageManager = context.packageManager
 
     suspend fun install(
         packageName: String,
         versionCode: Long,
         onProgress: (Float?) -> Unit
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<Unit> = withContext(ioDispatcher) {
         val directory = File(context.cacheDir, "play_$packageName")
         try {
             onProgress(null)
