@@ -13,13 +13,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.DeferredAnimatedContent
+import androidx.compose.animation.MutableContentTransform
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.DeferredTransitionState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.rememberDeferredTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -103,6 +108,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -145,11 +151,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.NavigationEventState
 import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
@@ -183,6 +192,10 @@ private const val TABULAR_FIGURES = "tnum"
 private const val FOCUS_PIVOT = 0.3f
 private const val EXPANDED_COLUMNS = 2
 private const val FADE_THROUGH_SCALE = 0.92f
+private const val PREDICTIVE_BACK_EXIT_SCALE = 0.9f
+private const val PREDICTIVE_BACK_ENTER_SCALE = 1.1f
+private const val PREDICTIVE_BACK_FADE_THRESHOLD = 0.35f
+private val PredictiveBackEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
 private const val BLUR_BEHIND_RADIUS = 20
 private const val DIM_WITH_BLUR = 0.1f
 private const val DIM_WITHOUT_BLUR = 0.4f
@@ -289,10 +302,22 @@ internal fun AppUpdaterScreen(
     val inputModeManager = LocalInputModeManager.current
     val coroutineScope = rememberCoroutineScope()
     var themeDialog by rememberSaveable { mutableStateOf(false) }
+    var backNavigation by remember { mutableStateOf(false) }
+    val backState = rememberNavigationEventState(NavigationEventInfo.None)
+    val backProgress = remember(backState) { BackProgress(backState) }
+    val inBackGesture by remember(backState) {
+        derivedStateOf { backState.transitionState is NavigationEventTransitionState.InProgress }
+    }
+    val tabState = remember { DeferredTransitionState(selectedTab) }
+    if (inBackGesture) tabState.defer(AppTab.Updates) else tabState.animateTo(selectedTab)
+    val tabTransition = rememberDeferredTransition(tabState)
     NavigationBackHandler(
-        state = rememberNavigationEventState(NavigationEventInfo.None),
+        state = backState,
         isBackEnabled = selectedTab != AppTab.Updates,
-        onBackCompleted = { selectedTab = AppTab.Updates }
+        onBackCompleted = {
+            backNavigation = true
+            selectedTab = AppTab.Updates
+        }
     )
 
     LaunchedEffect(Unit) {
@@ -311,6 +336,7 @@ internal fun AppUpdaterScreen(
     val activeFocus = if (selectedTab == AppTab.Updates) updatesFocus else settingsFocus
     val selectTab: (AppTab) -> Unit = { tab ->
         if (tab != selectedTab) {
+            backNavigation = false
             selectedTab = tab
         } else {
             coroutineScope.reveal(activeListState, activeBarState)
@@ -392,56 +418,61 @@ internal fun AppUpdaterScreen(
         modifier = modifier.windowInsetsPadding(overscan.only(WindowInsetsSides.Start)),
         navigationSuiteType = navigationSuiteType
     ) {
-        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(activeBarState)
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(text = stringResource(selectedTab.labelRes)) },
-                    actions = {
-                        if (selectedTab == AppTab.Updates) {
-                            val toUpdates = Modifier.focusProperties { down = updatesFocus }
-                            BarAction(
-                                icon = R.drawable.ic_apk_install,
-                                label = stringResource(R.string.install_bundle),
-                                onClick = onPickBundle,
-                                modifier = toUpdates
-                            )
-                            BarAction(
-                                icon = R.drawable.ic_refresh,
-                                label = stringResource(R.string.refresh),
-                                onClick = onRefresh,
-                                modifier = toUpdates
-                            )
-                        }
-                    },
-                    windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
-                    contentPadding = PaddingValues(horizontal = barMargin),
-                    scrollBehavior = scrollBehavior
-                )
+        val motion = MaterialTheme.motionScheme
+        tabTransition.DeferredAnimatedContent(
+            transitionSpec = {
+                if (backNavigation) {
+                    (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), PREDICTIVE_BACK_ENTER_SCALE))
+                        .togetherWith(fadeOut(motion.fastEffectsSpec()) + scaleOut(motion.defaultSpatialSpec(), PREDICTIVE_BACK_EXIT_SCALE))
+                } else {
+                    (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), FADE_THROUGH_SCALE))
+                        .togetherWith(fadeOut(motion.fastEffectsSpec()))
+                }
             },
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            contentWindowInsets = ScaffoldDefaults.contentWindowInsets.add(overscan.only(WindowInsetsSides.Bottom + WindowInsetsSides.End))
-        ) { padding ->
-            val layoutDirection = LocalLayoutDirection.current
-            val density = LocalDensity.current
-            val contentPadding = PaddingValues(
-                start = padding.calculateStartPadding(layoutDirection) + margin,
-                top = padding.calculateTopPadding(),
-                end = padding.calculateEndPadding(layoutDirection) + margin,
-                bottom = padding.calculateBottomPadding() + margin
-            )
-            val focusScroll = remember(density) { FocusScroll(density) }
-            val motion = MaterialTheme.motionScheme
-            SideEffect { focusScroll.padding = contentPadding }
+            mutableTransformSpec = { predictiveBackTransform(backProgress) }
+        ) { tab ->
+            val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(if (tab == AppTab.Updates) updatesBarState else settingsBarState)
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text(text = stringResource(tab.labelRes)) },
+                        actions = {
+                            if (tab == AppTab.Updates) {
+                                val toUpdates = Modifier.focusProperties { down = updatesFocus }
+                                BarAction(
+                                    icon = R.drawable.ic_apk_install,
+                                    label = stringResource(R.string.install_bundle),
+                                    onClick = onPickBundle,
+                                    modifier = toUpdates
+                                )
+                                BarAction(
+                                    icon = R.drawable.ic_refresh,
+                                    label = stringResource(R.string.refresh),
+                                    onClick = onRefresh,
+                                    modifier = toUpdates
+                                )
+                            }
+                        },
+                        windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+                        contentPadding = PaddingValues(horizontal = barMargin),
+                        scrollBehavior = scrollBehavior
+                    )
+                },
+                snackbarHost = { if (tab == selectedTab) SnackbarHost(hostState = snackbarHostState) },
+                contentWindowInsets = ScaffoldDefaults.contentWindowInsets.add(overscan.only(WindowInsetsSides.Bottom + WindowInsetsSides.End))
+            ) { padding ->
+                val layoutDirection = LocalLayoutDirection.current
+                val density = LocalDensity.current
+                val contentPadding = PaddingValues(
+                    start = padding.calculateStartPadding(layoutDirection) + margin,
+                    top = padding.calculateTopPadding(),
+                    end = padding.calculateEndPadding(layoutDirection) + margin,
+                    bottom = padding.calculateBottomPadding() + margin
+                )
+                val focusScroll = remember(density) { FocusScroll(density) }
+                SideEffect { focusScroll.padding = contentPadding }
 
-            CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
-                AnimatedContent(
-                    targetState = selectedTab,
-                    transitionSpec = {
-                        (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), FADE_THROUGH_SCALE))
-                            .togetherWith(fadeOut(motion.fastEffectsSpec()))
-                    }
-                ) { tab ->
+                CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
                     when (tab) {
                         AppTab.Updates -> UpdatesView(
                             listState = updatesListState,
@@ -1053,6 +1084,29 @@ private fun DialogBlurBehind() {
         window.attributes = window.attributes.apply { blurBehindRadius = BLUR_BEHIND_RADIUS }
         windowManager.addCrossWindowBlurEnabledListener(listener)
         onDispose { windowManager.removeCrossWindowBlurEnabledListener(listener) }
+    }
+}
+
+private class BackProgress(private val state: NavigationEventState<*>) {
+    private var last = 0f
+
+    val value: Float
+        get() {
+            (state.transitionState as? NavigationEventTransitionState.InProgress)?.let {
+                last = PredictiveBackEasing.transform(it.latestEvent.progress)
+            }
+            return last
+        }
+}
+
+private fun predictiveBackTransform(progress: BackProgress) = MutableContentTransform {
+    initialContentTransform {
+        scale = lerp(1f, PREDICTIVE_BACK_EXIT_SCALE, progress.value)
+        alpha = 1f - (progress.value / PREDICTIVE_BACK_FADE_THRESHOLD).coerceAtMost(1f)
+    }
+    targetContentTransform {
+        scale = lerp(PREDICTIVE_BACK_ENTER_SCALE, 1f, progress.value)
+        alpha = ((progress.value - PREDICTIVE_BACK_FADE_THRESHOLD) / (1f - PREDICTIVE_BACK_FADE_THRESHOLD)).coerceAtLeast(0f)
     }
 }
 

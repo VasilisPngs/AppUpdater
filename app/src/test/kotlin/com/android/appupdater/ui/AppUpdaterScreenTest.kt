@@ -1,9 +1,11 @@
 package com.android.appupdater.ui
 
 import android.content.pm.PackageManager
+import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -177,6 +179,28 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    fun `follows the back gesture from Settings with Google's full screen motion`() {
+        show(loaded(entry("Alpha")))
+        val updates = compose.onNodeWithText("Alpha").getBoundsInRoot()
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+        val settings = compose.onNodeWithText(string(R.string.theme)).getBoundsInRoot()
+
+        backGesture(0.1f)
+        val exit = PredictiveBack.transform(0.1f)
+        assertScaled(settings, 1f - 0.1f * exit, compose.onNodeWithText(string(R.string.theme)).getBoundsInRoot())
+        assertScaled(updates, 1.1f - 0.1f * exit, compose.onNodeWithText("Alpha").getBoundsInRoot())
+
+        compose.runOnIdle { backDispatcher.dispatchOnBackCancelled() }
+        compose.onAllNodesWithText("Alpha").assertCountEquals(0)
+        assertScaled(settings, 1f, compose.onNodeWithText(string(R.string.theme)).getBoundsInRoot())
+
+        backGesture(0.6f)
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        assertScaled(updates, 1f, compose.onNodeWithText("Alpha").getBoundsInRoot())
+        compose.onAllNodesWithText(string(R.string.theme)).assertCountEquals(0)
+    }
+
+    @Test
     fun `changes the theme from settings`() {
         show(loaded())
 
@@ -308,6 +332,19 @@ class AppUpdaterScreenTest {
         return List(nodes.fetchSemanticsNodes().size) { nodes[it].getBoundsInRoot() }.minBy { it.top }
     }
 
+    private fun backGesture(progress: Float) {
+        compose.runOnIdle {
+            backDispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_LEFT))
+            backDispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT))
+        }
+        compose.waitForIdle()
+    }
+
+    private fun assertScaled(rest: DpRect, scale: Float, actual: DpRect) {
+        assertEquals((rest.right - rest.left).value * scale, (actual.right - actual.left).value, 0.5f)
+        assertEquals(((rest.left + rest.right) / 2).value, ((actual.left + actual.right) / 2).value, 0.5f)
+    }
+
     private fun assertContentEdge(margin: Dp) {
         show(loaded(entry("Alpha"), entry("Beta")))
 
@@ -391,5 +428,6 @@ class AppUpdaterScreenTest {
         const val BUNDLE_NAME = "Bundle.apkm"
         const val LONG_VERSION = "141.0.7390.122.4567.890.12345.67890.1234.5678.9012.3456.7890.1234.5678"
         val SPACING = 8.dp
+        val PredictiveBack = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
     }
 }
