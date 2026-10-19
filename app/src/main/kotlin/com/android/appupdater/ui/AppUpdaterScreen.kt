@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Resources
-import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -136,7 +135,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.isCrossWindowBlurEnabled
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -151,7 +151,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavBackStack
@@ -174,7 +174,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 import java.text.NumberFormat
-import java.util.function.Consumer
 
 private val ContentMargin = 16.dp
 private val CompactMargin = 16.dp
@@ -189,7 +188,6 @@ private val InstallingIconSize = 28.dp
 private val TvOverscanHorizontal = 48.dp
 private val TvOverscanVertical = 27.dp
 private const val TABULAR_FIGURES = "tnum"
-private const val FOCUS_PIVOT = 0.3f
 private const val EXPANDED_COLUMNS = 2
 private const val FADE_THROUGH_SCALE = 0.92f
 private const val PREDICTIVE_BACK_EXIT_SCALE = 0.9f
@@ -200,9 +198,9 @@ private val PredictiveBackExitFade = Easing { (PredictiveBackEasing.transform(it
 private val PredictiveBackEnterFade = Easing {
     ((PredictiveBackEasing.transform(it) - PREDICTIVE_BACK_FADE_THRESHOLD) / (1f - PREDICTIVE_BACK_FADE_THRESHOLD)).coerceAtLeast(0f)
 }
-private const val BLUR_BEHIND_RADIUS = 20
-private const val DIM_WITH_BLUR = 0.1f
-private const val DIM_WITHOUT_BLUR = 0.4f
+private val DialogBlurRadius = 10.dp
+private const val BLURRED_SCRIM_ALPHA = 0.2f
+private const val SCRIM_ALPHA = 0.32f
 private const val NOTICE_KEY = "notice"
 private const val EMPTY_KEY = "empty"
 private const val INSTALL_TYPE = "install"
@@ -459,7 +457,8 @@ internal fun AppUpdaterScreen(
                     end = padding.calculateEndPadding(layoutDirection) + margin,
                     bottom = padding.calculateBottomPadding() + margin
                 )
-                val focusScroll = remember(density) { FocusScroll(density) }
+                val platformScroll = LocalBringIntoViewSpec.current
+                val focusScroll = remember(platformScroll, density) { FocusScroll(platformScroll, density) }
                 SideEffect { focusScroll.padding = contentPadding }
 
                 CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
@@ -1057,7 +1056,6 @@ private fun ThemeDialog(
         },
         title = { Text(text = stringResource(R.string.theme)) },
         text = {
-            DialogBlurBehind()
             Column(modifier = Modifier.selectableGroup()) {
                 ThemeMode.entries.forEach { mode ->
                     val selected = mode == current
@@ -1075,24 +1073,16 @@ private fun ThemeDialog(
                     }
                 }
             }
-        }
+        },
+        properties = dialogProperties()
     )
 }
 
 @Composable
-private fun DialogBlurBehind() {
-    val window = (LocalView.current.parent as? DialogWindowProvider)?.window ?: return
-    DisposableEffect(window) {
-        val windowManager = window.windowManager
-        val listener = Consumer<Boolean> { enabled ->
-            window.setDimAmount(if (enabled) DIM_WITH_BLUR else DIM_WITHOUT_BLUR)
-        }
-        window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-        window.attributes = window.attributes.apply { blurBehindRadius = BLUR_BEHIND_RADIUS }
-        windowManager.addCrossWindowBlurEnabledListener(listener)
-        onDispose { windowManager.removeCrossWindowBlurEnabledListener(listener) }
-    }
-}
+private fun dialogProperties() = DialogProperties(
+    blurBehindRadius = DialogBlurRadius,
+    scrimAlpha = if (LocalWindowInfo.current.isCrossWindowBlurEnabled) BLURRED_SCRIM_ALPHA else SCRIM_ALPHA
+)
 
 private fun fadeThrough(motion: MotionScheme) =
     (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), FADE_THROUGH_SCALE))
@@ -1131,14 +1121,13 @@ private class CardFocus {
     val entries = HashMap<String, FocusRequester>()
 }
 
-private class FocusScroll(private val density: Density) : BringIntoViewSpec {
+private class FocusScroll(private val platform: BringIntoViewSpec, private val density: Density) : BringIntoViewSpec {
     var padding = PaddingValues()
 
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
         val top = with(density) { padding.calculateTopPadding().toPx() }
-        val end = containerSize - with(density) { padding.calculateBottomPadding().toPx() }
-        if (offset >= top && offset + size <= end) return 0f
-        return offset - (containerSize * FOCUS_PIVOT).coerceIn(top, maxOf(top, end - size))
+        val bottom = with(density) { padding.calculateBottomPadding().toPx() }
+        return platform.calculateScrollDistance(offset - top, size, containerSize - top - bottom)
     }
 }
 

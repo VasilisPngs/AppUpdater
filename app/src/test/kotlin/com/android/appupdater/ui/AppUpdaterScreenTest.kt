@@ -1,6 +1,8 @@
 package com.android.appupdater.ui
 
 import android.content.pm.PackageManager
+import android.view.View
+import android.view.WindowManager
 import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
@@ -17,6 +19,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
@@ -24,7 +27,12 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -32,10 +40,13 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import com.android.appupdater.R
 import com.android.appupdater.data.model.Appearance
 import com.android.appupdater.data.model.AppUpdateInfo
@@ -204,6 +215,21 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    fun `blurs and dims behind dialogs through the dialog properties`() {
+        show(loaded())
+
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+        compose.onNodeWithText(string(R.string.theme)).performClick()
+
+        val dialog = compose.onNode(isDialog()).fetchSemanticsNode().root as View
+        val attributes = (dialog.parent as DialogWindowProvider).window.attributes
+        val blur = context.getSystemService(WindowManager::class.java).isCrossWindowBlurEnabled
+        assertTrue(attributes.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND != 0)
+        assertEquals(with(Density(context)) { 10.dp.roundToPx() }, attributes.blurBehindRadius)
+        assertEquals(if (blur) 0.2f else 0.32f, attributes.dimAmount, 0f)
+    }
+
+    @Test
     fun `changes the theme from settings`() {
         show(loaded())
 
@@ -303,6 +329,21 @@ class AppUpdaterScreenTest {
         state = loaded(alpha, gamma)
 
         compose.onAllNodesWithContentDescription(string(R.string.source_apkmirror))[1].assertIsFocused()
+    }
+
+    @Test
+    fun `scrolls a focused update out from under the top app bar`() {
+        show(loaded(*Array(8) { entry("App $it") }), keyboard = true)
+        val contentTop = bounds("App 0").top
+        val button = compose.onNode(hasContentDescription(string(R.string.source_apkmirror)) and hasAnyAncestor(hasText("App 1")))
+        val hidden = button.getBoundsInRoot().let { it.top - contentTop + (it.bottom - it.top) / 2 }
+        compose.onNode(hasScrollAction()).performSemanticsAction(SemanticsActions.ScrollBy) {
+            it(0f, with(Density(context)) { hidden.toPx() })
+        }
+
+        button.requestFocus()
+
+        assertEquals(contentTop, button.getBoundsInRoot().top)
     }
 
     @Test

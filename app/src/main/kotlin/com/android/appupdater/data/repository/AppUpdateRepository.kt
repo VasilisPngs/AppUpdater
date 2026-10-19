@@ -259,7 +259,7 @@ class AppUpdateRepository(
 
     private fun matchesSignature(app: App, installed: InstalledApp): Boolean =
         app.certificateSetList.any { set ->
-            runCatching { Base64.getUrlDecoder().decode(set.certificateSet).toHex() }.getOrNull() in installed.signatureSha1s
+            runCatching { Base64.getUrlDecoder().decode(set.certificateSet).toHexString() }.getOrNull() in installed.signatureSha1s
         }
 
     private fun playDate(value: String, locale: Locale): Long? = runCatching {
@@ -296,11 +296,9 @@ class AppUpdateRepository(
         if (isEmpty()) return emptySet()
         val digest = MessageDigest.getInstance(algorithm)
         return mapTo(mutableSetOf()) { signature ->
-            digest.digest(signature.toByteArray()).toHex()
+            digest.digest(signature.toByteArray()).toHexString()
         }
     }
-
-    private fun ByteArray.toHex(): String = toHexString()
 
     private fun String.toAbsoluteApkMirrorUrl(): String = APKMIRROR_URL + this
 
