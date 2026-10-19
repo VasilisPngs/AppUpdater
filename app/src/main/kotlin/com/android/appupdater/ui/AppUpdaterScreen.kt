@@ -14,13 +14,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.DeferredAnimatedContent
-import androidx.compose.animation.MutableContentTransform
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.DeferredTransitionState
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.rememberDeferredTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -76,6 +74,7 @@ import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.RadioButton
@@ -109,13 +108,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSerializable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -152,15 +151,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.lerp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigationevent.NavigationEventInfo
-import androidx.navigationevent.NavigationEventTransitionState
-import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.NavigationEventState
-import androidx.navigationevent.compose.rememberNavigationEventState
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.Appearance
@@ -174,6 +171,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.serializer
 import java.text.NumberFormat
 import java.util.function.Consumer
 
@@ -197,6 +196,10 @@ private const val PREDICTIVE_BACK_EXIT_SCALE = 0.9f
 private const val PREDICTIVE_BACK_ENTER_SCALE = 1.1f
 private const val PREDICTIVE_BACK_FADE_THRESHOLD = 0.35f
 private val PredictiveBackEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
+private val PredictiveBackExitFade = Easing { (PredictiveBackEasing.transform(it) / PREDICTIVE_BACK_FADE_THRESHOLD).coerceAtMost(1f) }
+private val PredictiveBackEnterFade = Easing {
+    ((PredictiveBackEasing.transform(it) - PREDICTIVE_BACK_FADE_THRESHOLD) / (1f - PREDICTIVE_BACK_FADE_THRESHOLD)).coerceAtLeast(0f)
+}
 private const val BLUR_BEHIND_RADIUS = 20
 private const val DIM_WITH_BLUR = 0.1f
 private const val DIM_WITHOUT_BLUR = 0.4f
@@ -205,14 +208,25 @@ private const val EMPTY_KEY = "empty"
 private const val INSTALL_TYPE = "install"
 private const val UPDATE_TYPE = "update"
 
-private enum class AppTab(
+@Serializable
+private sealed interface Screen : NavKey {
+    @Serializable
+    data object Updates : Screen
+
+    @Serializable
+    data object Settings : Screen
+}
+
+private class TopLevelItem(
     @StringRes val labelRes: Int,
     @DrawableRes val iconRes: Int,
     @DrawableRes val selectedIconRes: Int
-) {
-    Updates(R.string.updates, R.drawable.ic_updates, R.drawable.ic_updates_filled),
-    Settings(R.string.settings, R.drawable.ic_settings, R.drawable.ic_settings_filled)
-}
+)
+
+private val TopLevelItems = mapOf(
+    Screen.Updates to TopLevelItem(R.string.updates, R.drawable.ic_updates, R.drawable.ic_updates_filled),
+    Screen.Settings to TopLevelItem(R.string.settings, R.drawable.ic_settings, R.drawable.ic_settings_filled)
+)
 
 @get:StringRes
 private val ThemeMode.labelRes: Int
@@ -292,7 +306,8 @@ internal fun AppUpdaterScreen(
     onDynamicColorChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(AppTab.Updates) }
+    val backStack = rememberSerializable(serializer = serializer()) { NavBackStack<Screen>(Screen.Updates) }
+    val current = backStack.last()
     val updatesListState = rememberLazyListState()
     val settingsListState = rememberLazyListState()
     val updatesBarState = rememberTopAppBarState()
@@ -304,22 +319,6 @@ internal fun AppUpdaterScreen(
     val coroutineScope = rememberCoroutineScope()
     var themeDialog by rememberSaveable { mutableStateOf(false) }
     var backNavigation by remember { mutableStateOf(false) }
-    val backState = rememberNavigationEventState(NavigationEventInfo.None)
-    val backProgress = remember(backState) { BackProgress(backState) }
-    val inBackGesture by remember(backState) {
-        derivedStateOf { backState.transitionState is NavigationEventTransitionState.InProgress }
-    }
-    val tabState = remember { DeferredTransitionState(selectedTab) }
-    if (inBackGesture) tabState.defer(AppTab.Updates) else tabState.animateTo(selectedTab)
-    val tabTransition = rememberDeferredTransition(tabState)
-    NavigationBackHandler(
-        state = backState,
-        isBackEnabled = selectedTab != AppTab.Updates,
-        onBackCompleted = {
-            backNavigation = true
-            selectedTab = AppTab.Updates
-        }
-    )
 
     LaunchedEffect(Unit) {
         if (inputModeManager.inputMode == InputMode.Keyboard) navigationFocus.requestFocus()
@@ -332,13 +331,14 @@ internal fun AppUpdaterScreen(
         }
     }
 
-    val activeListState = if (selectedTab == AppTab.Updates) updatesListState else settingsListState
-    val activeBarState = if (selectedTab == AppTab.Updates) updatesBarState else settingsBarState
-    val activeFocus = if (selectedTab == AppTab.Updates) updatesFocus else settingsFocus
-    val selectTab: (AppTab) -> Unit = { tab ->
-        if (tab != selectedTab) {
+    val activeListState = if (current == Screen.Updates) updatesListState else settingsListState
+    val activeBarState = if (current == Screen.Updates) updatesBarState else settingsBarState
+    val activeFocus = if (current == Screen.Updates) updatesFocus else settingsFocus
+    val navigate: (Screen) -> Unit = { screen ->
+        if (screen != current) {
             backNavigation = false
-            selectedTab = tab
+            backStack.subList(1, backStack.size).clear()
+            if (screen != Screen.Updates) backStack.add(screen)
         } else {
             coroutineScope.reveal(activeListState, activeBarState)
         }
@@ -373,20 +373,20 @@ internal fun AppUpdaterScreen(
 
     NavigationSuiteScaffold(
         navigationItems = {
-            AppTab.entries.forEach { tab ->
-                val selected = tab == selectedTab
+            TopLevelItems.forEach { (screen, item) ->
+                val selected = screen == current
                 NavigationSuiteItem(
                     selected = selected,
-                    onClick = { selectTab(tab) },
+                    onClick = { navigate(screen) },
                     icon = {
                         Icon(
-                            painter = painterResource(if (selected) tab.selectedIconRes else tab.iconRes),
+                            painter = painterResource(if (selected) item.selectedIconRes else item.iconRes),
                             contentDescription = null
                         )
                     },
-                    label = { Text(text = stringResource(tab.labelRes)) },
+                    label = { Text(text = stringResource(item.labelRes)) },
                     navigationSuiteType = navigationSuiteType,
-                    badge = if (tab == AppTab.Updates && updates.isNotEmpty()) {
+                    badge = if (screen == Screen.Updates && updates.isNotEmpty()) {
                         {
                             Badge {
                                 Text(
@@ -401,8 +401,8 @@ internal fun AppUpdaterScreen(
                     modifier = Modifier
                         .then(if (selected) Modifier.focusRequester(navigationFocus) else Modifier)
                         .focusProperties {
-                            val first = tab == AppTab.entries.first()
-                            val last = tab == AppTab.entries.last()
+                            val first = screen == TopLevelItems.keys.first()
+                            val last = screen == TopLevelItems.keys.last()
                             if (navigationBar) {
                                 up = activeFocus
                                 if (first) start = FocusRequester.Cancel
@@ -420,25 +420,14 @@ internal fun AppUpdaterScreen(
         navigationSuiteType = navigationSuiteType
     ) {
         val motion = MaterialTheme.motionScheme
-        tabTransition.DeferredAnimatedContent(
-            transitionSpec = {
-                if (backNavigation) {
-                    (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), PREDICTIVE_BACK_ENTER_SCALE))
-                        .togetherWith(fadeOut(motion.fastEffectsSpec()) + scaleOut(motion.defaultSpatialSpec(), PREDICTIVE_BACK_EXIT_SCALE))
-                } else {
-                    (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), FADE_THROUGH_SCALE))
-                        .togetherWith(fadeOut(motion.fastEffectsSpec()))
-                }
-            },
-            mutableTransformSpec = { predictiveBackTransform(backProgress) }
-        ) { tab ->
-            val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(if (tab == AppTab.Updates) updatesBarState else settingsBarState)
+        val content: @Composable (Screen) -> Unit = { screen ->
+            val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(if (screen == Screen.Updates) updatesBarState else settingsBarState)
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text(text = stringResource(tab.labelRes)) },
+                        title = { Text(text = stringResource(TopLevelItems.getValue(screen).labelRes)) },
                         actions = {
-                            if (tab == AppTab.Updates) {
+                            if (screen == Screen.Updates) {
                                 val toUpdates = Modifier.focusProperties { down = updatesFocus }
                                 BarAction(
                                     icon = R.drawable.ic_apk_install,
@@ -459,7 +448,7 @@ internal fun AppUpdaterScreen(
                         scrollBehavior = scrollBehavior
                     )
                 },
-                snackbarHost = { if (tab == selectedTab) SnackbarHost(hostState = snackbarHostState) },
+                snackbarHost = { if (screen == current) SnackbarHost(hostState = snackbarHostState) },
                 contentWindowInsets = ScaffoldDefaults.contentWindowInsets.add(overscan.only(WindowInsetsSides.Bottom + WindowInsetsSides.End))
             ) { padding ->
                 val layoutDirection = LocalLayoutDirection.current
@@ -474,8 +463,8 @@ internal fun AppUpdaterScreen(
                 SideEffect { focusScroll.padding = contentPadding }
 
                 CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
-                    when (tab) {
-                        AppTab.Updates -> UpdatesView(
+                    when (screen) {
+                        Screen.Updates -> UpdatesView(
                             listState = updatesListState,
                             barState = updatesBarState,
                             nestedScroll = scrollBehavior.nestedScrollConnection,
@@ -494,7 +483,7 @@ internal fun AppUpdaterScreen(
                             onRefresh = onRefresh,
                             columns = columns
                         )
-                        AppTab.Settings -> SettingsView(
+                        Screen.Settings -> SettingsView(
                             listState = settingsListState,
                             barState = settingsBarState,
                             nestedScroll = scrollBehavior.nestedScrollConnection,
@@ -510,6 +499,16 @@ internal fun AppUpdaterScreen(
                 }
             }
         }
+        NavDisplay(
+            backStack = backStack,
+            onBack = {
+                backNavigation = true
+                backStack.removeLastOrNull()
+            },
+            transitionSpec = { fadeThrough(motion) },
+            popTransitionSpec = { if (backNavigation) backTransition(motion) else fadeThrough(motion) },
+            predictivePopTransitionSpec = { predictiveBackTransition() }
+        ) { screen -> NavEntry(screen, content = content) }
     }
 
     if (themeDialog) {
@@ -1095,28 +1094,17 @@ private fun DialogBlurBehind() {
     }
 }
 
-private class BackProgress(private val state: NavigationEventState<*>) {
-    private var last = 0f
+private fun fadeThrough(motion: MotionScheme) =
+    (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), FADE_THROUGH_SCALE))
+        .togetherWith(fadeOut(motion.fastEffectsSpec()))
 
-    val value: Float
-        get() {
-            (state.transitionState as? NavigationEventTransitionState.InProgress)?.let {
-                last = PredictiveBackEasing.transform(it.latestEvent.progress)
-            }
-            return last
-        }
-}
+private fun backTransition(motion: MotionScheme) =
+    (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), PREDICTIVE_BACK_ENTER_SCALE))
+        .togetherWith(fadeOut(motion.fastEffectsSpec()) + scaleOut(motion.defaultSpatialSpec(), PREDICTIVE_BACK_EXIT_SCALE))
 
-private fun predictiveBackTransform(progress: BackProgress) = MutableContentTransform {
-    initialContentTransform {
-        scale = lerp(1f, PREDICTIVE_BACK_EXIT_SCALE, progress.value)
-        alpha = 1f - (progress.value / PREDICTIVE_BACK_FADE_THRESHOLD).coerceAtMost(1f)
-    }
-    targetContentTransform {
-        scale = lerp(PREDICTIVE_BACK_ENTER_SCALE, 1f, progress.value)
-        alpha = ((progress.value - PREDICTIVE_BACK_FADE_THRESHOLD) / (1f - PREDICTIVE_BACK_FADE_THRESHOLD)).coerceAtLeast(0f)
-    }
-}
+private fun predictiveBackTransition() =
+    (fadeIn(tween(easing = PredictiveBackEnterFade)) + scaleIn(tween(easing = PredictiveBackEasing), PREDICTIVE_BACK_ENTER_SCALE))
+        .togetherWith(fadeOut(tween(easing = PredictiveBackExitFade)) + scaleOut(tween(easing = PredictiveBackEasing), PREDICTIVE_BACK_EXIT_SCALE))
 
 private class TopReveal(scope: CoroutineScope, listState: LazyListState, barState: TopAppBarState) {
     val modifier = Modifier.onFocusEvent { state ->
