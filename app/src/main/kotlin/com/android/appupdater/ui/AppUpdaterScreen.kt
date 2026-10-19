@@ -72,6 +72,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -552,6 +553,8 @@ private fun UpdatesView(
     val cards = remember(keyboard) { CardFocus() }
     val installList = remember(installs) { installs.entries.toList() }
     val rows = remember(updates, columns) { updates.chunked(columns) }
+    val installStart = if (notice != null && updates.isNotEmpty()) 1 else 0
+    val updateStart = installStart + installList.size
 
     val previous = cards.keys
     val lost = cards.focused?.takeIf { key -> updates.none { it.first.packageName == key } }
@@ -593,12 +596,12 @@ private fun UpdatesView(
                 .focusRequester(focus)
                 .focusRestorer(),
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(SmallSpacing)
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
         ) {
             if (notice != null && updates.isNotEmpty()) {
                 item(key = NOTICE_KEY, contentType = NOTICE_KEY) {
                     SegmentedListItem(
-                        shapes = ListItemDefaults.segmentedShapes(0, 1),
+                        shapes = ListItemDefaults.segmentedShapes(0, updateStart + rows.size),
                         colors = listItemColors(),
                         modifier = Modifier.animateItem(fade, placement, fade)
                     ) {
@@ -611,9 +614,9 @@ private fun UpdatesView(
                 }
             }
 
-            items(installList, key = { it.key }, contentType = { INSTALL_TYPE }) { (_, state) ->
+            itemsIndexed(installList, key = { _, install -> install.key }, contentType = { _, _ -> INSTALL_TYPE }) { index, (_, state) ->
                 SegmentedListItem(
-                    shapes = ListItemDefaults.segmentedShapes(0, 1),
+                    shapes = ListItemDefaults.segmentedShapes(installStart + index, updateStart + rows.size),
                     colors = listItemColors(),
                     modifier = Modifier.animateItem(fade, placement, fade),
                     supportingContent = { LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth()) }
@@ -659,12 +662,16 @@ private fun UpdatesView(
                     modifier = Modifier
                         .animateItem(fade, placement, fade)
                         .height(IntrinsicSize.Max),
-                    horizontalArrangement = Arrangement.spacedBy(SmallSpacing)
+                    horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
                 ) {
-                    row.forEach { (app, update) ->
+                    row.forEachIndexed { column, (app, update) ->
                         UpdateItem(
                             app = app,
                             update = update,
+                            shapes = ListItemDefaults.segmentedShapes(
+                                updateStart + index,
+                                updateStart + (updates.size - column + columns - 1) / columns
+                            ),
                             install = playInstalls[app.packageName],
                             cards = cards,
                             onApkMirror = onApkMirror,
@@ -715,7 +722,7 @@ private fun SettingsView(
             .focusRequester(focus)
             .focusRestorer(),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(SmallSpacing)
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
     ) {
         item(key = "appearance") {
             SectionHeader(text = stringResource(R.string.appearance))
@@ -724,7 +731,7 @@ private fun SettingsView(
         item(key = "theme") {
             SegmentedListItem(
                 onClick = onTheme,
-                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                shapes = ListItemDefaults.segmentedShapes(0, 2),
                 colors = listItemColors(),
                 modifier = reveal.modifier,
                 supportingContent = { Text(text = stringResource(appearance.themeMode.labelRes)) }
@@ -738,7 +745,7 @@ private fun SettingsView(
                 checked = appearance.dynamicColor,
                 onCheckedChange = onDynamicColorChange,
                 modifier = Modifier.semantics { role = Role.Switch },
-                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                shapes = ListItemDefaults.segmentedShapes(1, 2),
                 colors = listItemColors(),
                 supportingContent = { Text(text = stringResource(R.string.dynamic_color_description)) },
                 trailingContent = { Switch(checked = appearance.dynamicColor, onCheckedChange = null) }
@@ -804,6 +811,7 @@ private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
 private fun UpdateItem(
     app: InstalledApp,
     update: AppUpdateInfo,
+    shapes: ListItemShapes,
     install: PlayInstall?,
     cards: CardFocus,
     onApkMirror: (String) -> Unit,
@@ -842,7 +850,7 @@ private fun UpdateItem(
     }
 
     SegmentedListItem(
-        shapes = ListItemDefaults.segmentedShapes(0, 1),
+        shapes = shapes,
         colors = listItemColors(),
         modifier = modifier.then(cardModifier),
         leadingContent = {

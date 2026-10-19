@@ -6,12 +6,14 @@ import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -20,6 +22,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -241,7 +244,9 @@ class AppUpdaterScreenTest {
         val beta = bounds("Beta")
         assertEquals(alpha.left, beta.left)
         assertEquals(alpha.right, beta.right)
-        assertEquals(SPACING, beta.top - alpha.bottom)
+        assertEquals(ListItemDefaults.SegmentedGap, beta.top - alpha.bottom)
+        assertEquals(true to false, corners("Alpha"))
+        assertEquals(false to true, corners("Beta"))
     }
 
     @Test
@@ -253,7 +258,7 @@ class AppUpdaterScreenTest {
         val beta = bounds("Beta")
         assertEquals(alpha.top, beta.top)
         assertEquals(alpha.bottom, beta.bottom)
-        assertEquals(SPACING, beta.left - alpha.right)
+        assertEquals(ListItemDefaults.SegmentedGap, beta.left - alpha.right)
         val latest = compose.onAllNodesWithText("Latest: v2.0 ($LATEST_CODE)", useUnmergedTree = true)
         assertTrue(latest[0].getBoundsInRoot().bottom > latest[1].getBoundsInRoot().bottom)
         val buttons = compose.onAllNodesWithContentDescription(string(R.string.source_apkmirror))
@@ -318,7 +323,10 @@ class AppUpdaterScreenTest {
         assertEquals(72.dp, dynamicItem.bottom - dynamicItem.top)
         assertEquals(themeItem.left, dynamicItem.left)
         assertEquals(themeItem.right, dynamicItem.right)
-        assertEquals(8.dp, dynamicItem.top - themeItem.bottom)
+        assertEquals(ListItemDefaults.SegmentedGap, dynamicItem.top - themeItem.bottom)
+        assertEquals(true to false, corners(string(R.string.theme)))
+        assertEquals(false to true, corners(string(R.string.dynamic_color)))
+        assertEquals(true to true, corners(string(R.string.disabled_apps)))
 
         compose.onNodeWithText(string(R.string.theme)).performClick()
         val light = compose.onNodeWithText(string(R.string.theme_light)).getBoundsInRoot()
@@ -330,6 +338,13 @@ class AppUpdaterScreenTest {
     private fun text(value: String): DpRect {
         val nodes = compose.onAllNodesWithText(value, useUnmergedTree = true)
         return List(nodes.fetchSemanticsNodes().size) { nodes[it].getBoundsInRoot() }.minBy { it.top }
+    }
+
+    private fun corners(text: String): Pair<Boolean, Boolean> {
+        val image = compose.onNodeWithText(text).captureToImage().asAndroidBitmap()
+        val container = image.getPixel(CORNER_INSET, image.height / 2)
+        return (image.getPixel(CORNER_INSET, CORNER_INSET) != container) to
+            (image.getPixel(CORNER_INSET, image.height - 1 - CORNER_INSET) != container)
     }
 
     private fun backGesture(progress: Float) {
@@ -420,6 +435,7 @@ class AppUpdaterScreenTest {
     }
 
     private companion object {
+        const val CORNER_INSET = 3
         const val INSTALLED_CODE = 100L
         const val LATEST_CODE = 200L
         const val DOWNLOADED = 0.42f
@@ -427,7 +443,6 @@ class AppUpdaterScreenTest {
         const val BUNDLE = "content://downloads/bundle.apkm"
         const val BUNDLE_NAME = "Bundle.apkm"
         const val LONG_VERSION = "141.0.7390.122.4567.890.12345.67890.1234.5678.9012.3456.7890.1234.5678"
-        val SPACING = 8.dp
         val PredictiveBack = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
     }
 }
