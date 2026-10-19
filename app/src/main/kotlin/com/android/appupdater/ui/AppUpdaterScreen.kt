@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.view.WindowManager
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -149,6 +148,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.Appearance
@@ -287,7 +289,11 @@ internal fun AppUpdaterScreen(
     val inputModeManager = LocalInputModeManager.current
     val coroutineScope = rememberCoroutineScope()
     var themeDialog by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = selectedTab != AppTab.Updates) { selectedTab = AppTab.Updates }
+    NavigationBackHandler(
+        state = rememberNavigationEventState(NavigationEventInfo.None),
+        isBackEnabled = selectedTab != AppTab.Updates,
+        onBackCompleted = { selectedTab = AppTab.Updates }
+    )
 
     LaunchedEffect(Unit) {
         if (inputModeManager.inputMode == InputMode.Keyboard) navigationFocus.requestFocus()

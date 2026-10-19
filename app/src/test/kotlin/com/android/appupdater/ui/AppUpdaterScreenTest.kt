@@ -1,6 +1,8 @@
 package com.android.appupdater.ui
 
 import android.content.pm.PackageManager
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.annotation.StringRes
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
@@ -11,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsFocused
@@ -64,6 +67,7 @@ class AppUpdaterScreenTest {
     private val disabledApps = mutableListOf<Boolean>()
     private var refreshes = 0
     private var bundlePicks = 0
+    private lateinit var backDispatcher: OnBackPressedDispatcher
 
     @Test
     fun `shows each update with its installed and latest versions`() {
@@ -157,6 +161,19 @@ class AppUpdaterScreenTest {
 
         compose.onNodeWithContentDescription(context.resources.getQuantityString(R.plurals.updates_available, 2, 2))
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun `returns from Settings to Updates with back`() {
+        show(loaded(entry("Alpha")))
+
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+        compose.onNodeWithText(string(R.string.theme)).assertIsDisplayed()
+        compose.onAllNodesWithText("Alpha").assertCountEquals(0)
+
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.onNodeWithText("Alpha").assertIsDisplayed()
+        compose.onAllNodesWithText(string(R.string.theme)).assertCountEquals(0)
     }
 
     @Test
@@ -310,6 +327,7 @@ class AppUpdaterScreenTest {
                 val inputModeManager = LocalInputModeManager.current
                 LaunchedEffect(Unit) { inputModeManager.requestInputMode(InputMode.Keyboard) }
             }
+            backDispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
             AppUpdaterTheme {
                 AppUpdaterScreen(
                     uiState = state,
