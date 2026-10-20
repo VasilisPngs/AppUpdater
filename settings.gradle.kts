@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 rootProject.name = "AppUpdater"
 
 include(":app")
+include(":baselineprofile")

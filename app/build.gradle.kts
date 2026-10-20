@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -79,11 +80,13 @@ dependencies {
     implementation(libs.androidx.compose.material3.navigation.suite)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.text.google.fonts)
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.aurora.gplayapi)
     androidLintTool(platform(libs.asm.bom))
+    baselineProfile(project(":baselineprofile"))
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(platform(libs.junit.bom))
