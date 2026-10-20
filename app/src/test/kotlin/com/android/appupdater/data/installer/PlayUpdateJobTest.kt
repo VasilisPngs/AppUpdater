@@ -1,7 +1,9 @@
 package com.android.appupdater.data.installer
 
+import android.Manifest
 import android.app.job.JobScheduler
 import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.net.NetworkCapabilities
 import com.android.appupdater.data.installer.PlayUpdateService.Companion.toExtras
 import com.android.appupdater.data.installer.PlayUpdateService.Companion.toPlayUpdate
@@ -36,6 +38,15 @@ class PlayUpdateJobTest {
         assertEquals(ComponentName(context, PlayUpdateService::class.java), job.service)
         assertEquals(PlayUpdate(PACKAGE, NAME, "2.1", 21, latest = false), job.extras.toPlayUpdate())
         assertEquals(mapOf(PACKAGE to PlayInstall(null)), installs.play.value)
+    }
+
+    @Test
+    fun `holds the network state permission that a job with a network constraint needs`() {
+        val requested = context.packageManager
+            .getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()))
+            .requestedPermissions
+
+        assertTrue(Manifest.permission.ACCESS_NETWORK_STATE in requested.orEmpty())
     }
 
     @Test
