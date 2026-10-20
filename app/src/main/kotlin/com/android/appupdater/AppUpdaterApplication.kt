@@ -36,6 +36,7 @@ class AppContainer(context: Context) {
     val preferences = AppPreferences(context)
     val updates = AppUpdateRepository(context, playCatalog)
     val installs = InstallRepository(
+        context,
         scope,
         BundleInstaller(context, packageInstaller),
         PlayInstaller(context, playCatalog, playHttpClient, packageInstaller),

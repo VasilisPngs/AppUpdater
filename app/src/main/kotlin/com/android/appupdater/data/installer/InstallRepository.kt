@@ -1,11 +1,13 @@
 package com.android.appupdater.data.installer
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.PlayInstall
+import com.android.appupdater.data.model.PlayUpdate
 import com.android.appupdater.data.model.installEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -19,6 +21,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
 class InstallRepository(
+    private val context: Context,
     private val scope: CoroutineScope,
     private val bundleInstaller: BundleInstaller,
     private val playInstaller: PlayInstaller,
@@ -55,24 +58,31 @@ class InstallRepository(
         if (packageName in playStates.value) return
 
         playStates.update { it + (packageName to PlayInstall(null)) }
-        scope.launch {
-            val result = playInstaller.install(packageName, target.code) { progress ->
+        val request = PlayUpdate(packageName, update.appName, target.name, target.code, target.code == update.newVersionCode)
+        if (!PlayUpdateService.schedule(context, request)) {
+            playStates.update { it - packageName }
+            finished.tryEmit(InstallEvent.Failed(INSTALLATION_FAILED))
+        }
+    }
+
+    suspend fun runPlayUpdate(update: PlayUpdate, onSize: (Long) -> Unit, onProgress: (Float?) -> Unit): InstallEvent {
+        val packageName = update.packageName
+        playStates.update { it + (packageName to PlayInstall(null)) }
+        val event = try {
+            playInstaller.install(packageName, update.versionCode, onSize) { progress ->
                 playStates.update { it + (packageName to PlayInstall(progress)) }
-            }
-            val event = result.fold(
+                onProgress(progress)
+            }.fold(
                 onSuccess = {
-                    if (target.code == update.newVersionCode) {
-                        InstallEvent.Finished(update.appName)
-                    } else {
-                        InstallEvent.FinishedFromPlay(update.appName, target.name)
-                    }
+                    if (update.latest) InstallEvent.Finished(update.appName) else InstallEvent.FinishedFromPlay(update.appName, update.versionName)
                 },
                 onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
             )
-
+        } finally {
             playStates.update { it - packageName }
-            finished.tryEmit(event)
         }
+        finished.tryEmit(event)
+        return event
     }
 
     fun confirmationShown(intent: Intent) = packageInstaller.confirmationShown(intent)

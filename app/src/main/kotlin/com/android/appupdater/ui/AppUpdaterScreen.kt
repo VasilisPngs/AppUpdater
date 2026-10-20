@@ -2,6 +2,8 @@
 
 package com.android.appupdater.ui
 
+import android.Manifest
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -246,6 +248,20 @@ fun AppUpdaterScreen(
     val bundlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::installBundle)
     }
+    val activity = LocalActivity.current
+    var pendingPlay by rememberSaveable { mutableStateOf<String?>(null) }
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        uiState.updates.firstOrNull { it.packageName == pendingPlay }?.let(viewModel::updateFromPlay)
+        pendingPlay = null
+    }
+    val updateFromPlay: (AppUpdateInfo) -> Unit = { update ->
+        if (askForNotifications(context, activity)) {
+            pendingPlay = update.packageName
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.updateFromPlay(update)
+        }
+    }
     val resources = LocalResources.current
     val noBrowser = stringResource(R.string.no_browser)
     val noFilePicker = stringResource(R.string.no_file_picker)
@@ -281,7 +297,7 @@ fun AppUpdaterScreen(
         onRefresh = viewModel::refresh,
         onPickBundle = pickBundle,
         onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
-        onPlay = viewModel::updateFromPlay,
+        onPlay = updateFromPlay,
         onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
         onThemeChange = viewModel::setThemeMode,
         onDynamicColorChange = viewModel::setDynamicColor,
@@ -1159,6 +1175,10 @@ private fun displayVersion(name: String, numberFormat: String): String {
     val version = if (name.length > 1 && name[0].lowercaseChar() == 'v' && name[1].isDigit()) name.substring(1) else name
     return if (version.firstOrNull()?.isDigit() == true) numberFormat.format(version) else version
 }
+
+private fun askForNotifications(context: Context, activity: Activity?): Boolean =
+    context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+        activity?.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) == false
 
 private fun openUrlInBrowser(context: Context, url: String): Boolean = try {
     context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))

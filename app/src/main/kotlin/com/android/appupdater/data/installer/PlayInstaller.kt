@@ -31,6 +31,7 @@ class PlayInstaller(
     suspend fun install(
         packageName: String,
         versionCode: Long,
+        onSize: (Long) -> Unit,
         onProgress: (Float?) -> Unit
     ): Result<Unit> = withContext(ioDispatcher) {
         val directory = File(context.cacheDir, "play_$packageName")
@@ -51,10 +52,9 @@ class PlayInstaller(
                     .filter { (name, code) -> name.isNotBlank() && code > 0 && !isSharedLibraryInstalled(name, code) }
                     .map { (name, code) -> name to deliver(purchases, name, code, LIBRARY_OFFER_TYPE, certificate) }
 
-                val progress = Progress(
-                    (appFiles + libraryFiles.flatMap { it.second }).sumOf { it.size }.coerceAtLeast(1),
-                    onProgress
-                )
+                val size = (appFiles + libraryFiles.flatMap { it.second }).sumOf { it.size }.coerceAtLeast(1)
+                onSize(size)
+                val progress = Progress(size, onProgress)
                 val libraries = libraryFiles.map { (name, files) -> download(files, File(directory, name), progress) }
                 val app = download(appFiles, File(directory, packageName), progress)
                 verify(app, packageName, versionCode)
