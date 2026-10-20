@@ -1,19 +1,15 @@
 package com.android.appupdater.data.installer
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.job.JobInfo
 import android.app.job.JobParameters
 import android.app.job.JobScheduler
 import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.os.PersistableBundle
 import com.android.appupdater.AppUpdaterApplication
-import com.android.appupdater.MainActivity
 import com.android.appupdater.R
 import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.PlayUpdate
@@ -32,9 +28,7 @@ class PlayUpdateService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         val update = params.extras.toPlayUpdate()
         val notifications = getSystemService(NotificationManager::class.java)
-        notifications.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, getString(R.string.updates), NotificationManager.IMPORTANCE_LOW)
-        )
+        createUpdatesChannel()
         setNotification(params, params.jobId, progress(update, null), JOB_END_NOTIFICATION_POLICY_REMOVE)
         running[params.jobId] = scope.launch {
             val event = (application as AppUpdaterApplication).container.installs.runPlayUpdate(
@@ -60,7 +54,7 @@ class PlayUpdateService : JobService() {
     }
 
     private fun progress(update: PlayUpdate, progress: Float?): Notification =
-        Notification.Builder(this, CHANNEL_ID)
+        Notification.Builder(this, UPDATES_CHANNEL)
             .setSmallIcon(R.drawable.ic_updates)
             .setContentTitle(update.appName)
             .setCategory(Notification.CATEGORY_PROGRESS)
@@ -70,18 +64,14 @@ class PlayUpdateService : JobService() {
             .build()
 
     private fun result(event: InstallEvent): Notification =
-        Notification.Builder(this, CHANNEL_ID)
+        Notification.Builder(this, UPDATES_CHANNEL)
             .setSmallIcon(R.drawable.ic_updates)
             .setContentTitle(event.text(resources))
             .setContentIntent(openApp())
             .setAutoCancel(true)
             .build()
 
-    private fun openApp(): PendingIntent =
-        PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-
     companion object {
-        private const val CHANNEL_ID = "updates"
         private const val RESULT_ID = 1
         private const val PERCENT = 100
         private const val PACKAGE_NAME = "package_name"

@@ -15,6 +15,16 @@
     <string name="dynamic_color">Dynamic color</string>
     <string name="dynamic_color_description">Colors from your wallpaper</string>
     <string name="install_bundle">Install APK bundle</string>
+    <string name="automatic_updates">Automatic updates</string>
+    <string name="automatic_updates_description">Download new versions when you open the app and install them when you leave it</string>
+    <string name="app_update">App update</string>
+    <string name="self_update_checking">Checking for updates</string>
+    <string name="self_update_up_to_date">Up to date</string>
+    <string name="self_update_available">New version available</string>
+    <string name="self_update_downloading">Downloading · %1$d%%</string>
+    <string name="self_update_ready">Installs when you leave the app</string>
+    <string name="self_update_installing">Installing</string>
+    <string name="self_update_failed">Couldn\'t update</string>
     <string name="disabled_apps">Disabled apps</string>
     <string name="disabled_apps_description">Include disabled applications when checking for updates</string>
     <string name="version_current">Current: %1$s (%2$d)</string>

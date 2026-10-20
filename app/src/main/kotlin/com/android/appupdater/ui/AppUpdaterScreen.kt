@@ -163,11 +163,13 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.Appearance
+import com.android.appupdater.data.model.AppUpdate
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
+import com.android.appupdater.data.model.SelfUpdate
 import com.android.appupdater.data.model.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -176,6 +178,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 import java.text.NumberFormat
+import kotlin.math.roundToInt
 
 private val ContentMargin = 16.dp
 private val CompactMargin = 16.dp
@@ -243,6 +246,7 @@ fun AppUpdaterScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val appUpdate by viewModel.appUpdate.collectAsStateWithLifecycle()
     ReportDrawnWhen { uiState.loaded }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -303,6 +307,9 @@ fun AppUpdaterScreen(
         onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
         onThemeChange = viewModel::setThemeMode,
         onDynamicColorChange = viewModel::setDynamicColor,
+        appUpdate = appUpdate,
+        onAutomaticUpdatesChange = viewModel::setAutomaticUpdates,
+        onUpdateApp = viewModel::updateApp,
         modifier = modifier
     )
 }
@@ -319,6 +326,9 @@ internal fun AppUpdaterScreen(
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    appUpdate: AppUpdate,
+    onAutomaticUpdatesChange: (Boolean) -> Unit,
+    onUpdateApp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val backStack = rememberSerializable(serializer = serializer()) { NavBackStack<Screen>(Screen.Updates) }
@@ -509,7 +519,10 @@ internal fun AppUpdaterScreen(
                             includeDisabledApps = uiState.includeDisabledApps,
                             onIncludeDisabledAppsChange = onIncludeDisabledAppsChange,
                             onTheme = { themeDialog = true },
-                            onDynamicColorChange = onDynamicColorChange
+                            onDynamicColorChange = onDynamicColorChange,
+                            appUpdate = appUpdate,
+                            onAutomaticUpdatesChange = onAutomaticUpdatesChange,
+                            onUpdateApp = onUpdateApp
                         )
                     }
                 }
@@ -731,7 +744,10 @@ private fun SettingsView(
     includeDisabledApps: Boolean,
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
     onTheme: () -> Unit,
-    onDynamicColorChange: (Boolean) -> Unit
+    onDynamicColorChange: (Boolean) -> Unit,
+    appUpdate: AppUpdate,
+    onAutomaticUpdatesChange: (Boolean) -> Unit,
+    onUpdateApp: () -> Unit
 ) {
     val reveal = rememberTopReveal(listState, barState)
     LazyColumn(
@@ -778,12 +794,30 @@ private fun SettingsView(
             SectionHeader(text = stringResource(R.string.updates), modifier = Modifier.padding(top = ContentMargin))
         }
 
+        item(key = "automatic-updates") {
+            SegmentedListItem(
+                checked = appUpdate.automatic,
+                onCheckedChange = onAutomaticUpdatesChange,
+                modifier = Modifier.semantics { role = Role.Switch },
+                shapes = ListItemDefaults.segmentedShapes(0, 3),
+                colors = listItemColors(),
+                supportingContent = { Text(text = stringResource(R.string.automatic_updates_description)) },
+                trailingContent = { Switch(checked = appUpdate.automatic, onCheckedChange = null) }
+            ) {
+                Text(text = stringResource(R.string.automatic_updates))
+            }
+        }
+
+        item(key = "app-update") {
+            AppUpdateItem(status = appUpdate.status, onUpdate = onUpdateApp, shapes = ListItemDefaults.segmentedShapes(1, 3))
+        }
+
         item(key = "disabled-apps") {
             SegmentedListItem(
                 checked = includeDisabledApps,
                 onCheckedChange = onIncludeDisabledAppsChange,
                 modifier = Modifier.semantics { role = Role.Switch },
-                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                shapes = ListItemDefaults.segmentedShapes(2, 3),
                 colors = listItemColors(),
                 supportingContent = { Text(text = stringResource(R.string.disabled_apps_description)) },
                 trailingContent = { Switch(checked = includeDisabledApps, onCheckedChange = null) }
@@ -791,6 +825,41 @@ private fun SettingsView(
                 Text(text = stringResource(R.string.disabled_apps))
             }
         }
+    }
+}
+
+@Composable
+private fun AppUpdateItem(status: SelfUpdate, onUpdate: () -> Unit, shapes: ListItemShapes) {
+    val text = when (status) {
+        SelfUpdate.Checking -> stringResource(R.string.self_update_checking)
+        SelfUpdate.UpToDate -> stringResource(R.string.self_update_up_to_date)
+        SelfUpdate.CheckFailed -> stringResource(R.string.check_failed)
+        SelfUpdate.Available -> stringResource(R.string.self_update_available)
+        is SelfUpdate.Downloading -> stringResource(R.string.self_update_downloading, (status.progress * 100).roundToInt())
+        SelfUpdate.Ready -> stringResource(R.string.self_update_ready)
+        SelfUpdate.Installing -> stringResource(R.string.self_update_installing)
+        SelfUpdate.Failed -> stringResource(R.string.self_update_failed)
+    }
+    SegmentedListItem(
+        shapes = shapes,
+        colors = listItemColors(),
+        supportingContent = {
+            Column {
+                Text(text = text)
+                when (status) {
+                    is SelfUpdate.Downloading -> LinearWavyProgressIndicator(progress = { status.progress }, modifier = Modifier.fillMaxWidth())
+                    SelfUpdate.Installing -> LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    else -> Unit
+                }
+            }
+        },
+        trailingContent = if (status == SelfUpdate.Available || status == SelfUpdate.Ready || status == SelfUpdate.Failed) {
+            { FilledTonalButton(onClick = onUpdate, shapes = ButtonDefaults.shapes()) { Text(text = stringResource(R.string.update)) } }
+        } else {
+            null
+        }
+    ) {
+        Text(text = stringResource(R.string.app_update))
     }
 }
 

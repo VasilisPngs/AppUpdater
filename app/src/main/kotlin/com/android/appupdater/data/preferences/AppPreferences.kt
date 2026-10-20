@@ -23,12 +23,18 @@ class AppPreferences(
 ) {
     val includeDisabledApps: Flow<Boolean> = store.data.map { it[INCLUDE_DISABLED_APPS] ?: false }.distinctUntilChanged()
 
+    val automaticUpdates: Flow<Boolean> = store.data.map { it[AUTOMATIC_UPDATES] ?: false }.distinctUntilChanged()
+
     val appearance: Flow<Appearance> = store.data
         .map { preferences -> Appearance(preferences.themeMode(), preferences[DYNAMIC_COLOR] ?: false) }
         .distinctUntilChanged()
 
     suspend fun setIncludeDisabledApps(value: Boolean) {
         store.edit { it[INCLUDE_DISABLED_APPS] = value }
+    }
+
+    suspend fun setAutomaticUpdates(value: Boolean) {
+        store.edit { it[AUTOMATIC_UPDATES] = value }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
@@ -50,6 +56,7 @@ class AppPreferences(
 
     private companion object {
         val INCLUDE_DISABLED_APPS = booleanPreferencesKey("include_disabled_apps")
+        val AUTOMATIC_UPDATES = booleanPreferencesKey("automatic_updates")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     }

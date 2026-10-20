@@ -49,11 +49,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import com.android.appupdater.R
 import com.android.appupdater.data.model.Appearance
+import com.android.appupdater.data.model.AppUpdate
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
 import com.android.appupdater.data.model.PlayVersion
+import com.android.appupdater.data.model.SelfUpdate
 import com.android.appupdater.data.model.ThemeMode
 import com.android.appupdater.ui.theme.AppUpdaterTheme
 import org.junit.Assert.assertEquals
@@ -81,6 +83,9 @@ class AppUpdaterScreenTest {
     private val themes = mutableListOf<ThemeMode>()
     private val dynamicColors = mutableListOf<Boolean>()
     private val disabledApps = mutableListOf<Boolean>()
+    private val automaticUpdates = mutableListOf<Boolean>()
+    private var appUpdate by mutableStateOf(AppUpdate())
+    private var appUpdates = 0
     private var refreshes = 0
     private var bundlePicks = 0
     private lateinit var backDispatcher: OnBackPressedDispatcher
@@ -252,6 +257,7 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp")
     fun `includes disabled apps from settings`() {
         show(loaded())
 
@@ -259,6 +265,55 @@ class AppUpdaterScreenTest {
         compose.onNodeWithText(string(R.string.disabled_apps)).performClick()
 
         assertEquals(listOf(true), disabledApps)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `turns automatic updates on from settings`() {
+        show(loaded())
+
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+        compose.onNodeWithText(string(R.string.automatic_updates)).assertIsOff().performClick()
+
+        assertEquals(listOf(true), automaticUpdates)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `shows in settings that the app is up to date`() {
+        appUpdate = AppUpdate(status = SelfUpdate.UpToDate)
+        show(loaded())
+
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+
+        compose.onNodeWithText(string(R.string.self_update_up_to_date)).assertIsDisplayed()
+        compose.onAllNodesWithText(string(R.string.update)).assertCountEquals(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `updates the app from settings when a new version is available`() {
+        appUpdate = AppUpdate(status = SelfUpdate.Available)
+        show(loaded())
+
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+        compose.onNodeWithText(string(R.string.self_update_available)).assertIsDisplayed()
+        compose.onNodeWithText(string(R.string.update)).performClick()
+
+        assertEquals(1, appUpdates)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `shows the download of the app update`() {
+        appUpdate = AppUpdate(automatic = true, status = SelfUpdate.Downloading(0.42f))
+        show(loaded())
+
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+
+        compose.onNodeWithText(string(R.string.self_update_downloading, 42)).assertIsDisplayed()
+        compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(0.42f, 0f..1f))).assertIsDisplayed()
+        compose.onAllNodesWithText(string(R.string.update)).assertCountEquals(0)
     }
 
     @Test
@@ -367,7 +422,9 @@ class AppUpdaterScreenTest {
         assertEquals(ListItemDefaults.SegmentedGap, dynamicItem.top - themeItem.bottom)
         assertEquals(true to false, corners(string(R.string.theme)))
         assertEquals(false to true, corners(string(R.string.dynamic_color)))
-        assertEquals(true to true, corners(string(R.string.disabled_apps)))
+        assertEquals(true to false, corners(string(R.string.automatic_updates)))
+        assertEquals(false to false, corners(string(R.string.app_update)))
+        assertEquals(false to true, corners(string(R.string.disabled_apps)))
 
         compose.onNodeWithText(string(R.string.theme)).performClick()
         val light = compose.onNodeWithText(string(R.string.theme_light)).getBoundsInRoot()
@@ -432,7 +489,10 @@ class AppUpdaterScreenTest {
                     onPlay = { played += it },
                     onIncludeDisabledAppsChange = { disabledApps += it },
                     onThemeChange = { themes += it },
-                    onDynamicColorChange = { dynamicColors += it }
+                    onDynamicColorChange = { dynamicColors += it },
+                    appUpdate = appUpdate,
+                    onAutomaticUpdatesChange = { automaticUpdates += it },
+                    onUpdateApp = { appUpdates++ }
                 )
             }
         }
