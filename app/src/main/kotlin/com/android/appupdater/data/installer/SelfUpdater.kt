@@ -6,11 +6,9 @@ import com.android.appupdater.data.model.SelfUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -40,10 +38,9 @@ internal const val UPDATED_MARKER = "self-update"
 class SelfUpdater(
     private val context: Context,
     private val scope: CoroutineScope,
-    private val packageInstaller: PackageInstallerManager,
-    private val foreground: Flow<Boolean>
+    private val packageInstaller: PackageInstallerManager
 ) {
-    private val state = MutableStateFlow<SelfUpdate>(SelfUpdate.Checking)
+    private val state = MutableStateFlow<SelfUpdate>(SelfUpdate.Idle)
     private val apk = File(context.cacheDir, APK_NAME)
     private val json = Json { ignoreUnknownKeys = true }
     private var release: GitHubAsset? = null
@@ -51,39 +48,26 @@ class SelfUpdater(
 
     val status: StateFlow<SelfUpdate> = state.asStateFlow()
 
-    fun check(automatic: Boolean) {
+    fun check() {
         if (work?.isActive == true) return
         work = scope.launch {
-            state.value = SelfUpdate.Checking
             val asset = try {
                 newerRelease()
             } catch (_: IOException) {
-                state.value = SelfUpdate.CheckFailed
-                return@launch
+                null
             } catch (_: SerializationException) {
-                state.value = SelfUpdate.CheckFailed
-                return@launch
+                null
             }
             release = asset
-            state.value = if (asset == null) SelfUpdate.UpToDate else SelfUpdate.Available
-            if (asset == null || !automatic || !context.packageManager.canRequestPackageInstalls()) {
-                return@launch
-            }
-            if (download(asset)) {
-                state.value = SelfUpdate.Ready
-                foreground.first { !it }
-                install()
-            }
+            state.value = if (asset == null) SelfUpdate.Idle else SelfUpdate.Available
         }
     }
 
     fun update() {
         val asset = release ?: return
-        val current = state.value
-        if (current != SelfUpdate.Available && current != SelfUpdate.Ready && current != SelfUpdate.Failed) return
-        work?.cancel()
+        if (state.value != SelfUpdate.Available && state.value != SelfUpdate.Failed) return
         work = scope.launch {
-            if (current == SelfUpdate.Ready || download(asset)) install()
+            if (download(asset)) install()
         }
     }
 

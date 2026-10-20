@@ -11,12 +11,12 @@ import com.android.appupdater.AppUpdaterApplication
 import com.android.appupdater.data.installer.InstallRepository
 import com.android.appupdater.data.installer.SelfUpdater
 import com.android.appupdater.data.model.Appearance
-import com.android.appupdater.data.model.AppUpdate
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstallEvent
 import com.android.appupdater.data.model.InstallState
 import com.android.appupdater.data.model.InstalledApp
 import com.android.appupdater.data.model.PlayInstall
+import com.android.appupdater.data.model.SelfUpdate
 import com.android.appupdater.data.model.ThemeMode
 import com.android.appupdater.data.preferences.AppPreferences
 import com.android.appupdater.data.repository.AppUpdateRepository
@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -70,8 +69,7 @@ class AppUpdaterViewModel(
             .onStart { start() }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), AppUpdaterUiState())
 
-    val appUpdate: StateFlow<AppUpdate> = combine(preferences.automaticUpdates, selfUpdater.status, ::AppUpdate)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), AppUpdate())
+    val selfUpdate: StateFlow<SelfUpdate> = selfUpdater.status
 
     val appearance: StateFlow<Appearance?> = preferences.appearance
         .onStart { preferences.restoreThemeMode() }
@@ -80,7 +78,7 @@ class AppUpdaterViewModel(
     private fun start() {
         if (started) return
         started = true
-        viewModelScope.launch { selfUpdater.check(preferences.automaticUpdates.first()) }
+        selfUpdater.check()
         viewModelScope.launch {
             repository.packageChanges.collect { packageName ->
                 AppIconCache.evict(packageName)
@@ -146,11 +144,6 @@ class AppUpdaterViewModel(
     fun setIncludeDisabledApps(include: Boolean) {
         if (state.value.includeDisabledApps == include) return
         viewModelScope.launch { preferences.setIncludeDisabledApps(include) }
-    }
-
-    fun setAutomaticUpdates(enabled: Boolean) {
-        if (appUpdate.value.automatic == enabled) return
-        viewModelScope.launch { preferences.setAutomaticUpdates(enabled) }
     }
 
     fun updateApp() = selfUpdater.update()
