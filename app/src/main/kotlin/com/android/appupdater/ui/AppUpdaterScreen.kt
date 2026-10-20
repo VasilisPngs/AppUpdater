@@ -15,7 +15,6 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -269,7 +268,7 @@ fun AppUpdaterScreen(
     }
 
     uiState.confirmation?.let { confirmation ->
-        LaunchedEffect(confirmation) {
+        SideEffect(confirmation) {
             viewModel.confirmationShown(confirmation)
             runCatching { context.startActivity(confirmation) }
         }
@@ -358,7 +357,7 @@ internal fun AppUpdaterScreen(
         navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
     val window = LocalActivity.current?.window
     val navigationBarScrim = !navigationBar && WindowInsets.navigationBars.getBottom(LocalDensity.current) > 0
-    SideEffect { window?.isNavigationBarContrastEnforced = navigationBarScrim }
+    SideEffect(window, navigationBarScrim) { window?.isNavigationBarContrastEnforced = navigationBarScrim }
     val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
 
     val context = LocalContext.current
@@ -544,6 +543,8 @@ private fun UpdatesView(
 ) {
     val pullState = rememberPullToRefreshState()
     val motion = MaterialTheme.motionScheme
+    val context = LocalContext.current
+    val iconSizePx = with(LocalDensity.current) { AppIconSize.roundToPx() }
     val fade = motion.defaultEffectsSpec<Float>()
     val placement = motion.defaultSpatialSpec<IntOffset>()
     val reveal = rememberTopReveal(listState, barState)
@@ -672,6 +673,9 @@ private fun UpdatesView(
                             ),
                             install = playInstalls[app.packageName],
                             cards = cards,
+                            context = context,
+                            iconSizePx = iconSizePx,
+                            motion = motion,
                             onApkMirror = onApkMirror,
                             onPlay = onPlay,
                             modifier = Modifier
@@ -812,11 +816,13 @@ private fun UpdateItem(
     shapes: ListItemShapes,
     install: PlayInstall?,
     cards: CardFocus,
+    context: Context,
+    iconSizePx: Int,
+    motion: MotionScheme,
     onApkMirror: (String) -> Unit,
     onPlay: (AppUpdateInfo) -> Unit,
     modifier: Modifier
 ) {
-    val context = LocalContext.current
     val packageName = app.packageName
     val playFocus = remember { FocusRequester() }
     val apkMirrorFocus = remember { FocusRequester() }
@@ -838,7 +844,6 @@ private fun UpdateItem(
         if (entry != null) cards.entries[packageName] = entry
         onDispose { cards.entries.remove(packageName) }
     }
-    val iconSizePx = with(LocalDensity.current) { AppIconSize.roundToPx() }
     val iconBitmap by produceState(AppIconCache.peek(app.packageName), app.packageName) {
         if (value == null) {
             value = withContext(Dispatchers.IO) {
@@ -852,9 +857,8 @@ private fun UpdateItem(
         colors = listItemColors(),
         modifier = modifier.then(cardModifier),
         leadingContent = {
-            val motion = MaterialTheme.motionScheme
-            val iconSize by animateDpAsState(
-                targetValue = if (install == null) AppIconSize else InstallingIconSize,
+            val iconScale by animateFloatAsState(
+                targetValue = if (install == null) 1f else InstallingIconSize / AppIconSize,
                 animationSpec = motion.defaultSpatialSpec(),
                 label = "icon"
             )
@@ -881,7 +885,12 @@ private fun UpdateItem(
                     Image(
                         bitmap = bitmap.asImageBitmap(),
                         contentDescription = null,
-                        modifier = Modifier.size(iconSize),
+                        modifier = Modifier
+                            .size(AppIconSize)
+                            .graphicsLayer {
+                                scaleX = iconScale
+                                scaleY = iconScale
+                            },
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -920,6 +929,7 @@ private fun UpdateItem(
                             text = stringResource(R.string.update),
                             icon = R.drawable.ic_source_play,
                             source = stringResource(R.string.source_play),
+                            motion = motion,
                             busy = install != null,
                             progress = install?.progress,
                             onClick = { onPlay(update) },
@@ -931,6 +941,7 @@ private fun UpdateItem(
                             text = stringResource(R.string.update),
                             icon = R.drawable.ic_source_apkmirror,
                             source = stringResource(R.string.source_apkmirror),
+                            motion = motion,
                             enabled = install == null,
                             onClick = { onApkMirror(url) },
                             modifier = Modifier.focusRequester(apkMirrorFocus)
@@ -949,6 +960,7 @@ private fun SourceButton(
     text: String,
     @DrawableRes icon: Int,
     source: String,
+    motion: MotionScheme,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -959,7 +971,7 @@ private fun SourceButton(
     val active = enabled && !busy
     val progressShown by animateFloatAsState(
         targetValue = if (busy && progress != null) 1f else 0f,
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        animationSpec = motion.fastEffectsSpec(),
         label = "progress"
     )
 

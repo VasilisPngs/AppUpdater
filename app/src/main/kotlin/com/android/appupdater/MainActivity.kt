@@ -1,5 +1,6 @@
 package com.android.appupdater
 
+import android.content.ContentResolver
 import android.content.Intent
 import android.content.res.Configuration
 import android.content.res.Resources
@@ -72,6 +73,6 @@ class MainActivity : ComponentActivity() {
 
     private fun installFromIntent(intent: Intent) {
         if (intent.action != Intent.ACTION_VIEW) return
-        intent.data?.let(viewModel::installBundle)
+        intent.data?.takeIf { it.scheme == ContentResolver.SCHEME_CONTENT }?.let(viewModel::installBundle)
     }
 }
