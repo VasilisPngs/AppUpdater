@@ -189,6 +189,7 @@ private val CompactMargin = 16.dp
 private val WideMargin = 24.dp
 private val MaxListWidth = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp
 private val SmallSpacing = 8.dp
+private val HeaderSpacing = 20.dp
 private val OptionHeight = 56.dp
 private val VersionSpacing = 4.dp
 private val EmptyPadding = 48.dp
@@ -776,10 +777,7 @@ private fun SettingsView(
         }
 
         item(key = "appearance") {
-            SectionHeader(
-                text = stringResource(R.string.appearance),
-                modifier = if (selfUpdate == SelfUpdate.Idle) Modifier else Modifier.padding(top = ContentMargin)
-            )
+            SectionHeader(text = stringResource(R.string.appearance))
         }
 
         item(key = "theme") {
@@ -809,7 +807,7 @@ private fun SettingsView(
         }
 
         item(key = "updates") {
-            SectionHeader(text = stringResource(R.string.updates), modifier = Modifier.padding(top = ContentMargin))
+            SectionHeader(text = stringResource(R.string.updates))
         }
 
         item(key = "disabled-apps") {
@@ -888,13 +886,13 @@ private fun BarAction(
 private fun listItemColors() = ListItemDefaults.segmentedColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
 
 @Composable
-private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
+private fun SectionHeader(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.labelLargeEmphasized,
         color = MaterialTheme.colorScheme.primary,
-        modifier = modifier
-            .padding(start = ContentMargin, end = ContentMargin, bottom = SmallSpacing)
+        modifier = Modifier
+            .padding(start = ContentMargin, top = HeaderSpacing, end = ContentMargin, bottom = SmallSpacing)
             .semantics { heading() }
     )
 }
