@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.window.core.layout.WindowSizeClass
 import com.android.appupdater.R
 import com.android.appupdater.data.model.Appearance
 import com.android.appupdater.data.model.AppUpdateInfo
@@ -371,6 +372,36 @@ class AppUpdaterScreenTest {
     fun `keeps the margins inside the television overscan`() {
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, true)
         assertContentEdge(24.dp + 48.dp)
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h400dp")
+    fun `centers one column of updates as wide as a compact window`() {
+        show(loaded(entry("Alpha"), entry("Beta")))
+
+        val width = compose.onRoot().getBoundsInRoot().right
+        val alpha = bounds("Alpha")
+        val refresh = compose.onNodeWithContentDescription(string(R.string.refresh), useUnmergedTree = true).getBoundsInRoot()
+        assertEquals(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp, alpha.right - alpha.left)
+        assertEquals(alpha.left, width - alpha.right)
+        assertEquals(alpha.left, text(string(R.string.updates)).left)
+        assertEquals(alpha.right, refresh.right)
+    }
+
+    @Test
+    @Config(qualifiers = "w1300dp-h400dp")
+    fun `centers two columns of updates each as wide as a compact window`() {
+        show(loaded(entry("Alpha"), entry("Beta")))
+
+        val width = compose.onRoot().getBoundsInRoot().right
+        val alpha = bounds("Alpha")
+        val beta = bounds("Beta")
+        val refresh = compose.onNodeWithContentDescription(string(R.string.refresh), useUnmergedTree = true).getBoundsInRoot()
+        assertEquals(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp, alpha.right - alpha.left)
+        assertEquals(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp, beta.right - beta.left)
+        assertEquals(alpha.left, width - beta.right)
+        assertEquals(alpha.left, text(string(R.string.updates)).left)
+        assertEquals(beta.right, refresh.right)
     }
 
     @Test
