@@ -3,9 +3,9 @@ package com.android.appupdater.data.repository
 import com.android.appupdater.data.model.ApkMirrorApk
 import com.android.appupdater.data.model.ApkMirrorApp
 import com.android.appupdater.data.model.InstalledApp
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
 
 class ApkMirrorSelectorTest {
     private val phone = ApkMirrorSelector(
@@ -33,7 +33,7 @@ class ApkMirrorSelectorTest {
             apk(2016120043, "firefox-144-0-3", architectures = listOf("x86_64"))
         )
 
-        assertEquals(2016120041, select(release, installed("143.0.2", 2016115639))?.apk?.versionCode)
+        assertEquals(2016120041L, select(release, installed("143.0.2", 2016115639))?.apk?.versionCode)
     }
 
     @Test
@@ -45,7 +45,7 @@ class ApkMirrorSelectorTest {
             apk(744404843, "chrome-142-0-7444-48-3", architectures = listOf("arm64-v8a"), minimumApi = 29)
         )
 
-        assertEquals(744404833, select(release, installed("141.0.7390.122", 739012233, minSdk = 29))?.apk?.versionCode)
+        assertEquals(744404833L, select(release, installed("141.0.7390.122", 739012233, minSdk = 29))?.apk?.versionCode)
     }
 
     @Test
@@ -56,7 +56,7 @@ class ApkMirrorSelectorTest {
             apk(254231150, "google-play-services-25-42-31-2", minimumApi = 34)
         )
 
-        assertEquals(254231141, select(release, installed("25.40.32", 254032040, minSdk = 31))?.apk?.versionCode)
+        assertEquals(254231141L, select(release, installed("25.40.32", 254032040, minSdk = 31))?.apk?.versionCode)
     }
 
     @Test
