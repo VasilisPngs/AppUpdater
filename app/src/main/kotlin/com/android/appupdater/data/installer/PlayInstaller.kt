@@ -62,8 +62,8 @@ class PlayInstaller(
             }
 
             onProgress(null)
-            libraries.forEach { packageInstaller.install(it.map(::source)).getOrThrow() }
-            packageInstaller.install(app.map(::source)).getOrThrow()
+            libraries.forEach { val _ = packageInstaller.install(it.map(::source)).getOrThrow() }
+            val _ = packageInstaller.install(app.map(::source)).getOrThrow()
             Result.success(Unit)
         } catch (exception: CancellationException) {
             throw exception

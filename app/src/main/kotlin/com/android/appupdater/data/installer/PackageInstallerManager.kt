@@ -50,7 +50,7 @@ class PackageInstallerManager(
         val session = try {
             installer.openSession(sessionId)
         } catch (exception: Exception) {
-            runCatching { installer.abandonSession(sessionId) }
+            val _ = runCatching { installer.abandonSession(sessionId) }
             return Result.failure(exception)
         }
 
@@ -88,14 +88,14 @@ class PackageInstallerManager(
             session.close()
             result.await()
         } catch (exception: CancellationException) {
-            runCatching { session.abandon() }
+            val _ = runCatching { session.abandon() }
             throw exception
         } catch (exception: Exception) {
-            runCatching { session.abandon() }
+            val _ = runCatching { session.abandon() }
             Result.failure(exception)
         } finally {
             pendingConfirmation.value = null
-            runCatching { context.unregisterReceiver(receiver) }
+            val _ = runCatching { context.unregisterReceiver(receiver) }
         }
     }
 

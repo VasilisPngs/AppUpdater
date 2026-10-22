@@ -28,7 +28,7 @@ class PlayAuthProvider(private val context: Context, val httpClient: PlayHttpCli
     }.getOrNull()?.also { session = it }
 
     private fun save(auth: AuthData) {
-        runCatching {
+        val _ = runCatching {
             store.writeText(
                 JSONObject()
                     .put(KEY_FINGERPRINT, Build.FINGERPRINT)
