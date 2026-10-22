@@ -298,7 +298,7 @@ fun AppUpdaterScreen(
     uiState.confirmation?.let { confirmation ->
         SideEffect(confirmation) {
             viewModel.confirmationShown(confirmation)
-            runCatching { context.startActivity(confirmation) }
+            val _ = runCatching { context.startActivity(confirmation) }
         }
     }
 

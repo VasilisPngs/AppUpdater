@@ -432,7 +432,7 @@ class AppUpdaterScreenTest {
         val button = compose.onNode(hasContentDescription(string(R.string.source_apkmirror)) and hasAnyAncestor(hasText("App 1")))
         val hidden = button.getBoundsInRoot().let { it.top - contentTop + (it.bottom - it.top) / 2 }
         compose.onNode(hasScrollAction()).performSemanticsAction(SemanticsActions.ScrollBy) {
-            it(0f, with(Density(context)) { hidden.toPx() })
+            val _ = it(0f, with(Density(context)) { hidden.toPx() })
         }
 
         button.requestFocus()
