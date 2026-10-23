@@ -199,6 +199,8 @@ private val InstallingIconSize = 28.dp
 private val TvOverscanHorizontal = 48.dp
 private val TvOverscanVertical = 27.dp
 private const val TABULAR_FIGURES = "tnum"
+private const val PLAY_STORE_PACKAGE = "com.android.vending"
+private const val PLAY_LISTING_URL = "https://play.google.com/store/apps/details?id="
 private const val EXPANDED_COLUMNS = 2
 private const val FADE_THROUGH_SCALE = 0.92f
 private const val PREDICTIVE_BACK_EXIT_SCALE = 0.9f
@@ -266,19 +268,24 @@ fun AppUpdaterScreen(
         uiState.updates.firstOrNull { it.packageName == pendingPlay }?.let(viewModel::updateFromPlay)
         pendingPlay = null
     }
-    val updateFromPlay: (AppUpdateInfo) -> Unit = { update ->
-        if (askForNotifications(context, activity)) {
-            pendingPlay = update.packageName
-            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            viewModel.updateFromPlay(update)
-        }
-    }
     val resources = LocalResources.current
     val noBrowser = stringResource(R.string.no_browser)
     val noFilePicker = stringResource(R.string.no_file_picker)
     val showMessage: (String) -> Unit = { message ->
         coroutineScope.launch { snackbarHostState.showSnackbar(message) }
+    }
+    val updateFromPlay: (AppUpdateInfo) -> Unit = { update ->
+        when {
+            update.playUpdate?.paid == true -> {
+                val listing = PLAY_LISTING_URL + update.packageName
+                if (!openUrl(context, listing, PLAY_STORE_PACKAGE) && !openUrl(context, listing)) showMessage(noBrowser)
+            }
+            askForNotifications(context, activity) -> {
+                pendingPlay = update.packageName
+                notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            else -> viewModel.updateFromPlay(update)
+        }
     }
     val pickBundle = {
         try {
@@ -308,7 +315,7 @@ fun AppUpdaterScreen(
         snackbarHostState = snackbarHostState,
         onRefresh = viewModel::refresh,
         onPickBundle = pickBundle,
-        onApkMirror = { if (!openUrlInBrowser(context, it)) showMessage(noBrowser) },
+        onApkMirror = { if (!openUrl(context, it)) showMessage(noBrowser) },
         onPlay = updateFromPlay,
         onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
         onThemeChange = viewModel::setThemeMode,
@@ -1252,8 +1259,8 @@ private fun askForNotifications(context: Context, activity: Activity?): Boolean 
     context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
         activity?.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) == false
 
-private fun openUrlInBrowser(context: Context, url: String): Boolean = try {
-    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+private fun openUrl(context: Context, url: String, packageName: String? = null): Boolean = try {
+    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).setPackage(packageName))
     true
 } catch (_: ActivityNotFoundException) {
     false

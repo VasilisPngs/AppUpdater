@@ -11,7 +11,6 @@ import android.content.pm.SigningInfo
 import android.os.Build
 import com.android.appupdater.data.api.ApkMirrorClient
 import com.android.appupdater.data.appLabel
-import com.android.appupdater.data.isStableRelease
 import com.android.appupdater.data.model.ApkMirrorApp
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.InstalledApp
@@ -210,7 +209,7 @@ class AppUpdateRepository(
         get() = testingProgram?.isSubscribed == true || earlyAccess
 
     private fun playUpdate(app: App, installed: InstalledApp): App? = app.takeIf {
-        matchesSignature(it, installed) && it.versionCode > installed.versionCode && isStableRelease(it.versionName)
+        matchesSignature(it, installed) && it.versionCode > installed.versionCode
     }
 
     private fun merge(
@@ -240,7 +239,7 @@ class AppUpdateRepository(
                         ?: confirmation.dates[app.packageName],
                     apkMirrorUrl = null,
                     playAvailable = true,
-                    playUpdate = PlayVersion(playUpdate.versionName, playUpdate.versionCode)
+                    playUpdate = PlayVersion(playUpdate.versionName, playUpdate.versionCode, !playUpdate.isFree)
                 )
                 mirror != null -> AppUpdateInfo(
                     packageName = app.packageName,
@@ -250,7 +249,7 @@ class AppUpdateRepository(
                     publishedAt = mirror.publishedAt,
                     apkMirrorUrl = mirror.apk.link.toAbsoluteApkMirrorUrl(),
                     playAvailable = play != null,
-                    playUpdate = playUpdate?.let { PlayVersion(it.versionName, it.versionCode) }
+                    playUpdate = playUpdate?.let { PlayVersion(it.versionName, it.versionCode, !it.isFree) }
                 )
                 else -> null
             }

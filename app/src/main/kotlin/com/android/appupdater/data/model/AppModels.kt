@@ -22,4 +22,4 @@ data class AppUpdateInfo(
     val playUpdate: PlayVersion?
 )
 
-data class PlayVersion(val name: String, val code: Long)
+data class PlayVersion(val name: String, val code: Long, val paid: Boolean = false)

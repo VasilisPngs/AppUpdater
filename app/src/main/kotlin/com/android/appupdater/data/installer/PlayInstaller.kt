@@ -3,7 +3,6 @@ package com.android.appupdater.data.installer
 import android.content.Context
 import android.content.pm.PackageManager
 import com.android.appupdater.data.api.SharedHttpClient
-import com.android.appupdater.data.isStableRelease
 import com.android.appupdater.data.play.PlayCatalog
 import com.android.appupdater.data.play.PlayHttpClient
 import com.android.appupdater.data.play.deliveryFailure
@@ -128,10 +127,6 @@ class PlayInstaller(
             ?: throw IllegalStateException("Google Play returned an unreadable APK.")
         check(archive.packageName == packageName && archive.longVersionCode == versionCode) {
             "Google Play returned a different package or version."
-        }
-        val versionName = archive.versionName.orEmpty()
-        check(isStableRelease(versionName)) {
-            "$versionName is a pre-release. Only stable versions are installed."
         }
     }
 
