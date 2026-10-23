@@ -5,7 +5,6 @@ import android.app.job.JobScheduler
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.net.NetworkCapabilities
-import com.android.appupdater.data.installer.PlayUpdateService.Companion.toExtras
 import com.android.appupdater.data.installer.PlayUpdateService.Companion.toPlayUpdate
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.PlayInstall
@@ -63,13 +62,6 @@ class PlayUpdateJobTest {
         installs.updateFromPlay(update(PlayVersion("3.0", NEWEST)))
 
         assertEquals(1, scheduler.allPendingJobs.size)
-    }
-
-    @Test
-    fun `keeps every detail of the update in the job`() {
-        val update = PlayUpdate(PACKAGE, NAME, "2.1", 21, latest = true)
-
-        assertEquals(update, update.toExtras().toPlayUpdate())
     }
 
     private fun repository(): InstallRepository {

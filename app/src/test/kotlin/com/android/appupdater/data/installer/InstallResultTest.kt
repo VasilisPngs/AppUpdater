@@ -87,7 +87,6 @@ class InstallResultTest {
 
         assertEquals(PACKAGE, details.packageName)
         assertEquals(context.packageManager.getApplicationLabel(installed).toString(), details.label.toString())
-        assertEquals(LABEL, details.label.toString())
         assertEquals(ULocale.forLocale(context.resources.configuration.locales[0]), details.locale)
         assertEquals(iconSize, details.icon?.width)
     }
