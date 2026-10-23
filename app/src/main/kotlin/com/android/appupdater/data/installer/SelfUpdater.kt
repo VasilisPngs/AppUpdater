@@ -11,29 +11,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import okhttp3.Request
 import okhttp3.Response
+import org.json.JSONException
+import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.security.MessageDigest
 
-@Serializable
-internal data class GitHubRelease(val assets: List<GitHubAsset>)
-
-@Serializable
-internal data class GitHubAsset(
-    val name: String,
-    val size: Long,
-    val digest: String,
-    @SerialName("browser_download_url") val url: String
-)
-
 internal const val UPDATED_MARKER = "self-update"
+
+private class Release(val url: String, val size: Long, val digest: String)
 
 class SelfUpdater(
     private val context: Context,
@@ -42,8 +31,7 @@ class SelfUpdater(
 ) {
     private val state = MutableStateFlow<SelfUpdate>(SelfUpdate.Idle)
     private val apk = File(context.cacheDir, APK_NAME)
-    private val json = Json { ignoreUnknownKeys = true }
-    private var release: GitHubAsset? = null
+    private var release: Release? = null
     private var work: Job? = null
 
     val status: StateFlow<SelfUpdate> = state.asStateFlow()
@@ -51,40 +39,42 @@ class SelfUpdater(
     fun check() {
         if (work?.isActive == true) return
         work = scope.launch {
-            val asset = try {
+            val newer = try {
                 newerRelease()
             } catch (_: IOException) {
                 null
-            } catch (_: SerializationException) {
+            } catch (_: JSONException) {
                 null
             }
-            release = asset
-            state.value = if (asset == null) SelfUpdate.Idle else SelfUpdate.Available
+            release = newer
+            state.value = if (newer == null) SelfUpdate.Idle else SelfUpdate.Available
         }
     }
 
     fun update() {
-        val asset = release ?: return
+        val newer = release ?: return
         if (state.value != SelfUpdate.Available && state.value != SelfUpdate.Failed) return
         work = scope.launch {
-            if (download(asset)) install()
+            if (download(newer)) install()
         }
     }
 
-    private suspend fun newerRelease(): GitHubAsset? = withContext(Dispatchers.IO) {
+    private suspend fun newerRelease(): Release? = withContext(Dispatchers.IO) {
         apk.delete()
-        val release = fetch(RELEASE_URL) { json.decodeFromString<GitHubRelease>(it.body.string()) }
-        val asset = release.assets.firstOrNull { it.name == APK_NAME } ?: throw IOException("No $APK_NAME in the release")
+        val assets = fetch(RELEASE_URL) { JSONObject(it.body.string()).getJSONArray("assets") }
+        val asset = (0 until assets.length()).map(assets::getJSONObject).firstOrNull { it.getString("name") == APK_NAME }
+            ?: throw IOException("No $APK_NAME in the release")
         val installed = File(context.applicationInfo.sourceDir).inputStream().use(::sha256)
-        asset.takeIf { it.digest != installed }
+        Release(asset.getString("browser_download_url"), asset.getLong("size"), asset.getString("digest"))
+            .takeIf { it.digest != installed }
     }
 
-    private suspend fun download(asset: GitHubAsset): Boolean {
+    private suspend fun download(release: Release): Boolean {
         state.value = SelfUpdate.Downloading(0f)
         val downloaded = try {
             withContext(Dispatchers.IO) {
-                fetch(asset.url) { response ->
-                    val total = response.body.contentLength().takeIf { it > 0 } ?: asset.size
+                fetch(release.url) { response ->
+                    val total = response.body.contentLength().takeIf { it > 0 } ?: release.size
                     response.body.byteStream().use { input ->
                         apk.outputStream().use { output ->
                             var copied = 0L
@@ -95,7 +85,7 @@ class SelfUpdater(
                             }
                         }
                     }
-                } == asset.digest
+                } == release.digest
             }
         } catch (_: IOException) {
             false
