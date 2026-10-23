@@ -65,23 +65,28 @@ class InstallRepository(
         }
     }
 
-    suspend fun runPlayUpdate(update: PlayUpdate, onSize: (Long) -> Unit, onProgress: (Float?) -> Unit): InstallEvent {
+    suspend fun runPlayUpdate(update: PlayUpdate, onSize: (Long) -> Unit, onProgress: (Float?) -> Unit): InstallEvent? {
         val packageName = update.packageName
         playStates.update { it + (packageName to PlayInstall(null)) }
         val event = try {
-            playInstaller.install(packageName, update.versionCode, onSize) { progress ->
-                playStates.update { it + (packageName to PlayInstall(progress)) }
-                onProgress(progress)
-            }.fold(
-                onSuccess = {
-                    if (update.latest) InstallEvent.Finished(update.appName) else InstallEvent.FinishedFromPlay(update.appName, update.versionName)
-                },
-                onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
-            )
+            val approval = packageInstaller.preapprove(packageName)
+            if (approval == Preapproval.Declined) {
+                null
+            } else {
+                playInstaller.install(packageName, update.versionCode, (approval as? Preapproval.Approved)?.sessionId, onSize) { progress ->
+                    playStates.update { it + (packageName to PlayInstall(progress)) }
+                    onProgress(progress)
+                }.fold(
+                    onSuccess = {
+                        if (update.latest) InstallEvent.Finished(update.appName) else InstallEvent.FinishedFromPlay(update.appName, update.versionName)
+                    },
+                    onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
+                )
+            }
         } finally {
             playStates.update { it - packageName }
         }
-        finished.tryEmit(event)
+        event?.let(finished::tryEmit)
         return event
     }
 

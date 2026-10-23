@@ -1,16 +1,22 @@
 package com.android.appupdater.data.installer
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
+import android.icu.util.ULocale
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 
 @RunWith(RobolectricTestRunner::class)
 class InstallResultTest {
-    private val installer = PackageInstallerManager(RuntimeEnvironment.getApplication())
+    private val context = RuntimeEnvironment.getApplication()
+    private val installer = PackageInstallerManager(context)
 
     @Test
     fun `names the package a session installed`() {
@@ -49,5 +55,48 @@ class InstallResultTest {
         )
     }
 
+    @Test
+    fun `keeps the session the user approved before the download`() {
+        assertEquals(Preapproval.Approved(SESSION), installer.preapproval(status(PackageInstaller.STATUS_SUCCESS), SESSION))
+    }
+
+    @Test
+    fun `stops when the user declines the update`() {
+        assertEquals(Preapproval.Declined, installer.preapproval(status(PackageInstaller.STATUS_FAILURE_ABORTED), SESSION))
+    }
+
+    @Test
+    fun `asks after the download when the system cannot ask before it`() {
+        assertEquals(Preapproval.Unavailable, installer.preapproval(status(PackageInstaller.STATUS_FAILURE_BLOCKED), SESSION))
+    }
+
+    @Test
+    fun `asks for the update with the name and icon the installed app has`() {
+        val info = ApplicationInfo().apply {
+            packageName = PACKAGE
+            nonLocalizedLabel = LABEL
+        }
+        shadowOf(context.packageManager).installPackage(PackageInfo().apply {
+            packageName = PACKAGE
+            applicationInfo = info
+        })
+
+        val details = installer.preapprovalDetails(PACKAGE)
+        val installed = context.packageManager.getApplicationInfo(PACKAGE, PackageManager.ApplicationInfoFlags.of(0))
+        val iconSize = context.resources.getDimensionPixelSize(android.R.dimen.app_icon_size)
+
+        assertEquals(PACKAGE, details.packageName)
+        assertEquals(context.packageManager.getApplicationLabel(installed).toString(), details.label.toString())
+        assertEquals(LABEL, details.label.toString())
+        assertEquals(ULocale.forLocale(context.resources.configuration.locales[0]), details.locale)
+        assertEquals(iconSize, details.icon?.width)
+    }
+
     private fun status(code: Int): Intent = Intent().putExtra(PackageInstaller.EXTRA_STATUS, code)
+
+    private companion object {
+        const val SESSION = 7
+        const val PACKAGE = "com.example.app"
+        const val LABEL = "Example"
+    }
 }

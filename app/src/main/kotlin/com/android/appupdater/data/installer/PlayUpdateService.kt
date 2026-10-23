@@ -36,7 +36,7 @@ class PlayUpdateService : JobService() {
                 onSize = { updateEstimatedNetworkBytes(params, it, 0) },
                 onProgress = { setNotification(params, params.jobId, progress(update, it), JOB_END_NOTIFICATION_POLICY_REMOVE) }
             )
-            notifications.notify(update.packageName, RESULT_ID, result(event))
+            event?.let { notifications.notify(update.packageName, RESULT_ID, result(it)) }
             running.remove(params.jobId)
             jobFinished(params, false)
         }

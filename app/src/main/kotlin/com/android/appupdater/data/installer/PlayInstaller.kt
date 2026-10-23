@@ -31,6 +31,7 @@ class PlayInstaller(
     suspend fun install(
         packageName: String,
         versionCode: Long,
+        preapproved: Int?,
         onSize: (Long) -> Unit,
         onProgress: (Float?) -> Unit
     ): Result<Unit> = withContext(ioDispatcher) {
@@ -63,11 +64,13 @@ class PlayInstaller(
 
             onProgress(null)
             libraries.forEach { val _ = packageInstaller.install(it.map(::source)).getOrThrow() }
-            val _ = packageInstaller.install(app.map(::source)).getOrThrow()
+            val _ = packageInstaller.install(app.map(::source), preapproved).getOrThrow()
             Result.success(Unit)
         } catch (exception: CancellationException) {
+            preapproved?.let(packageInstaller::abandon)
             throw exception
         } catch (exception: Exception) {
+            preapproved?.let(packageInstaller::abandon)
             Result.failure(exception)
         } finally {
             directory.deleteRecursively()
