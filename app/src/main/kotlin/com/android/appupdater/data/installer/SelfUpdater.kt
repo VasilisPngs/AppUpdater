@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.Headers.Companion.toHeaders
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONException
@@ -61,7 +62,7 @@ class SelfUpdater(
 
     private suspend fun newerRelease(): Release? = withContext(Dispatchers.IO) {
         apk.delete()
-        val assets = fetch(RELEASE_URL) { JSONObject(it.body.string()).getJSONArray("assets") }
+        val assets = fetch(RELEASE_URL, GITHUB_HEADERS) { JSONObject(it.body.string()).getJSONArray("assets") }
         val asset = (0 until assets.length()).map(assets::getJSONObject).firstOrNull { it.getString("name") == APK_NAME }
             ?: throw IOException("No $APK_NAME in the release")
         val installed = File(context.applicationInfo.sourceDir).inputStream().use(::sha256)
@@ -108,15 +109,18 @@ class SelfUpdater(
         apk.delete()
     }
 
-    private fun <T> fetch(url: String, read: (Response) -> T): T =
-        SharedHttpClient.instance.newCall(Request.Builder().url(url).build()).execute().use { response ->
+    private fun <T> fetch(url: String, headers: Map<String, String> = emptyMap(), read: (Response) -> T): T {
+        val request = Request.Builder().url(url).headers(headers.toHeaders()).build()
+        return SharedHttpClient.instance.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
             read(response)
         }
+    }
 
     private companion object {
         const val APK_NAME = "AppUpdater.apk"
         const val RELEASE_URL = "https://api.github.com/repos/VasilisPngs/AppUpdater/releases/tags/AppUpdater"
+        val GITHUB_HEADERS = mapOf("Accept" to "application/vnd.github+json", "X-GitHub-Api-Version" to "2026-03-10")
     }
 }
 
