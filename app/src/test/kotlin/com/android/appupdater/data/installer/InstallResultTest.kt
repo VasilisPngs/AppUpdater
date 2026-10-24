@@ -7,6 +7,8 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.icu.util.ULocale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -67,7 +69,21 @@ class InstallResultTest {
 
     @Test
     fun `asks after the download when the system cannot ask before it`() {
-        assertEquals(Preapproval.Unavailable, installer.preapproval(status(PackageInstaller.STATUS_FAILURE_BLOCKED), SESSION))
+        assertEquals(Preapproval.Skipped, installer.preapproval(status(PackageInstaller.STATUS_FAILURE_BLOCKED), SESSION))
+    }
+
+    @Test
+    fun `updates without asking when AppUpdater installed the app last`() {
+        shadowOf(context.packageManager).setInstallSourceInfo(PACKAGE, context.packageName, null, null, context.packageName, null, PackageInstaller.PACKAGE_SOURCE_UNSPECIFIED)
+
+        assertTrue(installer.ownsUpdates(PACKAGE))
+    }
+
+    @Test
+    fun `asks before the download when Google Play owns the app's updates`() {
+        shadowOf(context.packageManager).setInstallSourceInfo(PACKAGE, PLAY_STORE, null, null, PLAY_STORE, PLAY_STORE, PackageInstaller.PACKAGE_SOURCE_STORE)
+
+        assertFalse(installer.ownsUpdates(PACKAGE))
     }
 
     @Test
@@ -97,5 +113,6 @@ class InstallResultTest {
         const val SESSION = 7
         const val PACKAGE = "com.example.app"
         const val LABEL = "Example"
+        const val PLAY_STORE = "com.android.vending"
     }
 }

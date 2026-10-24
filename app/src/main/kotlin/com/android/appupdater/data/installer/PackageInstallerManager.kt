@@ -24,7 +24,7 @@ import kotlinx.coroutines.withContext
 sealed interface Preapproval {
     data class Approved(val sessionId: Int) : Preapproval
     data object Declined : Preapproval
-    data object Unavailable : Preapproval
+    data object Skipped : Preapproval
 }
 
 class PackageInstallerManager(
@@ -41,7 +41,7 @@ class PackageInstallerManager(
     }
 
     suspend fun preapprove(packageName: String): Preapproval = sessionLock.withLock {
-        withContext(ioDispatcher) { request(packageName) }
+        withContext(ioDispatcher) { if (ownsUpdates(packageName)) Preapproval.Skipped else request(packageName) }
     }
 
     suspend fun install(sources: List<ApkSource>, preapproved: Int? = null): Result<String> = sessionLock.withLock {
@@ -56,13 +56,13 @@ class PackageInstallerManager(
         val details = try {
             preapprovalDetails(packageName)
         } catch (_: PackageManager.NameNotFoundException) {
-            return Preapproval.Unavailable
+            return Preapproval.Skipped
         }
         val installer = context.packageManager.packageInstaller
         val sessionId = try {
             installer.createSession(sessionParams().apply { setAppPackageName(packageName) })
         } catch (_: Exception) {
-            return Preapproval.Unavailable
+            return Preapproval.Skipped
         }
 
         val result = CompletableDeferred<Preapproval>()
@@ -81,13 +81,13 @@ class PackageInstallerManager(
         context.registerReceiver(receiver, IntentFilter(action), Context.RECEIVER_NOT_EXPORTED)
         return try {
             installer.openSession(sessionId).use { it.requestUserPreapproval(details, statusReceiver(action, sessionId)) }
-            result.await().also { if (it == Preapproval.Unavailable) abandon(sessionId) }
+            result.await().also { if (it == Preapproval.Skipped) abandon(sessionId) }
         } catch (exception: CancellationException) {
             abandon(sessionId)
             throw exception
         } catch (_: Exception) {
             abandon(sessionId)
-            Preapproval.Unavailable
+            Preapproval.Skipped
         } finally {
             pendingConfirmation.value = null
             val _ = runCatching { context.unregisterReceiver(receiver) }
@@ -152,6 +152,13 @@ class PackageInstallerManager(
         }
     }
 
+    internal fun ownsUpdates(packageName: String): Boolean = try {
+        val source = context.packageManager.getInstallSourceInfo(packageName)
+        (source.updateOwnerPackageName ?: source.installingPackageName) == context.packageName
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    }
+
     internal fun preapprovalDetails(packageName: String): PackageInstaller.PreapprovalDetails {
         val packageManager = context.packageManager
         val info = packageManager.getApplicationInfo(packageName, PackageManager.ApplicationInfoFlags.of(0))
@@ -168,7 +175,7 @@ class PackageInstallerManager(
         when (status.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_SUCCESS -> Preapproval.Approved(sessionId)
             PackageInstaller.STATUS_FAILURE_ABORTED -> Preapproval.Declined
-            else -> Preapproval.Unavailable
+            else -> Preapproval.Skipped
         }
 
     internal fun installResult(status: Intent): Result<String> =
