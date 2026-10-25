@@ -98,11 +98,15 @@ class SelfUpdater(
     private suspend fun install() {
         state.value = SelfUpdate.Installing
         val marker = File(context.noBackupFilesDir, UPDATED_MARKER)
-        val result = withContext(Dispatchers.IO) {
-            marker.createNewFile()
-            packageInstaller.install(listOf(ApkSource(APK_NAME, apk.length()) { apk.inputStream() }))
+        val installed = try {
+            withContext(Dispatchers.IO) {
+                marker.createNewFile()
+                packageInstaller.install(listOf(ApkSource(APK_NAME, apk.length()) { apk.inputStream() }))
+            }.isSuccess
+        } catch (_: IOException) {
+            false
         }
-        if (result.isFailure) {
+        if (!installed) {
             marker.delete()
             state.value = SelfUpdate.Failed
         }
