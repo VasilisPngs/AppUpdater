@@ -13,8 +13,24 @@ class ReleasesTest {
     }
 
     @Test
+    fun `treats the RC in Google's build names as stable`() {
+        listOf("20261013_00_RC00", "carrierservices.android_20250826_00_RC00.phone").forEach {
+            assertTrue(it, isStableRelease(it))
+        }
+    }
+
+    @Test
     fun `treats marked versions as pre-releases`() {
-        listOf("2.0-beta1", "1.0.0-rc2", "121.0.6167.0 Canary", "5.0-alpha", "3.1-dev", "8.0 Preview").forEach {
+        listOf(
+            "2.0-beta1",
+            "12.36.0-beta.01",
+            "121.0.6167.0 Canary",
+            "5.0-alpha",
+            "3.1-dev",
+            "8.0 Preview",
+            "243.0.1001198216-publicbeta",
+            "phone-openbeta_dynamic"
+        ).forEach {
             assertFalse(it, isStableRelease(it))
         }
     }

@@ -161,10 +161,24 @@ class ApkMirrorSelectorTest {
     }
 
     @Test
-    fun `skips a build whose release page marks it as a pre-release`() {
-        val release = release("2.0", apk(200, "app-2-0-beta"))
+    fun `skips the installed version when the release name shortens its build number`() {
+        val release = release("1.57.2626400", apk(262640093, "app-1-57-262640093"))
 
-        assertNull(select(release, installed("1.9", 190)))
+        assertNull(select(release, installed("1.57.262640083", 262640083)))
+    }
+
+    @Test
+    fun `skips an open beta build inside a stable release`() {
+        val release = release(
+            "20261013_00_RC00",
+            apk(325565063, "messages-android_20261013_00_rc00-phone_dynamic"),
+            apk(325565100, "messages-android_20261013_00_rc00-phone-openbeta_dynamic")
+        )
+
+        assertEquals(
+            325565063L,
+            select(release, installed("messages.android_20261006_00_RC00.phone_dynamic", 325500063))?.apk?.versionCode
+        )
     }
 
     @Test
@@ -209,6 +223,17 @@ class ApkMirrorSelectorTest {
         )
 
         assertEquals(202L, select(release, installed("1.9", 190))?.apk?.versionCode)
+    }
+
+    @Test
+    fun `prefers a build for every ABI over one for another density`() {
+        val release = release(
+            "2.0",
+            apk(201, "app-2-0-90h", densities = listOf("160dpi")),
+            apk(200, "app-2-0-90", architectures = listOf("universal"), densities = listOf("120-480dpi"))
+        )
+
+        assertEquals(200L, select(release, installed("1.9", 190))?.apk?.versionCode)
     }
 
     @Test

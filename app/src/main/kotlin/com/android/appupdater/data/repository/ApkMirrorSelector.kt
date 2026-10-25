@@ -48,7 +48,8 @@ internal class ApkMirrorSelector(
             .filter { it.versionCode > installed.versionCode }
             .filter { abiRank(it) != UNSUPPORTED_ABI }
             .minWithOrNull(
-                compareBy(::abiRank)
+                compareBy<ApkMirrorApk> { densityRank(it) == FOREIGN_DENSITY_RANK }
+                    .thenBy(::abiRank)
                     .thenByDescending { variantSuffix(it.versionCode, installed.versionCode) }
                     .thenBy(::densityRank)
                     .thenByDescending(ApkMirrorApk::versionCode)
@@ -60,10 +61,13 @@ internal class ApkMirrorSelector(
         )
     }
 
-    private fun isInstalledVersion(releaseNumbers: List<String>, installedNumbers: List<String>): Boolean =
-        releaseNumbers.isNotEmpty() &&
-            installedNumbers.size >= releaseNumbers.size &&
-            installedNumbers.subList(0, releaseNumbers.size) == releaseNumbers
+    private fun isInstalledVersion(releaseNumbers: List<String>, installedNumbers: List<String>): Boolean {
+        val last = releaseNumbers.lastIndex
+        return last >= 0 &&
+            installedNumbers.size > last &&
+            installedNumbers.subList(0, last) == releaseNumbers.subList(0, last) &&
+            installedNumbers[last].startsWith(releaseNumbers[last])
+    }
 
     private fun variantSuffix(versionCode: Long, installedVersionCode: Long): Int {
         var candidate = versionCode
