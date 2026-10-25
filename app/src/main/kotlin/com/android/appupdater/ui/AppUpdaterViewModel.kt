@@ -139,6 +139,10 @@ class AppUpdaterViewModel(
 
     fun installBundle(uri: Uri) = installs.installBundle(uri)
 
+    fun openBundle(uri: Uri) = installs.installBundle(uri) { packageName, versionCode ->
+        state.value.updates.offersFromApkMirror(packageName, versionCode)
+    }
+
     fun updateFromPlay(update: AppUpdateInfo) = installs.updateFromPlay(update)
 
     fun setIncludeDisabledApps(include: Boolean) {
@@ -184,3 +188,6 @@ class AppUpdaterViewModel(
         }
     }
 }
+
+internal fun List<AppUpdateInfo>.offersFromApkMirror(packageName: String, versionCode: Long): Boolean =
+    any { it.packageName == packageName && it.apkMirrorUrl != null && it.newVersionCode == versionCode }

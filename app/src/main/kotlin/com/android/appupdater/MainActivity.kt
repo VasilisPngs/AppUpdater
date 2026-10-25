@@ -73,6 +73,6 @@ class MainActivity : ComponentActivity() {
 
     private fun installFromIntent(intent: Intent) {
         if (intent.action != Intent.ACTION_VIEW) return
-        intent.data?.takeIf { it.scheme == ContentResolver.SCHEME_CONTENT }?.let(viewModel::installBundle)
+        intent.data?.takeIf { it.scheme == ContentResolver.SCHEME_CONTENT }?.let(viewModel::openBundle)
     }
 }

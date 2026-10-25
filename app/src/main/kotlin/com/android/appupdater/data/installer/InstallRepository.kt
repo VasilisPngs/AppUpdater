@@ -37,12 +37,12 @@ class InstallRepository(
     val results: SharedFlow<InstallEvent> = finished.asSharedFlow()
     val confirmation: StateFlow<Intent?> = packageInstaller.confirmation
 
-    fun installBundle(uri: Uri) {
+    fun installBundle(uri: Uri, isSuggested: ((String, Long) -> Boolean)? = null) {
         val key = uri.toString()
         if (!pendingBundles.add(key)) return
 
         scope.launch {
-            bundleInstaller.install(uri) { state ->
+            bundleInstaller.install(uri, isSuggested) { state ->
                 state.installEvent()?.let(finished::tryEmit)
                 bundleStates.update { it + (key to state) }
             }

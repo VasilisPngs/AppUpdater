@@ -1,6 +1,7 @@
 package com.android.appupdater.data.installer
 
 import android.content.Context
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -22,7 +23,7 @@ class BundleInstaller(
     private val packageInstaller: PackageInstallerManager,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-    suspend fun install(uri: Uri, onState: (InstallState) -> Unit) {
+    suspend fun install(uri: Uri, isSuggested: ((String, Long) -> Boolean)?, onState: (InstallState) -> Unit) {
         withContext(ioDispatcher) {
             val label = displayName(uri)
             val archive = File(context.cacheDir, "$ARCHIVE_PREFIX${System.nanoTime()}")
@@ -31,7 +32,9 @@ class BundleInstaller(
                 copyToCache(uri, archive)
 
                 val packageName = ZipFile(archive).use { zip ->
-                    packageInstaller.install(sources(zip, archive)).getOrThrow()
+                    val requireUserAction = isSuggested != null &&
+                        archivedPackage(zip, archive)?.let { isSuggested(it.packageName, it.longVersionCode) } != true
+                    packageInstaller.install(sources(zip, archive), requireUserAction = requireUserAction).getOrThrow()
                 }
                 onState(context.packageManager.installedApp(packageName, label))
             } catch (exception: CancellationException) {
@@ -120,6 +123,20 @@ class BundleInstaller(
         val matching = languages.filterKeys { it in deviceLanguages }.values.flatten()
         return matching.ifEmpty { languages[FALLBACK_LANGUAGE] ?: languages.values.flatten() }
     }
+
+    private fun archivedPackage(zip: ZipFile, archive: File): PackageInfo? {
+        val base = zip.getEntry(BASE_APK) ?: return archivedPackage(archive)
+        val file = File(context.cacheDir, "$ARCHIVE_PREFIX${System.nanoTime()}$APK_SUFFIX")
+        return try {
+            zip.getInputStream(base).use { input -> file.outputStream().use { input.copyTo(it, COPY_BUFFER_SIZE) } }
+            archivedPackage(file)
+        } finally {
+            file.delete()
+        }
+    }
+
+    private fun archivedPackage(file: File): PackageInfo? =
+        context.packageManager.getPackageArchiveInfo(file.path, PackageManager.PackageInfoFlags.of(0))
 
     private fun copyToCache(uri: Uri, target: File) {
         val input = context.contentResolver.openInputStream(uri)

@@ -44,8 +44,12 @@ class PackageInstallerManager(
         withContext(ioDispatcher) { if (ownsUpdates(packageName)) Preapproval.Skipped else request(packageName) }
     }
 
-    suspend fun install(sources: List<ApkSource>, preapproved: Int? = null): Result<String> = sessionLock.withLock {
-        withContext(ioDispatcher) { commit(sources, preapproved) }
+    suspend fun install(
+        sources: List<ApkSource>,
+        preapproved: Int? = null,
+        requireUserAction: Boolean = false
+    ): Result<String> = sessionLock.withLock {
+        withContext(ioDispatcher) { commit(sources, preapproved, requireUserAction) }
     }
 
     fun abandon(sessionId: Int) {
@@ -94,7 +98,7 @@ class PackageInstallerManager(
         }
     }
 
-    private suspend fun commit(sources: List<ApkSource>, preapproved: Int?): Result<String> {
+    private suspend fun commit(sources: List<ApkSource>, preapproved: Int?, requireUserAction: Boolean): Result<String> {
         if (sources.isEmpty()) {
             preapproved?.let(::abandon)
             return Result.failure(IllegalArgumentException("No APK files to install."))
@@ -102,7 +106,7 @@ class PackageInstallerManager(
 
         val installer = context.packageManager.packageInstaller
         val sessionId = preapproved ?: try {
-            installer.createSession(sessionParams().apply { setSize(sources.sumOf { it.size.coerceAtLeast(0) }) })
+            installer.createSession(sessionParams(requireUserAction).apply { setSize(sources.sumOf { it.size.coerceAtLeast(0) }) })
         } catch (exception: Exception) {
             return Result.failure(exception)
         }
@@ -185,9 +189,15 @@ class PackageInstallerManager(
             Result.failure(IllegalStateException(failureMessage(status.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))))
         }
 
-    private fun sessionParams(): PackageInstaller.SessionParams =
+    private fun sessionParams(requireUserAction: Boolean = false): PackageInstaller.SessionParams =
         PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-            setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+            setRequireUserAction(
+                if (requireUserAction) {
+                    PackageInstaller.SessionParams.USER_ACTION_REQUIRED
+                } else {
+                    PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED
+                }
+            )
         }
 
     private fun statusReceiver(action: String, sessionId: Int): IntentSender =
