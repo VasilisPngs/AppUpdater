@@ -48,6 +48,11 @@ android {
                 }
             }
         }
+        create("nonMinifiedRelease") {
+            optimization {
+                enable = false
+            }
+        }
     }
 
     compileOptions {
