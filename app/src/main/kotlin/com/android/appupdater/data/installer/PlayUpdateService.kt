@@ -9,6 +9,7 @@ import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
 import android.os.PersistableBundle
+import android.os.SystemClock
 import com.android.appupdater.AppUpdaterApplication
 import com.android.appupdater.R
 import com.android.appupdater.data.model.InstallEvent
@@ -30,11 +31,12 @@ class PlayUpdateService : JobService() {
         val notifications = getSystemService(NotificationManager::class.java)
         createUpdatesChannel()
         setNotification(params, params.jobId, progress(update, null), JOB_END_NOTIFICATION_POLICY_REMOVE)
+        val onProgress = rateLimited { setNotification(params, params.jobId, progress(update, it), JOB_END_NOTIFICATION_POLICY_REMOVE) }
         running[params.jobId] = scope.launch {
             val event = (application as AppUpdaterApplication).container.installs.runPlayUpdate(
                 update,
                 onSize = { updateEstimatedNetworkBytes(params, it, 0) },
-                onProgress = { setNotification(params, params.jobId, progress(update, it), JOB_END_NOTIFICATION_POLICY_REMOVE) }
+                onProgress = onProgress
             )
             event?.let { notifications.notify(update.packageName, RESULT_ID, result(it)) }
             running.remove(params.jobId)
@@ -79,6 +81,18 @@ class PlayUpdateService : JobService() {
         private const val VERSION_NAME = "version_name"
         private const val VERSION_CODE = "version_code"
         private const val LATEST = "latest"
+        private const val PROGRESS_INTERVAL_MILLIS = 200L
+
+        internal fun rateLimited(post: (Float?) -> Unit): (Float?) -> Unit {
+            var posted = SystemClock.elapsedRealtime()
+            return { progress ->
+                val now = SystemClock.elapsedRealtime()
+                if (progress == null || now - posted >= PROGRESS_INTERVAL_MILLIS) {
+                    posted = now
+                    post(progress)
+                }
+            }
+        }
 
         internal fun schedule(context: Context, update: PlayUpdate): Boolean =
             context.getSystemService(JobScheduler::class.java).schedule(

@@ -5,6 +5,7 @@ import android.app.job.JobScheduler
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.net.NetworkCapabilities
+import com.android.appupdater.data.installer.PlayUpdateService.Companion.rateLimited
 import com.android.appupdater.data.installer.PlayUpdateService.Companion.toPlayUpdate
 import com.android.appupdater.data.model.AppUpdateInfo
 import com.android.appupdater.data.model.PlayInstall
@@ -20,6 +21,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.shadows.ShadowSystemClock
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 class PlayUpdateJobTest {
@@ -62,6 +65,20 @@ class PlayUpdateJobTest {
         installs.updateFromPlay(update(PlayVersion("3.0", NEWEST)))
 
         assertEquals(1, scheduler.allPendingJobs.size)
+    }
+
+    @Test
+    fun `posts download progress no faster than the system accepts notification updates`() {
+        val posted = mutableListOf<Float?>()
+        val onProgress = rateLimited { posted += it }
+
+        for (percent in 1..100) {
+            ShadowSystemClock.advanceBy(Duration.ofMillis(10))
+            onProgress(percent / 100f)
+        }
+        onProgress(null)
+
+        assertEquals(listOf(0.2f, 0.4f, 0.6f, 0.8f, 1f, null), posted)
     }
 
     private fun repository(): InstallRepository {
