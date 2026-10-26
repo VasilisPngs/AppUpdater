@@ -21,6 +21,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
@@ -34,6 +35,7 @@ import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -168,7 +170,7 @@ class AppUpdaterScreenTest {
     }
 
     @Test
-    fun `refreshes and installs a bundle from the top app bar`() {
+    fun `refreshes and installs a bundle from the floating toolbar`() {
         show(loaded(entry("Chrome")))
 
         compose.onNodeWithContentDescription(string(R.string.refresh)).performClick()
@@ -176,6 +178,21 @@ class AppUpdaterScreenTest {
 
         assertEquals(1, refreshes)
         assertEquals(1, bundlePicks)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `centers the floating toolbar below the updates and keeps only Settings in the top app bar`() {
+        show(loaded(entry("Alpha"), entry("Beta")))
+        val root = compose.onRoot().getBoundsInRoot()
+        val settings = compose.onNodeWithContentDescription(string(R.string.settings), useUnmergedTree = true).getBoundsInRoot()
+        val install = compose.onNodeWithContentDescription(string(R.string.install_bundle)).getBoundsInRoot()
+        val refresh = compose.onNodeWithContentDescription(string(R.string.refresh)).getBoundsInRoot()
+
+        assertEquals((root.left + root.right).value / 2, (install.left + refresh.right).value / 2, 0.5f)
+        assertEquals(install.top, refresh.top)
+        assertTrue(install.top > bounds("Beta").bottom)
+        assertTrue(settings.bottom < bounds("Alpha").top)
     }
 
     @Test
@@ -191,10 +208,22 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    fun `reaches the floating toolbar with the d-pad below the updates`() {
+        show(loaded(entry("Alpha")), keyboard = true)
+        compose.onNodeWithContentDescription(string(R.string.source_apkmirror)).requestFocus()
+
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+
+        compose.onNode(isFocused()).assert(
+            hasContentDescription(string(R.string.install_bundle)) or hasContentDescription(string(R.string.refresh))
+        )
+    }
+
+    @Test
     fun `starts keyboard focus in the top app bar`() {
         show(loaded(entry("Alpha")), keyboard = true)
 
-        compose.onNodeWithContentDescription(string(R.string.install_bundle)).assertIsFocused()
+        compose.onNodeWithContentDescription(string(R.string.settings)).assertIsFocused()
     }
 
     @Test
@@ -461,7 +490,7 @@ class AppUpdaterScreenTest {
 
         state = loaded()
 
-        compose.onNodeWithContentDescription(string(R.string.install_bundle)).assertIsFocused()
+        compose.onNodeWithContentDescription(string(R.string.settings)).assertIsFocused()
     }
 
     @Test

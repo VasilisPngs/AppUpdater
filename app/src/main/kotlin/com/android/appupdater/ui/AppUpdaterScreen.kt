@@ -69,7 +69,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -413,24 +416,11 @@ internal fun AppUpdaterScreen(
                         },
                         actions = {
                             if (screen == Screen.Updates) {
-                                val toUpdates = Modifier.focusProperties { down = updatesFocus }
-                                BarAction(
-                                    icon = R.drawable.ic_apk_install,
-                                    label = stringResource(R.string.install_bundle),
-                                    onClick = onPickBundle,
-                                    modifier = toUpdates.focusRequester(barFocus)
-                                )
-                                BarAction(
-                                    icon = R.drawable.ic_refresh,
-                                    label = stringResource(R.string.refresh),
-                                    onClick = onRefresh,
-                                    modifier = toUpdates
-                                )
                                 BarAction(
                                     icon = R.drawable.ic_settings,
                                     label = stringResource(R.string.settings),
                                     onClick = openSettings,
-                                    modifier = toUpdates
+                                    modifier = Modifier.focusProperties { down = updatesFocus }.focusRequester(barFocus)
                                 )
                             }
                         },
@@ -440,14 +430,39 @@ internal fun AppUpdaterScreen(
                     )
                 },
                 snackbarHost = { if (screen == current) SnackbarHost(hostState = snackbarHostState) },
+                floatingActionButton = {
+                    if (screen == Screen.Updates) {
+                        HorizontalFloatingToolbar(
+                            expanded = true,
+                            colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors()
+                        ) {
+                            BarAction(
+                                icon = R.drawable.ic_apk_install,
+                                label = stringResource(R.string.install_bundle),
+                                onClick = onPickBundle
+                            )
+                            BarAction(
+                                icon = R.drawable.ic_refresh,
+                                label = stringResource(R.string.refresh),
+                                onClick = onRefresh
+                            )
+                        }
+                    }
+                },
+                floatingActionButtonPosition = FabPosition.Center,
                 contentWindowInsets = contentInsets
             ) { padding ->
                 val density = LocalDensity.current
+                val toolbarSpace = if (screen == Screen.Updates) {
+                    FloatingToolbarDefaults.ContainerSize + FloatingToolbarDefaults.ScreenOffset
+                } else {
+                    0.dp
+                }
                 val contentPadding = PaddingValues(
                     start = padding.calculateStartPadding(layoutDirection) + sideMargin,
                     top = padding.calculateTopPadding(),
                     end = padding.calculateEndPadding(layoutDirection) + sideMargin,
-                    bottom = padding.calculateBottomPadding() + margin
+                    bottom = padding.calculateBottomPadding() + toolbarSpace + margin
                 )
                 val platformScroll = LocalBringIntoViewSpec.current
                 val focusScroll = remember(platformScroll, density) { FocusScroll(platformScroll, density) }
