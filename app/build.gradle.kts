@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.android.appupdater"
+    namespace = "com.vasilispngs.appupdater"
     compileSdk {
         version = release(37) {
             minorApiLevel = 2
@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.android.appupdater"
+        applicationId = "com.vasilispngs.appupdater"
         minSdk {
             version = release(34)
         }
