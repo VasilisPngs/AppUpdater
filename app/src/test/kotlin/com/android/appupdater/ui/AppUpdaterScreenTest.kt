@@ -179,18 +179,29 @@ class AppUpdaterScreenTest {
     }
 
     @Test
-    fun `counts the available updates on the navigation badge`() {
-        show(loaded(entry("Chrome"), entry("Spotify")))
+    fun `opens Settings from the top app bar and returns with its back arrow`() {
+        show(loaded(entry("Alpha")))
 
-        compose.onNodeWithContentDescription(context.resources.getQuantityString(R.plurals.updates_available, 2, 2))
-            .assertIsDisplayed()
+        openSettings()
+        compose.onNodeWithText(string(R.string.theme)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(string(R.string.back)).performClick()
+
+        compose.onNodeWithText("Alpha").assertIsDisplayed()
+        compose.onAllNodesWithText(string(R.string.theme)).assertCountEquals(0)
+    }
+
+    @Test
+    fun `starts keyboard focus in the top app bar`() {
+        show(loaded(entry("Alpha")), keyboard = true)
+
+        compose.onNodeWithContentDescription(string(R.string.install_bundle)).assertIsFocused()
     }
 
     @Test
     fun `returns from Settings to Updates with back`() {
         show(loaded(entry("Alpha")))
 
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         compose.onNodeWithText(string(R.string.theme)).assertIsDisplayed()
         compose.onAllNodesWithText("Alpha").assertCountEquals(0)
 
@@ -200,10 +211,28 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    fun `slides Settings in from the end edge`() {
+        show(loaded(entry("Alpha")))
+        val updates = bounds("Alpha")
+        openSettings()
+        val settings = bounds(string(R.string.theme))
+        compose.onNodeWithContentDescription(string(R.string.back)).performClick()
+        compose.waitForIdle()
+
+        compose.mainClock.autoAdvance = false
+        openSettings()
+        compose.mainClock.advanceTimeBy(TRANSITION_PEEK_MILLIS)
+        val updatesShift = updates.left - bounds("Alpha").left
+        val settingsShift = bounds(string(R.string.theme)).left - settings.left
+        assertTrue(updatesShift > 0.dp && updatesShift < ForwardSlide)
+        assertTrue(settingsShift > 0.dp && settingsShift < ForwardSlide)
+    }
+
+    @Test
     fun `follows the back gesture from Settings with Google's full screen motion`() {
         show(loaded(entry("Alpha")))
         val updates = compose.onNodeWithText("Alpha").getBoundsInRoot()
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         val settings = compose.onNodeWithText(string(R.string.theme)).getBoundsInRoot()
 
         backGesture(0.1f)
@@ -225,7 +254,7 @@ class AppUpdaterScreenTest {
     fun `blurs and dims behind dialogs through the dialog properties`() {
         show(loaded())
 
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         compose.onNodeWithText(string(R.string.theme)).performClick()
 
         val dialog = compose.onNode(isDialog()).fetchSemanticsNode().root as View
@@ -240,7 +269,7 @@ class AppUpdaterScreenTest {
     fun `changes the theme from settings`() {
         show(loaded())
 
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         compose.onNodeWithText(string(R.string.theme_system)).assertIsDisplayed()
         compose.onNodeWithText(string(R.string.theme)).performClick()
         compose.onNodeWithText(string(R.string.theme_dark)).performClick()
@@ -252,7 +281,7 @@ class AppUpdaterScreenTest {
     fun `turns dynamic color on from settings`() {
         show(loaded())
 
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         compose.onNodeWithText(string(R.string.dynamic_color)).assertIsOff().performClick()
 
         assertEquals(listOf(true), dynamicColors)
@@ -263,7 +292,7 @@ class AppUpdaterScreenTest {
     fun `includes disabled apps from settings`() {
         show(loaded())
 
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         compose.onNodeWithText(string(R.string.disabled_apps)).performClick()
 
         assertEquals(listOf(true), disabledApps)
@@ -274,7 +303,7 @@ class AppUpdaterScreenTest {
     fun `shows nothing about app updates in settings while the app is up to date`() {
         show(loaded())
 
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
 
         compose.onNodeWithText(string(R.string.appearance)).assertIsDisplayed()
         compose.onAllNodesWithText(string(R.string.self_update_available)).assertCountEquals(0)
@@ -286,7 +315,7 @@ class AppUpdaterScreenTest {
         selfUpdate = SelfUpdate.Available
         show(loaded())
 
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         val update = bounds(string(R.string.self_update_available))
         val heading = text(string(R.string.appearance))
         assertTrue(update.bottom < heading.top)
@@ -303,7 +332,7 @@ class AppUpdaterScreenTest {
         selfUpdate = SelfUpdate.Downloading(DOWNLOADED)
         show(loaded())
 
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         compose.onNodeWithText(string(R.string.self_update_downloading, 42)).assertIsDisplayed()
         compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(DOWNLOADED, 0f..1f))).assertIsDisplayed()
         compose.onNodeWithText(string(R.string.self_update_available)).performClick()
@@ -316,7 +345,7 @@ class AppUpdaterScreenTest {
     fun `reaches the app update with the d-pad on television`() {
         selfUpdate = SelfUpdate.Available
         show(loaded(), keyboard = true)
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         compose.onNodeWithText(string(R.string.theme)).requestFocus()
 
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
@@ -362,7 +391,7 @@ class AppUpdaterScreenTest {
     }
 
     @Test
-    @Config(qualifiers = "w700dp-h1000dp")
+    @Config(qualifiers = "w620dp-h1000dp")
     fun `widens the margins from the medium breakpoint with the top app bar on the content edge`() {
         assertContentEdge(24.dp)
     }
@@ -381,11 +410,11 @@ class AppUpdaterScreenTest {
 
         val width = compose.onRoot().getBoundsInRoot().right
         val alpha = bounds("Alpha")
-        val refresh = compose.onNodeWithContentDescription(string(R.string.refresh), useUnmergedTree = true).getBoundsInRoot()
+        val trailing = compose.onNodeWithContentDescription(string(R.string.settings), useUnmergedTree = true).getBoundsInRoot()
         assertEquals(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp, alpha.right - alpha.left)
         assertEquals(alpha.left, width - alpha.right)
         assertEquals(alpha.left, text(string(R.string.updates)).left)
-        assertEquals(alpha.right, refresh.right)
+        assertEquals(alpha.right, trailing.right)
     }
 
     @Test
@@ -396,12 +425,12 @@ class AppUpdaterScreenTest {
         val width = compose.onRoot().getBoundsInRoot().right
         val alpha = bounds("Alpha")
         val beta = bounds("Beta")
-        val refresh = compose.onNodeWithContentDescription(string(R.string.refresh), useUnmergedTree = true).getBoundsInRoot()
+        val trailing = compose.onNodeWithContentDescription(string(R.string.settings), useUnmergedTree = true).getBoundsInRoot()
         assertEquals(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp, alpha.right - alpha.left)
         assertEquals(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp, beta.right - beta.left)
         assertEquals(alpha.left, width - beta.right)
         assertEquals(alpha.left, text(string(R.string.updates)).left)
-        assertEquals(beta.right, refresh.right)
+        assertEquals(beta.right, trailing.right)
     }
 
     @Test
@@ -426,6 +455,16 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    fun `moves focus to the top app bar when the last focused update leaves`() {
+        show(loaded(entry("Alpha")), keyboard = true)
+        compose.onNodeWithContentDescription(string(R.string.source_apkmirror)).requestFocus()
+
+        state = loaded()
+
+        compose.onNodeWithContentDescription(string(R.string.install_bundle)).assertIsFocused()
+    }
+
+    @Test
     fun `scrolls a focused update out from under the top app bar`() {
         show(loaded(*Array(8) { entry("App $it") }), keyboard = true)
         val contentTop = bounds("App 0").top
@@ -444,14 +483,14 @@ class AppUpdaterScreenTest {
     @Config(qualifiers = "w411dp-h891dp")
     fun `measures the settings by Google's list and app bar tokens`() {
         show(loaded())
-        compose.onNodeWithText(string(R.string.settings)).performClick()
+        openSettings()
         val heading = text(string(R.string.appearance))
         val themeItem = compose.onNodeWithText(string(R.string.theme)).getBoundsInRoot()
         val themeTitle = text(string(R.string.theme))
         val dynamicItem = compose.onNodeWithText(string(R.string.dynamic_color)).getBoundsInRoot()
         val title = text(string(R.string.settings))
 
-        assertEquals(16.dp, title.left)
+        assertEquals(56.dp, title.left)
         assertEquals(themeTitle.left, heading.left)
         assertEquals(themeItem.left + 16.dp, themeTitle.left)
         assertEquals(72.dp, themeItem.bottom - themeItem.top)
@@ -468,6 +507,10 @@ class AppUpdaterScreenTest {
         val dark = compose.onNodeWithText(string(R.string.theme_dark)).getBoundsInRoot()
         assertEquals(56.dp, light.bottom - light.top)
         assertEquals(light.bottom, dark.top)
+    }
+
+    private fun openSettings() {
+        compose.onNodeWithContentDescription(string(R.string.settings)).performClick()
     }
 
     private fun text(value: String): DpRect {
@@ -500,10 +543,10 @@ class AppUpdaterScreenTest {
 
         val width = compose.onRoot().getBoundsInRoot().right
         val cards = listOf(bounds("Alpha"), bounds("Beta"))
-        val refresh = compose.onNodeWithContentDescription(string(R.string.refresh), useUnmergedTree = true).getBoundsInRoot()
+        val trailing = compose.onNodeWithContentDescription(string(R.string.settings), useUnmergedTree = true).getBoundsInRoot()
         val title = text(string(R.string.updates))
         assertEquals(width - margin, cards.maxOf { it.right })
-        assertEquals(width - margin, refresh.right)
+        assertEquals(width - margin, trailing.right)
         assertEquals(cards.minOf { it.left }, title.left)
     }
 
@@ -580,6 +623,8 @@ class AppUpdaterScreenTest {
         const val BUNDLE = "content://downloads/bundle.apkm"
         const val BUNDLE_NAME = "Bundle.apkm"
         const val LONG_VERSION = "141.0.7390.122.4567.890.12345.67890.1234.5678.9012.3456.7890.1234.5678"
+        const val TRANSITION_PEEK_MILLIS = 50L
+        val ForwardSlide = 96.dp
         val PredictiveBack = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
     }
 }

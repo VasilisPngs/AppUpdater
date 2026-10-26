@@ -15,6 +15,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
@@ -55,7 +57,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -64,7 +65,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -99,10 +99,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
 import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -144,7 +140,6 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.isCrossWindowBlurEnabled
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -183,6 +178,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 import java.text.NumberFormat
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 private val ContentMargin = 16.dp
 private val CompactMargin = 16.dp
@@ -202,7 +198,7 @@ private const val TABULAR_FIGURES = "tnum"
 private const val PLAY_STORE_PACKAGE = "com.android.vending"
 private const val PLAY_LISTING_URL = "https://play.google.com/store/apps/details?id="
 private const val EXPANDED_COLUMNS = 2
-private const val FADE_THROUGH_SCALE = 0.92f
+private val ForwardSlide = 96.dp
 private const val PREDICTIVE_BACK_EXIT_SCALE = 0.9f
 private const val PREDICTIVE_BACK_ENTER_SCALE = 1.1f
 private const val PREDICTIVE_BACK_FADE_THRESHOLD = 0.35f
@@ -228,16 +224,12 @@ private sealed interface Screen : NavKey {
     data object Settings : Screen
 }
 
-private class TopLevelItem(
-    @StringRes val labelRes: Int,
-    @DrawableRes val iconRes: Int,
-    @DrawableRes val selectedIconRes: Int
-)
-
-private val TopLevelItems = mapOf(
-    Screen.Updates to TopLevelItem(R.string.updates, R.drawable.ic_updates, R.drawable.ic_updates_filled),
-    Screen.Settings to TopLevelItem(R.string.settings, R.drawable.ic_settings, R.drawable.ic_settings_filled)
-)
+@get:StringRes
+private val Screen.titleRes: Int
+    get() = when (this) {
+        Screen.Updates -> R.string.updates
+        Screen.Settings -> R.string.settings
+    }
 
 @get:StringRes
 private val ThemeMode.labelRes: Int
@@ -350,14 +342,12 @@ internal fun AppUpdaterScreen(
     val settingsBarState = rememberTopAppBarState()
     val updatesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
-    val navigationFocus = remember { FocusRequester() }
+    val barFocus = remember { FocusRequester() }
     val inputModeManager = LocalInputModeManager.current
-    val coroutineScope = rememberCoroutineScope()
     var themeDialog by rememberSaveable { mutableStateOf(false) }
-    var backNavigation by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        if (inputModeManager.inputMode == InputMode.Keyboard) navigationFocus.requestFocus()
+        if (inputModeManager.inputMode == InputMode.Keyboard) barFocus.requestFocus()
     }
 
     val updates = remember(uiState.installedApps, uiState.updates) {
@@ -367,20 +357,11 @@ internal fun AppUpdaterScreen(
         }
     }
 
-    val activeListState = if (current == Screen.Updates) updatesListState else settingsListState
-    val activeBarState = if (current == Screen.Updates) updatesBarState else settingsBarState
-    val activeFocus = if (current == Screen.Updates) updatesFocus else settingsFocus
-    val navigate: (Screen) -> Unit = { screen ->
-        if (screen != current) {
-            backNavigation = false
-            backStack.subList(1, backStack.size).clear()
-            if (screen != Screen.Updates) backStack.add(screen)
-        } else {
-            coroutineScope.reveal(activeListState, activeBarState)
-        }
+    val openSettings: () -> Unit = {
+        if (current != Screen.Settings) backStack.add(Screen.Settings)
     }
+    val goBack: () -> Unit = { backStack.removeLastOrNull() }
     val windowInfo = currentWindowAdaptiveInfoV2()
-    val navigationSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(windowInfo)
     val margin = if (windowInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)) {
         WideMargin
     } else {
@@ -391,12 +372,9 @@ internal fun AppUpdaterScreen(
     } else {
         1
     }
-    val navigationBar = navigationSuiteType == NavigationSuiteType.ShortNavigationBarCompact ||
-        navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
     val window = LocalActivity.current?.window
-    val navigationBarScrim = !navigationBar && WindowInsets.navigationBars.getBottom(LocalDensity.current) > 0
+    val navigationBarScrim = WindowInsets.navigationBars.getBottom(LocalDensity.current) > 0
     SideEffect(window, navigationBarScrim) { window?.isNavigationBarContrastEnforced = navigationBarScrim }
-    val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
 
     val context = LocalContext.current
     val television = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
@@ -406,157 +384,123 @@ internal fun AppUpdaterScreen(
         WindowInsets(0)
     }
 
-    NavigationSuiteScaffold(
-        navigationItems = {
-            TopLevelItems.forEach { (screen, item) ->
-                val selected = screen == current
-                NavigationSuiteItem(
-                    selected = selected,
-                    onClick = { navigate(screen) },
-                    icon = {
-                        Icon(
-                            painter = painterResource(if (selected) item.selectedIconRes else item.iconRes),
-                            contentDescription = null
-                        )
-                    },
-                    label = { Text(text = stringResource(item.labelRes)) },
-                    navigationSuiteType = navigationSuiteType,
-                    badge = if (screen == Screen.Updates && updates.isNotEmpty()) {
-                        {
-                            Badge {
-                                Text(
-                                    text = "${updates.size}",
-                                    modifier = Modifier.semantics { contentDescription = updatesAvailable }
+    val motion = MaterialTheme.motionScheme
+    val slide = with(LocalDensity.current) { ForwardSlide.roundToPx() }
+    val content: @Composable (Screen) -> Unit = { screen ->
+        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(if (screen == Screen.Updates) updatesBarState else settingsBarState)
+        val listColumns = if (screen == Screen.Updates) columns else 1
+        val listWidth = MaxListWidth * listColumns + ListItemDefaults.SegmentedGap * (listColumns - 1)
+        val contentInsets = ScaffoldDefaults.contentWindowInsets.add(overscan.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
+        var consumedInsets by remember { mutableStateOf(WindowInsets(0)) }
+        BoxWithConstraints(modifier = Modifier.onConsumedWindowInsetsChanged { consumedInsets = it }) {
+            val layoutDirection = LocalLayoutDirection.current
+            val insets = contentInsets.exclude(consumedInsets).asPaddingValues()
+            val safeWidth = maxWidth - insets.calculateStartPadding(layoutDirection) - insets.calculateEndPadding(layoutDirection)
+            val sideMargin = ((safeWidth - listWidth) / 2).coerceAtLeast(margin)
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text(text = stringResource(screen.titleRes)) },
+                        navigationIcon = {
+                            if (screen == Screen.Settings) {
+                                BarAction(
+                                    icon = R.drawable.ic_arrow_back,
+                                    label = stringResource(R.string.back),
+                                    onClick = goBack,
+                                    modifier = Modifier.focusProperties { down = settingsFocus }
                                 )
                             }
-                        }
-                    } else {
-                        null
-                    },
-                    modifier = Modifier
-                        .then(if (selected) Modifier.focusRequester(navigationFocus) else Modifier)
-                        .focusProperties {
-                            val first = screen == TopLevelItems.keys.first()
-                            val last = screen == TopLevelItems.keys.last()
-                            if (navigationBar) {
-                                up = activeFocus
-                                if (first) start = FocusRequester.Cancel
-                                if (last) end = FocusRequester.Cancel
-                            } else {
-                                end = activeFocus
-                                if (first) up = FocusRequester.Cancel
-                                if (last) down = FocusRequester.Cancel
+                        },
+                        actions = {
+                            if (screen == Screen.Updates) {
+                                val toUpdates = Modifier.focusProperties { down = updatesFocus }
+                                BarAction(
+                                    icon = R.drawable.ic_apk_install,
+                                    label = stringResource(R.string.install_bundle),
+                                    onClick = onPickBundle,
+                                    modifier = toUpdates.focusRequester(barFocus)
+                                )
+                                BarAction(
+                                    icon = R.drawable.ic_refresh,
+                                    label = stringResource(R.string.refresh),
+                                    onClick = onRefresh,
+                                    modifier = toUpdates
+                                )
+                                BarAction(
+                                    icon = R.drawable.ic_settings,
+                                    label = stringResource(R.string.settings),
+                                    onClick = openSettings,
+                                    modifier = toUpdates
+                                )
                             }
-                        }
-                )
-            }
-        },
-        modifier = modifier.windowInsetsPadding(overscan.only(WindowInsetsSides.Start)),
-        navigationSuiteType = navigationSuiteType
-    ) {
-        val motion = MaterialTheme.motionScheme
-        val content: @Composable (Screen) -> Unit = { screen ->
-            val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(if (screen == Screen.Updates) updatesBarState else settingsBarState)
-            val listColumns = if (screen == Screen.Updates) columns else 1
-            val listWidth = MaxListWidth * listColumns + ListItemDefaults.SegmentedGap * (listColumns - 1)
-            val contentInsets = ScaffoldDefaults.contentWindowInsets.add(overscan.only(WindowInsetsSides.Bottom + WindowInsetsSides.End))
-            var consumedInsets by remember { mutableStateOf(WindowInsets(0)) }
-            BoxWithConstraints(modifier = Modifier.onConsumedWindowInsetsChanged { consumedInsets = it }) {
-                val layoutDirection = LocalLayoutDirection.current
-                val insets = contentInsets.exclude(consumedInsets).asPaddingValues()
-                val safeWidth = maxWidth - insets.calculateStartPadding(layoutDirection) - insets.calculateEndPadding(layoutDirection)
-                val sideMargin = ((safeWidth - listWidth) / 2).coerceAtLeast(margin)
-                Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            title = { Text(text = stringResource(TopLevelItems.getValue(screen).labelRes)) },
-                            actions = {
-                                if (screen == Screen.Updates) {
-                                    val toUpdates = Modifier.focusProperties { down = updatesFocus }
-                                    BarAction(
-                                        icon = R.drawable.ic_apk_install,
-                                        label = stringResource(R.string.install_bundle),
-                                        onClick = onPickBundle,
-                                        modifier = toUpdates
-                                    )
-                                    BarAction(
-                                        icon = R.drawable.ic_refresh,
-                                        label = stringResource(R.string.refresh),
-                                        onClick = onRefresh,
-                                        modifier = toUpdates
-                                    )
-                                }
-                            },
-                            windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
-                            contentPadding = PaddingValues(horizontal = sideMargin - CompactMargin),
-                            scrollBehavior = scrollBehavior
-                        )
-                    },
-                    snackbarHost = { if (screen == current) SnackbarHost(hostState = snackbarHostState) },
-                    contentWindowInsets = contentInsets
-                ) { padding ->
-                    val density = LocalDensity.current
-                    val contentPadding = PaddingValues(
-                        start = padding.calculateStartPadding(layoutDirection) + sideMargin,
-                        top = padding.calculateTopPadding(),
-                        end = padding.calculateEndPadding(layoutDirection) + sideMargin,
-                        bottom = padding.calculateBottomPadding() + margin
+                        },
+                        windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+                        contentPadding = PaddingValues(horizontal = sideMargin - CompactMargin),
+                        scrollBehavior = scrollBehavior
                     )
-                    val platformScroll = LocalBringIntoViewSpec.current
-                    val focusScroll = remember(platformScroll, density) { FocusScroll(platformScroll, density) }
-                    SideEffect { focusScroll.padding = contentPadding }
+                },
+                snackbarHost = { if (screen == current) SnackbarHost(hostState = snackbarHostState) },
+                contentWindowInsets = contentInsets
+            ) { padding ->
+                val density = LocalDensity.current
+                val contentPadding = PaddingValues(
+                    start = padding.calculateStartPadding(layoutDirection) + sideMargin,
+                    top = padding.calculateTopPadding(),
+                    end = padding.calculateEndPadding(layoutDirection) + sideMargin,
+                    bottom = padding.calculateBottomPadding() + margin
+                )
+                val platformScroll = LocalBringIntoViewSpec.current
+                val focusScroll = remember(platformScroll, density) { FocusScroll(platformScroll, density) }
+                SideEffect { focusScroll.padding = contentPadding }
 
-                    CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
-                        when (screen) {
-                            Screen.Updates -> UpdatesView(
-                                listState = updatesListState,
-                                barState = updatesBarState,
-                                nestedScroll = scrollBehavior.nestedScrollConnection,
-                                focus = updatesFocus,
-                                exitFocus = navigationFocus,
-                                contentPadding = contentPadding,
-                                loaded = uiState.loaded,
-                                loading = uiState.scanning && !uiState.loaded,
-                                refreshing = uiState.scanning && uiState.loaded,
-                                notice = uiState.notice,
-                                updates = updates,
-                                installs = uiState.installs,
-                                playInstalls = uiState.playInstalls,
-                                onApkMirror = onApkMirror,
-                                onPlay = onPlay,
-                                onRefresh = onRefresh,
-                                columns = columns
-                            )
-                            Screen.Settings -> SettingsView(
-                                listState = settingsListState,
-                                barState = settingsBarState,
-                                nestedScroll = scrollBehavior.nestedScrollConnection,
-                                focus = settingsFocus,
-                                contentPadding = contentPadding,
-                                appearance = appearance,
-                                includeDisabledApps = uiState.includeDisabledApps,
-                                onIncludeDisabledAppsChange = onIncludeDisabledAppsChange,
-                                onTheme = { themeDialog = true },
-                                onDynamicColorChange = onDynamicColorChange,
-                                selfUpdate = selfUpdate,
-                                onUpdateApp = onUpdateApp
-                            )
-                        }
+                CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
+                    when (screen) {
+                        Screen.Updates -> UpdatesView(
+                            listState = updatesListState,
+                            barState = updatesBarState,
+                            nestedScroll = scrollBehavior.nestedScrollConnection,
+                            focus = updatesFocus,
+                            exitFocus = barFocus,
+                            contentPadding = contentPadding,
+                            loaded = uiState.loaded,
+                            loading = uiState.scanning && !uiState.loaded,
+                            refreshing = uiState.scanning && uiState.loaded,
+                            notice = uiState.notice,
+                            updates = updates,
+                            installs = uiState.installs,
+                            playInstalls = uiState.playInstalls,
+                            onApkMirror = onApkMirror,
+                            onPlay = onPlay,
+                            onRefresh = onRefresh,
+                            columns = columns
+                        )
+                        Screen.Settings -> SettingsView(
+                            listState = settingsListState,
+                            barState = settingsBarState,
+                            nestedScroll = scrollBehavior.nestedScrollConnection,
+                            focus = settingsFocus,
+                            contentPadding = contentPadding,
+                            appearance = appearance,
+                            includeDisabledApps = uiState.includeDisabledApps,
+                            onIncludeDisabledAppsChange = onIncludeDisabledAppsChange,
+                            onTheme = { themeDialog = true },
+                            onDynamicColorChange = onDynamicColorChange,
+                            selfUpdate = selfUpdate,
+                            onUpdateApp = onUpdateApp
+                        )
                     }
                 }
             }
         }
-        NavDisplay(
-            backStack = backStack,
-            onBack = {
-                backNavigation = true
-                backStack.removeLastOrNull()
-            },
-            transitionSpec = { fadeThrough(motion) },
-            popTransitionSpec = { if (backNavigation) backTransition(motion) else fadeThrough(motion) },
-            predictivePopTransitionSpec = { predictiveBackTransition() }
-        ) { screen -> NavEntry(screen, content = content) }
     }
+    NavDisplay(
+        backStack = backStack,
+        modifier = modifier,
+        onBack = goBack,
+        transitionSpec = { forwardTransition(motion, slide) },
+        popTransitionSpec = { backTransition(motion) },
+        predictivePopTransitionSpec = { predictiveBackTransition() }
+    ) { screen -> NavEntry(screen, content = content) }
 
     if (themeDialog) {
         ThemeDialog(
@@ -1191,9 +1135,9 @@ private fun dialogProperties() = DialogProperties(
     scrimAlpha = if (LocalWindowInfo.current.isCrossWindowBlurEnabled) BLURRED_SCRIM_ALPHA else SCRIM_ALPHA
 )
 
-private fun fadeThrough(motion: MotionScheme) =
-    (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), FADE_THROUGH_SCALE))
-        .togetherWith(fadeOut(motion.fastEffectsSpec()))
+private fun AnimatedContentTransitionScope<*>.forwardTransition(motion: MotionScheme, distance: Int) =
+    (slideIntoContainer(SlideDirection.Start, motion.defaultSpatialSpec()) { it.sign * distance } + fadeIn(motion.fastEffectsSpec()))
+        .togetherWith(slideOutOfContainer(SlideDirection.Start, motion.defaultSpatialSpec()) { it.sign * distance })
 
 private fun backTransition(motion: MotionScheme) =
     (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), PREDICTIVE_BACK_ENTER_SCALE))
