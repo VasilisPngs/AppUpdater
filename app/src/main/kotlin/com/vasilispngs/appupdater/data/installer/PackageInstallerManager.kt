@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -47,9 +48,42 @@ class PackageInstallerManager(
     suspend fun install(
         sources: List<ApkSource>,
         preapproved: Int? = null,
-        requireUserAction: Boolean = false
-    ): Result<String> = sessionLock.withLock {
-        withContext(ioDispatcher) { commit(sources, preapproved, requireUserAction) }
+        requireUserAction: Boolean = false,
+        packageName: String? = null
+    ): Result<String> = withContext(ioDispatcher) {
+        if (sources.isEmpty()) {
+            preapproved?.let(::abandon)
+            return@withContext Result.failure(IllegalArgumentException("No APK files to install."))
+        }
+
+        val installer = context.packageManager.packageInstaller
+        val sessionId = preapproved ?: try {
+            installer.createSession(
+                sessionParams(requireUserAction).apply {
+                    setSize(sources.sumOf { it.size.coerceAtLeast(0) })
+                    setAppPackageName(packageName)
+                }
+            )
+        } catch (exception: Exception) {
+            return@withContext Result.failure(exception)
+        }
+        val session = try {
+            installer.openSession(sessionId)
+        } catch (exception: Exception) {
+            abandon(sessionId)
+            return@withContext Result.failure(exception)
+        }
+
+        try {
+            runInterruptible { sources.forEach { session.write(it) } }
+            sessionLock.withLock { commit(session, sessionId) }
+        } catch (exception: CancellationException) {
+            val _ = runCatching { session.abandon() }
+            throw exception
+        } catch (exception: Exception) {
+            val _ = runCatching { session.abandon() }
+            Result.failure(exception)
+        }
     }
 
     fun abandon(sessionId: Int) {
@@ -98,25 +132,16 @@ class PackageInstallerManager(
         }
     }
 
-    private suspend fun commit(sources: List<ApkSource>, preapproved: Int?, requireUserAction: Boolean): Result<String> {
-        if (sources.isEmpty()) {
-            preapproved?.let(::abandon)
-            return Result.failure(IllegalArgumentException("No APK files to install."))
+    private fun PackageInstaller.Session.write(source: ApkSource) {
+        source.openStream().use { input ->
+            openWrite(source.name, 0, source.size).use { output ->
+                input.copyTo(output, COPY_BUFFER_SIZE)
+                fsync(output)
+            }
         }
+    }
 
-        val installer = context.packageManager.packageInstaller
-        val sessionId = preapproved ?: try {
-            installer.createSession(sessionParams(requireUserAction).apply { setSize(sources.sumOf { it.size.coerceAtLeast(0) }) })
-        } catch (exception: Exception) {
-            return Result.failure(exception)
-        }
-        val session = try {
-            installer.openSession(sessionId)
-        } catch (exception: Exception) {
-            abandon(sessionId)
-            return Result.failure(exception)
-        }
-
+    private suspend fun commit(session: PackageInstaller.Session, sessionId: Int): Result<String> {
         val result = CompletableDeferred<Result<String>>()
         val action = "${context.packageName}.PACKAGE_INSTALL_$sessionId"
         val receiver = object : BroadcastReceiver() {
@@ -132,24 +157,9 @@ class PackageInstallerManager(
 
         context.registerReceiver(receiver, IntentFilter(action), Context.RECEIVER_NOT_EXPORTED)
         return try {
-            sources.forEach { source ->
-                source.openStream().use { input ->
-                    session.openWrite(source.name, 0, source.size).use { output ->
-                        input.copyTo(output, COPY_BUFFER_SIZE)
-                        session.fsync(output)
-                    }
-                }
-            }
-
             session.commit(statusReceiver(action, sessionId))
             session.close()
             result.await()
-        } catch (exception: CancellationException) {
-            val _ = runCatching { session.abandon() }
-            throw exception
-        } catch (exception: Exception) {
-            val _ = runCatching { session.abandon() }
-            Result.failure(exception)
         } finally {
             pendingConfirmation.value = null
             val _ = runCatching { context.unregisterReceiver(receiver) }

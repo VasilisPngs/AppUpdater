@@ -10,6 +10,7 @@ okhttp = "5.5.1"
 kotlinxCoroutines = "1.11.0"
 kotlinxSerialization = "1.12.0"
 gplayapi = "3.6.4"
+protobuf = "4.37.0-RC1"
 asm = "9.11.1"
 junit4 = "4.13.2"
 robolectric = "4.17"
@@ -43,6 +44,7 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 aurora-gplayapi = { group = "com.auroraoss", name = "gplayapi", version.ref = "gplayapi" }
+protobuf-javalite = { group = "com.google.protobuf", name = "protobuf-javalite", version.ref = "protobuf" }
 asm-bom = { group = "org.ow2.asm", name = "asm-bom", version.ref = "asm" }
 junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
