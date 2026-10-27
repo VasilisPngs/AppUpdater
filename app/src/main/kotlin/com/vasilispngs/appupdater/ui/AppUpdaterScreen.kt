@@ -457,7 +457,8 @@ internal fun AppUpdaterScreen(
             }
         },
         modifier = modifier.windowInsetsPadding(overscan.only(WindowInsetsSides.Start)),
-        navigationSuiteType = navigationSuiteType
+        navigationSuiteType = navigationSuiteType,
+        navigationItemVerticalArrangement = Arrangement.Center
     ) {
         val motion = MaterialTheme.motionScheme
         val content: @Composable (Screen) -> Unit = { screen ->

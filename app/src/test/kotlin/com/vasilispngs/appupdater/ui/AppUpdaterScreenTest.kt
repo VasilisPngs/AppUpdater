@@ -20,7 +20,10 @@ import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
@@ -368,6 +371,19 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w700dp-h1000dp")
+    fun `centers the navigation rail items from the medium breakpoint`() {
+        show(loaded(entry("Alpha")))
+
+        val height = compose.onRoot().getBoundsInRoot().bottom
+        val updates = compose.onNode(tab(R.string.updates)).getBoundsInRoot()
+        val settings = compose.onNode(tab(R.string.settings)).getBoundsInRoot()
+        assertTrue(settings.top > updates.top)
+        assertTrue(updates.top > height / 3)
+        assertTrue(settings.bottom < height * 2 / 3)
+    }
+
+    @Test
     @Config(qualifiers = "w960dp-h540dp-television")
     fun `keeps the margins inside the television overscan`() {
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, true)
@@ -538,6 +554,9 @@ class AppUpdaterScreenTest {
     }
 
     private fun bounds(text: String): DpRect = compose.onNodeWithText(text).getBoundsInRoot()
+
+    private fun tab(@StringRes label: Int) =
+        hasText(string(label)) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
 
     private fun string(@StringRes id: Int, vararg args: Any): String = context.getString(id, *args)
 
