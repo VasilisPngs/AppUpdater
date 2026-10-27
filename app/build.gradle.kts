@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.ManagedVirtualDevice.PageAlignment
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.androidx.baselineprofile)
@@ -70,6 +72,7 @@ android {
                 device = "Pixel 10"
                 sdkVersion = 37
                 systemImageSource = "google"
+                pageAlignment = PageAlignment.FORCE_16KB_PAGES
                 testedAbi = "x86_64"
             }
         }
