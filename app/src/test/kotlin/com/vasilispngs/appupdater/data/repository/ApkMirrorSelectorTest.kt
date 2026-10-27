@@ -13,7 +13,8 @@ class ApkMirrorSelectorTest {
         abis = listOf("arm64-v8a", "armeabi-v7a", "armeabi"),
         densityDpi = 420,
         isTelevision = false,
-        isAutomotive = false
+        isAutomotive = false,
+        isDesktop = false
     )
 
     private val television = ApkMirrorSelector(
@@ -21,7 +22,17 @@ class ApkMirrorSelectorTest {
         abis = listOf("arm64-v8a", "armeabi-v7a", "armeabi"),
         densityDpi = 320,
         isTelevision = true,
-        isAutomotive = false
+        isAutomotive = false,
+        isDesktop = false
+    )
+
+    private val desktop = ApkMirrorSelector(
+        sdk = 36,
+        abis = listOf("arm64-v8a", "armeabi-v7a", "armeabi"),
+        densityDpi = 160,
+        isTelevision = false,
+        isAutomotive = false,
+        isDesktop = true
     )
 
     @Test
@@ -268,6 +279,24 @@ class ApkMirrorSelectorTest {
         assertNull(select(release, installed("1.9", 190)))
     }
 
+    @Test
+    fun `skips APKMirror's desktop builds on phones`() {
+        val release = release("100.0.982605956", apk(2099000023, "youtube-desktop-100-0-982605956"))
+
+        assertNull(select(release.copy(name = "YouTube (Desktop)"), installed("21.42.248", 1561304986)))
+        assertEquals(2099000023L, select(release, installed("21.42.248", 1561304986))?.apk?.versionCode)
+    }
+
+    @Test
+    fun `offers APKMirror's desktop builds on desktops`() {
+        val release = release("100.0.982605956", apk(2099000023, "youtube-desktop-100-0-982605956")).copy(name = "YouTube (Desktop)")
+
+        assertEquals(
+            2099000023L,
+            desktop.select(release, installed("100.0.982000000", 2099000022), requiresTelevisionBuild = false)?.apk?.versionCode
+        )
+    }
+
     private fun select(release: ApkMirrorApp, installed: InstalledApp) = phone.select(release, installed, requiresTelevisionBuild = false)
 
     private fun installed(
@@ -288,7 +317,7 @@ class ApkMirrorSelectorTest {
     )
 
     private fun release(versionName: String, vararg apks: ApkMirrorApk) =
-        ApkMirrorApp(PACKAGE, versionName, "2026-10-01 10:00:00", apks.toList())
+        ApkMirrorApp(PACKAGE, "App", versionName, "2026-10-01 10:00:00", apks.toList())
 
     private fun apk(
         versionCode: Long,

@@ -42,6 +42,7 @@ class ApkMirrorClient(private val userAgent: String) {
 
             ApkMirrorApp(
                 packageName = entry.optString("pname"),
+                name = entry.optJSONObject("app")?.optString("name").orEmpty(),
                 versionName = release?.optString("version").orEmpty(),
                 publishDate = release?.optString("publish_date").orEmpty(),
                 apks = parseApks(entry.optJSONArray("apks"))

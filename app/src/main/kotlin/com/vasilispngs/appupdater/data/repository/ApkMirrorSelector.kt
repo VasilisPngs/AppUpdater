@@ -17,12 +17,14 @@ internal class ApkMirrorSelector(
     abis: List<String>,
     densityDpi: Int,
     private val isTelevision: Boolean,
-    private val isAutomotive: Boolean
+    private val isAutomotive: Boolean,
+    private val isDesktop: Boolean
 ) {
     private val abis = abis.map(String::lowercase)
     private val densityBucket = DENSITY_BUCKETS.firstOrNull { it >= densityDpi } ?: DENSITY_BUCKETS.last()
 
     fun select(app: ApkMirrorApp, installed: InstalledApp, requiresTelevisionBuild: Boolean): MirrorCandidate? {
+        if (!isDesktop && app.name.trim().endsWith(DESKTOP_APP, ignoreCase = true)) return null
         if (!isStableRelease(app.versionName)) return null
         val releaseNumbers = versionNumbers(app.versionName)
         if (isInstalledVersion(releaseNumbers, versionNumbers(installed.versionName))) return null
@@ -205,6 +207,7 @@ internal class ApkMirrorSelector(
         const val LEANBACK = "leanback"
         const val LEANBACK_STANDALONE = "leanback_standalone"
         const val AUTOMOTIVE = "automotive"
+        const val DESKTOP_APP = "(Desktop)"
         const val VERSION_PREFIX = "v"
         val LEADING_ZEROS = Regex("^0+(?=\\d)")
         val UNIVERSAL_ARCHITECTURES = setOf("universal", "noarch")

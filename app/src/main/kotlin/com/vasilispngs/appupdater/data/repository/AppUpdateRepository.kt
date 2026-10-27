@@ -60,7 +60,8 @@ class AppUpdateRepository(
         abis = Build.SUPPORTED_ABIS.asList(),
         densityDpi = context.resources.displayMetrics.densityDpi,
         isTelevision = isTelevision,
-        isAutomotive = packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
+        isAutomotive = packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE),
+        isDesktop = packageManager.hasSystemFeature(PackageManager.FEATURE_PC)
     )
 
     val packageChanges: Flow<String> = callbackFlow {

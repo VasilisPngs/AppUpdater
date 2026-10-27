@@ -2,6 +2,7 @@ package com.vasilispngs.appupdater.data.model
 
 data class ApkMirrorApp(
     val packageName: String,
+    val name: String,
     val versionName: String,
     val publishDate: String,
     val apks: List<ApkMirrorApk>
