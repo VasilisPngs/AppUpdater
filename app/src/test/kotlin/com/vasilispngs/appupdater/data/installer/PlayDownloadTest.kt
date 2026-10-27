@@ -1,7 +1,6 @@
 package com.vasilispngs.appupdater.data.installer
 
 import com.aurora.gplayapi.AndroidAppDeliveryData
-import com.aurora.gplayapi.AndroidAppPatchData
 import com.aurora.gplayapi.SplitDeliveryData
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -99,23 +98,8 @@ class PlayDownloadTest {
         assertNull(ByteArrayInputStream(APK).gunzipped())
     }
 
-    @Test
-    fun `describes the download and the deltas Google Play offers`() {
-        val deltas = listOf(
-            Delta(3, Result.success(emptyList())),
-            Delta(4, Result.success(listOf(AndroidAppPatchData.newBuilder().setPatchFormat(4).setMaxPatchSize(200).build()))),
-            Delta(5, Result.failure(IllegalStateException("status 3")))
-        )
-
-        assertEquals(
-            "Google Play: gzip 600 B for 1 of 2 files · delta format 3 none · delta format 4 200 B for 1 · " +
-                "delta format 5 failed (java.lang.IllegalStateException: status 3)",
-            measurement(listOf(apk(compressedSize = 600)), 2, deltas) { "$it B" }
-        )
-    }
-
-    private fun apk(sha1: String = "", sha256: String = "", compressedSize: Long = 0) =
-        PlayApk("base.apk", "https://example.com/base", APK.size.toLong(), "", compressedSize, sha1, sha256)
+    private fun apk(sha1: String = "", sha256: String = "") =
+        PlayApk("base.apk", "https://example.com/base", APK.size.toLong(), "", 0, sha1, sha256)
 
     private fun ByteArray.digest(algorithm: String): ByteArray = MessageDigest.getInstance(algorithm).digest(this)
 

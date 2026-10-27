@@ -65,12 +65,7 @@ class InstallRepository(
         }
     }
 
-    suspend fun runPlayUpdate(
-        update: PlayUpdate,
-        onSize: (Long) -> Unit,
-        onMeasured: (String) -> Unit,
-        onProgress: (Float?) -> Unit
-    ): InstallEvent? {
+    suspend fun runPlayUpdate(update: PlayUpdate, onSize: (Long) -> Unit, onProgress: (Float?) -> Unit): InstallEvent? {
         val packageName = update.packageName
         playStates.update { it + (packageName to PlayInstall(null)) }
         val event = try {
@@ -78,7 +73,7 @@ class InstallRepository(
             if (approval == Preapproval.Declined) {
                 null
             } else {
-                playInstaller.install(packageName, update.versionCode, (approval as? Preapproval.Approved)?.sessionId, onSize, onMeasured) { progress ->
+                playInstaller.install(packageName, update.versionCode, (approval as? Preapproval.Approved)?.sessionId, onSize) { progress ->
                     playStates.update { it + (packageName to PlayInstall(progress)) }
                     onProgress(progress)
                 }.fold(

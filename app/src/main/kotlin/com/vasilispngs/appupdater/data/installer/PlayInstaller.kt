@@ -2,11 +2,8 @@ package com.vasilispngs.appupdater.data.installer
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.text.format.Formatter
 import android.util.Base64
 import com.aurora.gplayapi.AndroidAppDeliveryData
-import com.aurora.gplayapi.AndroidAppPatchData
-import com.aurora.gplayapi.Constants.PatchFormat
 import com.aurora.gplayapi.DeliveryResponse
 import com.aurora.gplayapi.exceptions.GooglePlayException
 import com.aurora.gplayapi.helpers.PurchaseHelper
@@ -43,7 +40,6 @@ class PlayInstaller(
         versionCode: Long,
         preapproved: Int?,
         onSize: (Long) -> Unit,
-        onMeasured: (String) -> Unit,
         onProgress: (Float?) -> Unit
     ): Result<Unit> = withContext(ioDispatcher) {
         try {
@@ -52,11 +48,6 @@ class PlayInstaller(
                 val (session, details) = catalog.details(packageName)
                 val purchases = PurchaseHelper(session).using(httpClient)
                 val certificate = packageManager.playCertificateHash(packageName)
-                val installedVersion = try {
-                    packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0)).longVersionCode
-                } catch (_: PackageManager.NameNotFoundException) {
-                    0L
-                }
 
                 val app = deliver(purchases, packageName, versionCode, details.offerType, certificate)
                 val libraries = details.dependencies.dependentLibraries
@@ -65,23 +56,14 @@ class PlayInstaller(
                     }
                     .filter { (name, code) -> name.isNotBlank() && code > 0 && !isSharedLibraryInstalled(name, code) }
                     .map { (name, code) -> deliver(purchases, name, code, LIBRARY_OFFER_TYPE, certificate) }
-                Delivery(app, libraries) { deltas(purchases, packageName, installedVersion, versionCode, details.offerType, certificate) }
+                Delivery(app, libraries)
             }
 
             val apks = delivery.app + delivery.libraries.flatten()
             onSize(apks.sumOf { if (it.compressedUrl.isEmpty()) it.size else it.compressedSize })
             val progress = Progress(apks.sumOf { it.size }.coerceAtLeast(1), onProgress)
-            val compressed = mutableListOf<PlayApk>()
-            val onCompressed: (PlayApk) -> Unit = { compressed += it }
-            delivery.libraries.forEach { files -> val _ = packageInstaller.install(sources(files, progress, onCompressed)).getOrThrow() }
-            val installed = packageInstaller.install(
-                sources(delivery.app, progress, onCompressed),
-                preapproved,
-                packageName = packageName
-            )
-            val deltas = runInterruptible { delivery.deltas() }
-            onMeasured(measurement(compressed, apks.size, deltas) { Formatter.formatShortFileSize(context, it) })
-            val _ = installed.getOrThrow()
+            delivery.libraries.forEach { files -> val _ = packageInstaller.install(sources(files, progress)).getOrThrow() }
+            val _ = packageInstaller.install(sources(delivery.app, progress), preapproved, packageName = packageName).getOrThrow()
             Result.success(Unit)
         } catch (exception: CancellationException) {
             preapproved?.let(packageInstaller::abandon)
@@ -115,50 +97,16 @@ class PlayInstaller(
         return data.apks()
     }
 
-    private fun deltas(
-        purchases: PurchaseHelper,
-        packageName: String,
-        installedVersion: Long,
-        versionCode: Long,
-        offerType: Int,
-        certificate: String?
-    ): List<Delta> = PatchFormat.entries.map { format ->
-        Delta(
-            format.value,
-            try {
-                val response = purchases.getDeliveryResponse(
-                    packageName = packageName,
-                    installedVersionCode = installedVersion,
-                    updateVersionCode = versionCode,
-                    offerType = offerType,
-                    patchFormat = format,
-                    deliveryToken = purchases.getDeliveryToken(packageName, versionCode, offerType, certificate),
-                    certificateHash = certificate
-                )
-                if (response.hasAppDeliveryData()) {
-                    Result.success(response.appDeliveryData.patches())
-                } else {
-                    Result.failure(IllegalStateException("status ${response.status}"))
-                }
-            } catch (exception: Exception) {
-                Result.failure(exception)
-            }
-        )
-    }
-
-    private fun sources(apks: List<PlayApk>, progress: Progress, onCompressed: (PlayApk) -> Unit): List<ApkSource> =
+    private fun sources(apks: List<PlayApk>, progress: Progress): List<ApkSource> =
         apks.map { apk ->
-            ApkSource(apk.name, apk.size) { apk.verified(apk.download(onCompressed), progress::advance) }
+            ApkSource(apk.name, apk.size) { apk.verified(apk.download(), progress::advance) }
         }
 
-    private fun PlayApk.download(onCompressed: (PlayApk) -> Unit): InputStream {
+    private fun PlayApk.download(): InputStream {
         if (compressedUrl.isNotEmpty()) {
             val response = fetch(compressedUrl, identity = true)
             if (response.isSuccessful) {
-                response.body.byteStream().gunzipped()?.let { stream ->
-                    onCompressed(this)
-                    return stream
-                }
+                response.body.byteStream().gunzipped()?.let { return it }
             } else {
                 response.close()
             }
@@ -180,7 +128,7 @@ class PlayInstaller(
         packageManager.getSharedLibraries(PackageManager.PackageInfoFlags.of(0))
             .any { it.name == packageName && it.longVersion == versionCode }
 
-    private class Delivery(val app: List<PlayApk>, val libraries: List<List<PlayApk>>, val deltas: () -> List<Delta>)
+    private class Delivery(val app: List<PlayApk>, val libraries: List<List<PlayApk>>)
 
     private class Progress(private val totalBytes: Long, private val onProgress: (Float?) -> Unit) {
         private var writtenBytes = 0L
@@ -211,8 +159,6 @@ internal class PlayApk(
     val sha1: String,
     val sha256: String
 )
-
-internal class Delta(val format: Int, val patches: Result<List<AndroidAppPatchData>>)
 
 internal fun AndroidAppDeliveryData.apks(): List<PlayApk> =
     listOf(PlayApk("base.apk", downloadUrl, downloadSize, compressedDownloadUrl, compressedSize, sha1.decodedHash(), sha256.decodedHash())) +
@@ -247,19 +193,6 @@ internal fun PlayApk.verified(input: InputStream, onBytes: (Int) -> Unit): Input
     return VerifiedStream(input, MessageDigest.getInstance(if (sha256.isBlank()) "SHA-1" else "SHA-256"), expected, name, onBytes)
 }
 
-internal fun measurement(compressed: List<PlayApk>, files: Int, deltas: List<Delta>, size: (Long) -> String): String =
-    (
-        listOf("gzip ${size(compressed.sumOf { it.compressedSize })} for ${compressed.size} of $files files") +
-            deltas.map { delta ->
-                "delta format ${delta.format} " + delta.patches.fold(
-                    onSuccess = { patches ->
-                        if (patches.isEmpty()) "none" else "${size(patches.sumOf { it.maxPatchSize })} for ${patches.size}"
-                    },
-                    onFailure = { "failed ($it)" }
-                )
-            }
-        ).joinToString(" · ", prefix = "Google Play: ")
-
 private fun DeliveryResponse.delivered(): AndroidAppDeliveryData = when (status) {
     DELIVERED -> appDeliveryData
     NOT_PURCHASED -> throw GooglePlayException.AppNotPurchased(status)
@@ -267,10 +200,6 @@ private fun DeliveryResponse.delivered(): AndroidAppDeliveryData = when (status)
     NOT_SUPPORTED, DEVICE_NOT_SUPPORTED -> throw GooglePlayException.AppNotSupported(status)
     else -> throw GooglePlayException.Unknown(status)
 }
-
-private fun AndroidAppDeliveryData.patches(): List<AndroidAppPatchData> =
-    listOfNotNull(patchData.takeIf { hasPatchData() }) +
-        splitDeliveryDataList.mapNotNull { split -> split.patchData.takeIf { split.hasPatchData() } }
 
 private fun String.decodedHash(): String = Base64.decode(this, Base64.URL_SAFE).toHexString()
 

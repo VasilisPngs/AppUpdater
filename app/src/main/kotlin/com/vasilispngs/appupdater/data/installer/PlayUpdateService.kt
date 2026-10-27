@@ -33,14 +33,12 @@ class PlayUpdateService : JobService() {
         setNotification(params, params.jobId, progress(update, null), JOB_END_NOTIFICATION_POLICY_REMOVE)
         val onProgress = rateLimited { setNotification(params, params.jobId, progress(update, it), JOB_END_NOTIFICATION_POLICY_REMOVE) }
         running[params.jobId] = scope.launch {
-            var offers: String? = null
             val event = (application as AppUpdaterApplication).container.installs.runPlayUpdate(
                 update,
                 onSize = { updateEstimatedNetworkBytes(params, it, 0) },
-                onMeasured = { offers = it },
                 onProgress = onProgress
             )
-            event?.let { notifications.notify(update.packageName, RESULT_ID, result(it, offers)) }
+            event?.let { notifications.notify(update.packageName, RESULT_ID, result(it)) }
             running.remove(params.jobId)
             jobFinished(params, false)
         }
@@ -67,12 +65,10 @@ class PlayUpdateService : JobService() {
             .setOngoing(true)
             .build()
 
-    private fun result(event: InstallEvent, offers: String?): Notification =
+    private fun result(event: InstallEvent): Notification =
         Notification.Builder(this, UPDATES_CHANNEL)
             .setSmallIcon(R.drawable.ic_updates)
             .setContentTitle(event.text(resources))
-            .setContentText(offers)
-            .setStyle(offers?.let { Notification.BigTextStyle().bigText(it) })
             .setContentIntent(openApp())
             .setAutoCancel(true)
             .build()
