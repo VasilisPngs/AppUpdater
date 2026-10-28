@@ -27,7 +27,7 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
 class PlayInstaller(
-    private val context: Context,
+    context: Context,
     private val catalog: PlayCatalog,
     private val httpClient: PlayHttpClient,
     private val packageInstaller: PackageInstallerManager,
