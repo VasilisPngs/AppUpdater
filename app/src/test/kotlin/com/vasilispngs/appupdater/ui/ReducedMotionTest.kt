@@ -13,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
-import com.vasilispngs.appupdater.data.model.Appearance
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.SelfUpdate
 import com.vasilispngs.appupdater.data.model.ThemeMode
@@ -65,7 +64,7 @@ class ReducedMotionTest {
                         installedApps = listOf(InstalledApp(packageName, "1.0", 1L, 26, emptySet(), emptySet(), true, false)),
                         updates = listOf(AppUpdateInfo(packageName, APP, "2.0", 2L, null, "https://www.apkmirror.com/", false, null))
                     ),
-                    appearance = Appearance(ThemeMode.System, dynamicColor = false),
+                    themeMode = ThemeMode.System,
                     snackbarHostState = remember { SnackbarHostState() },
                     onRefresh = {},
                     onPickBundle = {},
@@ -73,7 +72,6 @@ class ReducedMotionTest {
                     onPlay = {},
                     onIncludeDisabledAppsChange = {},
                     onThemeChange = {},
-                    onDynamicColorChange = {},
                     selfUpdate = SelfUpdate.Idle,
                     onUpdateApp = {}
                 )

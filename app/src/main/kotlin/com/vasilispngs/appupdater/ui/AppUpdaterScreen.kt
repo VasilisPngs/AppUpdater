@@ -169,7 +169,6 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import com.vasilispngs.appupdater.R
-import com.vasilispngs.appupdater.data.model.Appearance
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.InstallState
@@ -255,7 +254,7 @@ private val ThemeMode.labelRes: Int
 @Composable
 fun AppUpdaterScreen(
     viewModel: AppUpdaterViewModel,
-    appearance: Appearance,
+    themeMode: ThemeMode,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -316,7 +315,7 @@ fun AppUpdaterScreen(
 
     AppUpdaterScreen(
         uiState = uiState,
-        appearance = appearance,
+        themeMode = themeMode,
         snackbarHostState = snackbarHostState,
         onRefresh = viewModel::refresh,
         onPickBundle = pickBundle,
@@ -324,7 +323,6 @@ fun AppUpdaterScreen(
         onPlay = updateFromPlay,
         onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
         onThemeChange = viewModel::setThemeMode,
-        onDynamicColorChange = viewModel::setDynamicColor,
         selfUpdate = selfUpdate,
         onUpdateApp = viewModel::updateApp,
         modifier = modifier
@@ -334,7 +332,7 @@ fun AppUpdaterScreen(
 @Composable
 internal fun AppUpdaterScreen(
     uiState: AppUpdaterUiState,
-    appearance: Appearance,
+    themeMode: ThemeMode,
     snackbarHostState: SnackbarHostState,
     onRefresh: () -> Unit,
     onPickBundle: () -> Unit,
@@ -342,7 +340,6 @@ internal fun AppUpdaterScreen(
     onPlay: (AppUpdateInfo) -> Unit,
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
-    onDynamicColorChange: (Boolean) -> Unit,
     selfUpdate: SelfUpdate,
     onUpdateApp: () -> Unit,
     modifier: Modifier = Modifier
@@ -539,11 +536,10 @@ internal fun AppUpdaterScreen(
                                 nestedScroll = scrollBehavior.nestedScrollConnection,
                                 focus = settingsFocus,
                                 contentPadding = contentPadding,
-                                appearance = appearance,
+                                themeMode = themeMode,
                                 includeDisabledApps = uiState.includeDisabledApps,
                                 onIncludeDisabledAppsChange = onIncludeDisabledAppsChange,
                                 onTheme = { themeDialog = true },
-                                onDynamicColorChange = onDynamicColorChange,
                                 selfUpdate = selfUpdate,
                                 onUpdateApp = onUpdateApp
                             )
@@ -566,7 +562,7 @@ internal fun AppUpdaterScreen(
 
     if (themeDialog) {
         ThemeDialog(
-            current = appearance.themeMode,
+            current = themeMode,
             onDismiss = { themeDialog = false },
             onSelect = { mode ->
                 themeDialog = false
@@ -764,11 +760,10 @@ private fun SettingsView(
     nestedScroll: NestedScrollConnection,
     focus: FocusRequester,
     contentPadding: PaddingValues,
-    appearance: Appearance,
+    themeMode: ThemeMode,
     includeDisabledApps: Boolean,
     onIncludeDisabledAppsChange: (Boolean) -> Unit,
     onTheme: () -> Unit,
-    onDynamicColorChange: (Boolean) -> Unit,
     selfUpdate: SelfUpdate,
     onUpdateApp: () -> Unit
 ) {
@@ -796,26 +791,12 @@ private fun SettingsView(
         item(key = "theme") {
             SegmentedListItem(
                 onClick = onTheme,
-                shapes = ListItemDefaults.segmentedShapes(0, 2),
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
                 colors = listItemColors(),
                 modifier = reveal.modifier,
-                supportingContent = { Text(text = stringResource(appearance.themeMode.labelRes)) }
+                supportingContent = { Text(text = stringResource(themeMode.labelRes)) }
             ) {
                 Text(text = stringResource(R.string.theme))
-            }
-        }
-
-        item(key = "dynamic-color") {
-            SegmentedListItem(
-                checked = appearance.dynamicColor,
-                onCheckedChange = onDynamicColorChange,
-                modifier = Modifier.semantics { role = Role.Switch },
-                shapes = ListItemDefaults.segmentedShapes(1, 2),
-                colors = listItemColors(),
-                supportingContent = { Text(text = stringResource(R.string.dynamic_color_description)) },
-                trailingContent = { Switch(checked = appearance.dynamicColor, onCheckedChange = null) }
-            ) {
-                Text(text = stringResource(R.string.dynamic_color))
             }
         }
 

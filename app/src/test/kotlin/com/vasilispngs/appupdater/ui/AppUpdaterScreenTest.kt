@@ -26,7 +26,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
@@ -55,7 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.window.core.layout.WindowSizeClass
 import com.vasilispngs.appupdater.R
-import com.vasilispngs.appupdater.data.model.Appearance
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
 import com.vasilispngs.appupdater.data.model.InstallState
 import com.vasilispngs.appupdater.data.model.InstalledApp
@@ -87,7 +85,6 @@ class AppUpdaterScreenTest {
     private val played = mutableListOf<AppUpdateInfo>()
     private val opened = mutableListOf<String>()
     private val themes = mutableListOf<ThemeMode>()
-    private val dynamicColors = mutableListOf<Boolean>()
     private val disabledApps = mutableListOf<Boolean>()
     private var selfUpdate by mutableStateOf<SelfUpdate>(SelfUpdate.Idle)
     private var appUpdates = 0
@@ -249,16 +246,6 @@ class AppUpdaterScreenTest {
         compose.onNodeWithText(string(R.string.theme_dark)).performClick()
 
         assertEquals(listOf(ThemeMode.Dark), themes)
-    }
-
-    @Test
-    fun `turns dynamic color on from settings`() {
-        show(loaded())
-
-        compose.onNodeWithText(string(R.string.settings)).performClick()
-        compose.onNodeWithText(string(R.string.dynamic_color)).assertIsOff().performClick()
-
-        assertEquals(listOf(true), dynamicColors)
     }
 
     @Test
@@ -464,19 +451,13 @@ class AppUpdaterScreenTest {
         val heading = text(string(R.string.appearance))
         val themeItem = compose.onNodeWithText(string(R.string.theme)).getBoundsInRoot()
         val themeTitle = text(string(R.string.theme))
-        val dynamicItem = compose.onNodeWithText(string(R.string.dynamic_color)).getBoundsInRoot()
         val title = text(string(R.string.settings))
 
         assertEquals(16.dp, title.left)
         assertEquals(themeTitle.left, heading.left)
         assertEquals(themeItem.left + 16.dp, themeTitle.left)
         assertEquals(72.dp, themeItem.bottom - themeItem.top)
-        assertEquals(72.dp, dynamicItem.bottom - dynamicItem.top)
-        assertEquals(themeItem.left, dynamicItem.left)
-        assertEquals(themeItem.right, dynamicItem.right)
-        assertEquals(ListItemDefaults.SegmentedGap, dynamicItem.top - themeItem.bottom)
-        assertEquals(true to false, corners(string(R.string.theme)))
-        assertEquals(false to true, corners(string(R.string.dynamic_color)))
+        assertEquals(true to true, corners(string(R.string.theme)))
         assertEquals(true to true, corners(string(R.string.disabled_apps)))
 
         compose.onNodeWithText(string(R.string.theme)).performClick()
@@ -537,7 +518,7 @@ class AppUpdaterScreenTest {
             AppUpdaterTheme {
                 AppUpdaterScreen(
                     uiState = state,
-                    appearance = Appearance(ThemeMode.System, dynamicColor = false),
+                    themeMode = ThemeMode.System,
                     snackbarHostState = remember { SnackbarHostState() },
                     onRefresh = { refreshes++ },
                     onPickBundle = { bundlePicks++ },
@@ -545,7 +526,6 @@ class AppUpdaterScreenTest {
                     onPlay = { played += it },
                     onIncludeDisabledAppsChange = { disabledApps += it },
                     onThemeChange = { themes += it },
-                    onDynamicColorChange = { dynamicColors += it },
                     selfUpdate = selfUpdate,
                     onUpdateApp = { appUpdates++ }
                 )

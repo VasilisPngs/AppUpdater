@@ -8,7 +8,6 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.vasilispngs.appupdater.data.model.Appearance
 import com.vasilispngs.appupdater.data.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -23,9 +22,7 @@ class AppPreferences(
 ) {
     val includeDisabledApps: Flow<Boolean> = store.data.map { it[INCLUDE_DISABLED_APPS] ?: false }.distinctUntilChanged()
 
-    val appearance: Flow<Appearance> = store.data
-        .map { preferences -> Appearance(preferences.themeMode(), preferences[DYNAMIC_COLOR] ?: false) }
-        .distinctUntilChanged()
+    val themeMode: Flow<ThemeMode> = store.data.map { it.themeMode() }.distinctUntilChanged()
 
     suspend fun setIncludeDisabledApps(value: Boolean) {
         store.edit { it[INCLUDE_DISABLED_APPS] = value }
@@ -36,11 +33,7 @@ class AppPreferences(
         applyNightMode(mode)
     }
 
-    suspend fun setDynamicColor(value: Boolean) {
-        store.edit { it[DYNAMIC_COLOR] = value }
-    }
-
-    suspend fun restoreThemeMode(): ThemeMode = appearance.first().themeMode.also(::applyNightMode)
+    suspend fun restoreThemeMode(): ThemeMode = themeMode.first().also(::applyNightMode)
 
     private fun Preferences.themeMode(): ThemeMode = ThemeMode.entries.firstOrNull { it.name == this[THEME_MODE] } ?: ThemeMode.System
 
@@ -51,6 +44,5 @@ class AppPreferences(
     private companion object {
         val INCLUDE_DISABLED_APPS = booleanPreferencesKey("include_disabled_apps")
         val THEME_MODE = stringPreferencesKey("theme_mode")
-        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     }
 }

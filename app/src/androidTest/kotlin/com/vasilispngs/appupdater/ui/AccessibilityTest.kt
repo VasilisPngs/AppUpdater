@@ -15,7 +15,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
-import com.vasilispngs.appupdater.data.model.Appearance
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.PlayInstall
 import com.vasilispngs.appupdater.data.model.PlayVersion
@@ -90,7 +89,7 @@ class AccessibilityTest {
             AppUpdaterTheme(darkTheme = dark) {
                 AppUpdaterScreen(
                     uiState = state,
-                    appearance = Appearance(ThemeMode.System, dynamicColor = false),
+                    themeMode = ThemeMode.System,
                     snackbarHostState = remember { SnackbarHostState() },
                     onRefresh = {},
                     onPickBundle = {},
@@ -98,7 +97,6 @@ class AccessibilityTest {
                     onPlay = {},
                     onIncludeDisabledAppsChange = {},
                     onThemeChange = {},
-                    onDynamicColorChange = {},
                     selfUpdate = selfUpdate,
                     onUpdateApp = {}
                 )

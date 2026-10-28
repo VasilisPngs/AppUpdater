@@ -10,7 +10,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.vasilispngs.appupdater.AppUpdaterApplication
 import com.vasilispngs.appupdater.data.installer.InstallRepository
 import com.vasilispngs.appupdater.data.installer.SelfUpdater
-import com.vasilispngs.appupdater.data.model.Appearance
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.InstallState
@@ -71,7 +70,7 @@ class AppUpdaterViewModel(
 
     val selfUpdate: StateFlow<SelfUpdate> = selfUpdater.status
 
-    val appearance: StateFlow<Appearance?> = preferences.appearance
+    val themeMode: StateFlow<ThemeMode?> = preferences.themeMode
         .onStart { preferences.restoreThemeMode() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
@@ -153,13 +152,8 @@ class AppUpdaterViewModel(
     fun updateApp() = selfUpdater.update()
 
     fun setThemeMode(mode: ThemeMode) {
-        if (appearance.value?.themeMode == mode) return
+        if (themeMode.value == mode) return
         viewModelScope.launch { preferences.setThemeMode(mode) }
-    }
-
-    fun setDynamicColor(enabled: Boolean) {
-        if (appearance.value?.dynamicColor == enabled) return
-        viewModelScope.launch { preferences.setDynamicColor(enabled) }
     }
 
     fun messageShown(id: Long) {
