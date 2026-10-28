@@ -1,8 +1,10 @@
 package com.vasilispngs.appupdater.ui
 
+import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.InstallState
 import com.vasilispngs.appupdater.data.model.installEvent
+import com.vasilispngs.appupdater.data.repository.ScanProblem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -25,10 +27,17 @@ class InstallMessageTest {
     }
 
     @Test
-    fun `says why a bundle failed to install`() {
+    fun `says why a bundle failed to install in the system installer's words`() {
+        assertEquals("There's a problem with the app file", message(InstallState.Error(FILE_NAME, Failure.BadFile)))
+        assertEquals("This app is not compatible with your device", message(InstallState.Error(FILE_NAME, Failure.Incompatible)))
+        assertEquals("App not installed", message(InstallState.Error(FILE_NAME, Failure.NotInstalled)))
+    }
+
+    @Test
+    fun `names the shared library to install first`() {
         assertEquals(
-            "Installation failed: This file is not an APK or an APK bundle.",
-            message(InstallState.Error(FILE_NAME, "This file is not an APK or an APK bundle."))
+            "This app needs the shared library com.google.android.trichromelibrary_744404833. Install it first.",
+            message(InstallState.Error(FILE_NAME, Failure.MissingLibrary("com.google.android.trichromelibrary_744404833")))
         )
     }
 
@@ -48,8 +57,21 @@ class InstallMessageTest {
     @Test
     fun `says why an update failed`() {
         assertEquals(
-            "Update failed: Google Play: HTTP 429",
-            InstallEvent.Failed("Google Play: HTTP 429").text(resources)
+            "Google Play isn't available right now. Try again later.",
+            InstallEvent.Failed(Failure.PlayUnavailable).text(resources)
+        )
+        assertEquals(
+            "Couldn't reach auroraoss.com. Check your connection and any VPN, Private DNS, or content blocker.",
+            InstallEvent.Failed(Failure.SignInUnreachable("auroraoss.com")).text(resources)
+        )
+    }
+
+    @Test
+    fun `lists the apps Google Play could not check`() {
+        assertEquals("Couldn't check Chrome on Google Play", ScanProblem.PlayUnchecked(listOf("Chrome")).text(resources))
+        assertEquals(
+            "Couldn't check these apps on Google Play: Chrome, Maps, YouTube",
+            ScanProblem.PlayUnchecked(listOf("Chrome", "Maps", "YouTube")).text(resources)
         )
     }
 

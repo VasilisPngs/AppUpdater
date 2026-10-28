@@ -8,9 +8,10 @@ import com.aurora.gplayapi.DeliveryResponse
 import com.aurora.gplayapi.exceptions.GooglePlayException
 import com.aurora.gplayapi.helpers.PurchaseHelper
 import com.vasilispngs.appupdater.data.api.SharedHttpClient
+import com.vasilispngs.appupdater.data.model.Failure
+import com.vasilispngs.appupdater.data.model.FailureException
 import com.vasilispngs.appupdater.data.play.PlayCatalog
 import com.vasilispngs.appupdater.data.play.PlayHttpClient
-import com.vasilispngs.appupdater.data.play.deliveryFailure
 import com.vasilispngs.appupdater.data.play.playCertificateHash
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -21,7 +22,6 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.BufferedInputStream
 import java.io.FilterInputStream
-import java.io.IOException
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
@@ -81,19 +81,15 @@ class PlayInstaller(
         offerType: Int,
         certificate: String?
     ): List<PlayApk> {
-        val data = try {
-            val _ = runCatching { purchases.acquire(packageName, versionCode, offerType) }
-            purchases.getDeliveryResponse(
-                packageName = packageName,
-                updateVersionCode = versionCode,
-                offerType = offerType,
-                deliveryToken = purchases.getDeliveryToken(packageName, versionCode, offerType, certificate),
-                certificateHash = certificate
-            ).delivered()
-        } catch (exception: GooglePlayException) {
-            throw exception.deliveryFailure(packageName, versionCode)
-        }
-        if (data.downloadUrl.isEmpty()) throw IllegalStateException("Google Play returned no installable file.")
+        val _ = runCatching { purchases.acquire(packageName, versionCode, offerType) }
+        val data = purchases.getDeliveryResponse(
+            packageName = packageName,
+            updateVersionCode = versionCode,
+            offerType = offerType,
+            deliveryToken = purchases.getDeliveryToken(packageName, versionCode, offerType, certificate),
+            certificateHash = certificate
+        ).delivered()
+        if (data.downloadUrl.isEmpty()) throw FailureException(Failure.NotOffered)
         return data.apks()
     }
 
@@ -114,7 +110,7 @@ class PlayInstaller(
         val response = fetch(url)
         if (!response.isSuccessful) {
             response.close()
-            throw IOException("Google Play download failed (${response.code}).")
+            throw FailureException(Failure.PlayUnavailable)
         }
         return response.body.byteStream()
     }
@@ -188,9 +184,9 @@ internal fun PlayApk.verified(input: InputStream, onBytes: (Int) -> Unit): Input
     val expected = sha256.ifBlank { sha1 }
     if (expected.isBlank()) {
         input.close()
-        throw IOException("Google Play sent no checksum for $name.")
+        throw FailureException(Failure.Unverified)
     }
-    return VerifiedStream(input, MessageDigest.getInstance(if (sha256.isBlank()) "SHA-1" else "SHA-256"), expected, name, onBytes)
+    return VerifiedStream(input, MessageDigest.getInstance(if (sha256.isBlank()) "SHA-1" else "SHA-256"), expected, onBytes)
 }
 
 private fun DeliveryResponse.delivered(): AndroidAppDeliveryData = when (status) {
@@ -214,7 +210,6 @@ private class VerifiedStream(
     input: InputStream,
     private val digest: MessageDigest,
     private val expected: String,
-    private val name: String,
     private val onBytes: (Int) -> Unit
 ) : FilterInputStream(input) {
     private var verified = false
@@ -241,7 +236,7 @@ private class VerifiedStream(
         if (verified) return
         verified = true
         if (!digest.digest().toHexString().equals(expected, ignoreCase = true)) {
-            throw IOException("Google Play sent a damaged copy of $name.")
+            throw FailureException(Failure.Unverified)
         }
     }
 }

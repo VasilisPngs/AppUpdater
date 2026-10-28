@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Build
 import com.aurora.gplayapi.data.models.AuthData
 import com.aurora.gplayapi.helpers.AuthHelper
+import com.vasilispngs.appupdater.data.model.Failure
+import com.vasilispngs.appupdater.data.model.FailureException
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.io.File
@@ -47,17 +49,14 @@ class PlayAuthProvider(private val context: Context, val httpClient: PlayHttpCli
         val response = try {
             httpClient.postAuth(DISPENSER_URL, payload)
         } catch (exception: UnknownHostException) {
-            throw IllegalStateException(
-                "This device could not resolve $DISPENSER_HOST. Check the connection and any VPN, private DNS or content blocker.",
-                exception
-            )
+            throw FailureException(Failure.SignInUnreachable(DISPENSER_HOST), exception)
         }
-        if (!response.isSuccessful) throw IllegalStateException(dispenserError(response.code))
+        if (!response.isSuccessful) throw FailureException(dispenserFailure(response.code))
 
         val credentials = JSONObject(String(response.responseBytes))
         val email = credentials.optString("email")
         val token = credentials.optString("authToken")
-        check(email.isNotEmpty() && token.isNotEmpty()) { "The account dispenser returned no credentials." }
+        if (email.isEmpty() || token.isEmpty()) throw FailureException(Failure.SignInFailed)
 
         return AuthHelper.using(httpClient).build(
             email = email,
@@ -72,12 +71,12 @@ class PlayAuthProvider(private val context: Context, val httpClient: PlayHttpCli
         }
     }
 
-    private fun dispenserError(code: Int): String = when (code) {
-        400 -> "The account dispenser rejected the device configuration."
-        403 -> "The account dispenser refused this network."
-        429 -> "The account dispenser is rate limiting this network. Retry in ten minutes."
-        in 500..599 -> "The account dispenser is unavailable ($code)."
-        else -> "The account dispenser failed ($code)."
+    private fun dispenserFailure(code: Int): Failure = when (code) {
+        400 -> Failure.SignInRejected
+        403 -> Failure.SignInRefused
+        429 -> Failure.SignInLimited
+        in 500..599 -> Failure.SignInUnavailable
+        else -> Failure.SignInFailed
     }
 
     private companion object {

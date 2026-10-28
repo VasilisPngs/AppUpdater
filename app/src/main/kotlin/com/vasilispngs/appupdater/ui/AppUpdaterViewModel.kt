@@ -19,6 +19,7 @@ import com.vasilispngs.appupdater.data.model.SelfUpdate
 import com.vasilispngs.appupdater.data.model.ThemeMode
 import com.vasilispngs.appupdater.data.preferences.AppPreferences
 import com.vasilispngs.appupdater.data.repository.AppUpdateRepository
+import com.vasilispngs.appupdater.data.repository.ScanProblem
 import com.vasilispngs.appupdater.data.repository.ScanStatus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +40,7 @@ data class UserMessage(val id: Long, val event: InstallEvent)
 data class AppUpdaterUiState(
     val scanning: Boolean = true,
     val loaded: Boolean = false,
-    val notice: String? = null,
+    val problems: List<ScanProblem> = emptyList(),
     val installedApps: List<InstalledApp> = emptyList(),
     val updates: List<AppUpdateInfo> = emptyList(),
     val includeDisabledApps: Boolean = false,
@@ -122,13 +123,13 @@ class AppUpdaterViewModel(
                     is ScanStatus.Success -> current.copy(
                         scanning = false,
                         loaded = true,
-                        notice = null,
+                        problems = emptyList(),
                         updates = status.updates.pending(current.installedApps)
                     )
                     is ScanStatus.Error -> current.copy(
                         scanning = false,
                         loaded = true,
-                        notice = status.message,
+                        problems = status.problems,
                         updates = status.partialUpdates.pending(current.installedApps)
                     )
                 }

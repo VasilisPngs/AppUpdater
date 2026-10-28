@@ -55,12 +55,14 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.window.core.layout.WindowSizeClass
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstallState
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.PlayInstall
 import com.vasilispngs.appupdater.data.model.PlayVersion
 import com.vasilispngs.appupdater.data.model.SelfUpdate
 import com.vasilispngs.appupdater.data.model.ThemeMode
+import com.vasilispngs.appupdater.data.repository.ScanProblem
 import com.vasilispngs.appupdater.ui.theme.AppUpdaterTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -158,10 +160,10 @@ class AppUpdaterScreenTest {
 
     @Test
     fun `offers to try again when the check failed`() {
-        show(loaded(notice = NOTICE))
+        show(loaded(problems = listOf(ScanProblem.ApkMirror, ScanProblem.Play(Failure.PlayUnreachable))))
 
         compose.onNodeWithText(string(R.string.check_failed)).assertIsDisplayed()
-        compose.onNodeWithText(NOTICE).assertIsDisplayed()
+        compose.onNodeWithText(string(R.string.apkmirror_failed) + "\n" + string(R.string.play_unreachable)).assertIsDisplayed()
         compose.onNodeWithText(string(R.string.try_again)).performClick()
 
         assertEquals(1, refreshes)
@@ -542,12 +544,12 @@ class AppUpdaterScreenTest {
 
     private fun loaded(
         vararg entries: Pair<InstalledApp, AppUpdateInfo>,
-        notice: String? = null,
+        problems: List<ScanProblem> = emptyList(),
         playInstalls: Map<String, PlayInstall> = emptyMap()
     ) = AppUpdaterUiState(
         scanning = false,
         loaded = true,
-        notice = notice,
+        problems = problems,
         installedApps = entries.map { it.first },
         updates = entries.map { it.second },
         playInstalls = playInstalls
@@ -578,7 +580,6 @@ class AppUpdaterScreenTest {
         const val INSTALLED_CODE = 100L
         const val LATEST_CODE = 200L
         const val DOWNLOADED = 0.42f
-        const val NOTICE = "Network unavailable"
         const val BUNDLE = "content://downloads/bundle.apkm"
         const val BUNDLE_NAME = "Bundle.apkm"
         const val LONG_VERSION = "141.0.7390.122.4567.890.12345.67890.1234.5678.9012.3456.7890.1234.5678"

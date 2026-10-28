@@ -2,6 +2,8 @@ package com.vasilispngs.appupdater.data.installer
 
 import com.aurora.gplayapi.AndroidAppDeliveryData
 import com.aurora.gplayapi.SplitDeliveryData
+import com.vasilispngs.appupdater.data.model.Failure
+import com.vasilispngs.appupdater.data.model.FailureException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -11,7 +13,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.io.IOException
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
@@ -33,15 +34,15 @@ class PlayDownloadTest {
         val damaged = APK.copyOf().also { it[it.size / 2] = (it[it.size / 2] + 1).toByte() }
         val stream = apk(sha256 = APK.digest("SHA-256").toHexString()).verified(ByteArrayInputStream(damaged)) {}
 
-        val error = assertThrows(IOException::class.java) { val _ = stream.readBytes() }
-        assertEquals("Google Play sent a damaged copy of base.apk.", error.message)
+        val error = assertThrows(FailureException::class.java) { val _ = stream.readBytes() }
+        assertEquals(Failure.Unverified, error.failure)
     }
 
     @Test
     fun `refuses a Google Play file that ends early`() {
         val stream = apk(sha256 = APK.digest("SHA-256").toHexString()).verified(ByteArrayInputStream(APK.copyOf(APK.size - 1))) {}
 
-        assertThrows(IOException::class.java) { val _ = stream.readBytes() }
+        assertThrows(FailureException::class.java) { val _ = stream.readBytes() }
     }
 
     @Test
@@ -53,9 +54,9 @@ class PlayDownloadTest {
 
     @Test
     fun `refuses a Google Play file without a checksum`() {
-        val error = assertThrows(IOException::class.java) { apk().verified(ByteArrayInputStream(APK)) {} }
+        val error = assertThrows(FailureException::class.java) { apk().verified(ByteArrayInputStream(APK)) {} }
 
-        assertEquals("Google Play sent no checksum for base.apk.", error.message)
+        assertEquals(Failure.Unverified, error.failure)
     }
 
     @Test

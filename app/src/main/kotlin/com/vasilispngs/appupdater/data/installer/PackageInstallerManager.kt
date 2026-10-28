@@ -10,6 +10,8 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.icu.util.ULocale
 import androidx.core.graphics.drawable.toBitmap
+import com.vasilispngs.appupdater.data.model.Failure
+import com.vasilispngs.appupdater.data.model.FailureException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -53,7 +55,7 @@ class PackageInstallerManager(
     ): Result<String> = withContext(ioDispatcher) {
         if (sources.isEmpty()) {
             preapproved?.let(::abandon)
-            return@withContext Result.failure(IllegalArgumentException("No APK files to install."))
+            return@withContext Result.failure(FailureException(Failure.BadFile))
         }
 
         val installer = context.packageManager.packageInstaller
@@ -196,7 +198,7 @@ class PackageInstallerManager(
         if (status.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE) == PackageInstaller.STATUS_SUCCESS) {
             Result.success(status.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME).orEmpty())
         } else {
-            Result.failure(IllegalStateException(failureMessage(status.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))))
+            Result.failure(FailureException(installFailure(status)))
         }
 
     private fun sessionParams(requireUserAction: Boolean = false): PackageInstaller.SessionParams =
@@ -218,18 +220,22 @@ class PackageInstallerManager(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         ).intentSender
 
-    private fun failureMessage(message: String?): String {
-        val library = message?.let { MISSING_LIBRARY_PATTERN.find(it)?.groupValues?.get(1) }
-        return when {
-            library != null -> "Requires the shared library $library, install it first."
-            !message.isNullOrBlank() -> message
-            else -> INSTALLATION_FAILED
+    private fun installFailure(status: Intent): Failure =
+        when (status.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+            PackageInstaller.STATUS_FAILURE_BLOCKED -> Failure.Blocked
+            PackageInstaller.STATUS_FAILURE_CONFLICT -> Failure.Conflict
+            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> missingLibrary(status) ?: Failure.Incompatible
+            PackageInstaller.STATUS_FAILURE_INVALID -> Failure.Invalid
+            PackageInstaller.STATUS_FAILURE_STORAGE -> Failure.Storage
+            else -> Failure.NotInstalled
         }
-    }
+
+    private fun missingLibrary(status: Intent): Failure.MissingLibrary? =
+        status.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+            ?.let { MISSING_LIBRARY_PATTERN.find(it)?.groupValues?.get(1) }
+            ?.let(Failure::MissingLibrary)
 
     private companion object {
         val MISSING_LIBRARY_PATTERN = Regex("shared library ([^\\s;]+)")
     }
 }
-
-internal const val INSTALLATION_FAILED = "Installation failed"

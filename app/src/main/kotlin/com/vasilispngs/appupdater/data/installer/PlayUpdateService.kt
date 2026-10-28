@@ -38,7 +38,7 @@ class PlayUpdateService : JobService() {
                 onSize = { updateEstimatedNetworkBytes(params, it, 0) },
                 onProgress = onProgress
             )
-            event?.let { notifications.notify(update.packageName, RESULT_ID, result(it)) }
+            event?.let { notifications.notify(update.packageName, RESULT_ID, result(update, it)) }
             running.remove(params.jobId)
             jobFinished(params, false)
         }
@@ -65,13 +65,23 @@ class PlayUpdateService : JobService() {
             .setOngoing(true)
             .build()
 
-    private fun result(event: InstallEvent): Notification =
-        Notification.Builder(this, UPDATES_CHANNEL)
+    private fun result(update: PlayUpdate, event: InstallEvent): Notification {
+        val text = event.text(resources)
+        return Notification.Builder(this, UPDATES_CHANNEL)
             .setSmallIcon(R.drawable.ic_updates)
-            .setContentTitle(event.text(resources))
+            .apply {
+                if (event is InstallEvent.Failed) {
+                    setContentTitle(update.appName)
+                    setContentText(text)
+                    setStyle(Notification.BigTextStyle().bigText(text))
+                } else {
+                    setContentTitle(text)
+                }
+            }
             .setContentIntent(openApp())
             .setAutoCancel(true)
             .build()
+    }
 
     companion object {
         private const val RESULT_ID = 1

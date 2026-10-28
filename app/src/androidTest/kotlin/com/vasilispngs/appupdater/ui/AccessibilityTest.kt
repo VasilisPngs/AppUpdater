@@ -15,11 +15,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.PlayInstall
 import com.vasilispngs.appupdater.data.model.PlayVersion
 import com.vasilispngs.appupdater.data.model.SelfUpdate
 import com.vasilispngs.appupdater.data.model.ThemeMode
+import com.vasilispngs.appupdater.data.repository.ScanProblem
 import com.vasilispngs.appupdater.ui.theme.AppUpdaterTheme
 import org.junit.Before
 import org.junit.Rule
@@ -52,7 +54,7 @@ class AccessibilityTest {
     fun upToDate() = check(loaded())
 
     @Test
-    fun failedCheck() = check(loaded(notice = NOTICE))
+    fun failedCheck() = check(loaded(problems = listOf(ScanProblem.ApkMirror, ScanProblem.Play(Failure.PlayUnreachable))))
 
     @Test
     fun settings() {
@@ -108,12 +110,12 @@ class AccessibilityTest {
 
     private fun loaded(
         vararg entries: Pair<InstalledApp, AppUpdateInfo>,
-        notice: String? = null,
+        problems: List<ScanProblem> = emptyList(),
         playInstalls: Map<String, PlayInstall> = emptyMap()
     ) = AppUpdaterUiState(
         scanning = false,
         loaded = true,
-        notice = notice,
+        problems = problems,
         installedApps = entries.map { it.first },
         updates = entries.map { it.second },
         playInstalls = playInstalls
@@ -137,6 +139,5 @@ class AccessibilityTest {
         const val INSTALLED_CODE = 100L
         const val LATEST_CODE = 200L
         const val DOWNLOADED = 0.42f
-        const val NOTICE = "Network unavailable"
     }
 }

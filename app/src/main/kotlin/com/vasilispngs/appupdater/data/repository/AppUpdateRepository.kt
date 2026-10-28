@@ -14,10 +14,12 @@ import com.vasilispngs.appupdater.data.api.ApkMirrorClient
 import com.vasilispngs.appupdater.data.appLabel
 import com.vasilispngs.appupdater.data.model.ApkMirrorApp
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.PlayVersion
 import com.vasilispngs.appupdater.data.play.PlayCatalog
 import com.vasilispngs.appupdater.data.play.playCertificateHash
+import com.vasilispngs.appupdater.data.play.playLookupFailure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +43,14 @@ import java.util.Locale
 
 sealed interface ScanStatus {
     data class Success(val updates: List<AppUpdateInfo>) : ScanStatus
-    data class Error(val message: String, val partialUpdates: List<AppUpdateInfo>) : ScanStatus
+    data class Error(val problems: List<ScanProblem>, val partialUpdates: List<AppUpdateInfo>) : ScanStatus
+}
+
+sealed interface ScanProblem {
+    data object ApkMirror : ScanProblem
+    data object ApkMirrorPartial : ScanProblem
+    data class Play(val failure: Failure) : ScanProblem
+    data class PlayUnchecked(val apps: List<String>) : ScanProblem
 }
 
 class AppUpdateRepository(
@@ -122,22 +131,21 @@ class AppUpdateRepository(
         val delivery = offerMirrorVersionsOnPlay(merge(appsToCheck, mirrorApps, playApps, confirmation), playApps)
         val updates = delivery.updates.sortedWith(NEWEST_FIRST)
 
-        val failures = buildList {
+        val problems = buildList {
             val failedBatches = mirrorResults.count(Result<List<ApkMirrorApp>>::isFailure)
-            val mirrorFailure = mirrorResults.firstNotNullOfOrNull { it.exceptionOrNull() }?.let(::reason)
             when {
-                failedBatches == batches.size -> add("APKMirror: $mirrorFailure")
-                failedBatches > 0 -> add("Some applications were not checked on APKMirror: $mirrorFailure")
+                failedBatches == batches.size -> add(ScanProblem.ApkMirror)
+                failedBatches > 0 -> add(ScanProblem.ApkMirrorPartial)
             }
-            playResult.exceptionOrNull()?.let { add("Google Play: ${reason(it)}") }
+            playResult.exceptionOrNull()?.let { add(ScanProblem.Play(it.playLookupFailure())) }
             val unchecked = (confirmation.unconfirmed + delivery.unchecked)
                 .distinct()
                 .map(packageManager::appLabel)
                 .sortedWith(String.CASE_INSENSITIVE_ORDER)
-            if (unchecked.isNotEmpty()) add("Google Play: could not check ${unchecked.joinToString()}")
+            if (unchecked.isNotEmpty()) add(ScanProblem.PlayUnchecked(unchecked))
         }
 
-        if (failures.isEmpty()) ScanStatus.Success(updates) else ScanStatus.Error(failures.joinToString("\n"), updates)
+        if (problems.isEmpty()) ScanStatus.Success(updates) else ScanStatus.Error(problems, updates)
     }
 
     private inline fun <T> attempt(block: () -> T): Result<T> = try {
@@ -147,9 +155,6 @@ class AppUpdateRepository(
     } catch (exception: Exception) {
         Result.failure(exception)
     }
-
-    private fun reason(exception: Throwable): String =
-        exception.message?.takeIf(String::isNotBlank) ?: exception::class.simpleName.orEmpty()
 
     private suspend fun confirmPlayUpdates(candidates: List<App>): PlayConfirmation = coroutineScope {
         val permits = Semaphore(PLAY_CONFIRMATIONS)

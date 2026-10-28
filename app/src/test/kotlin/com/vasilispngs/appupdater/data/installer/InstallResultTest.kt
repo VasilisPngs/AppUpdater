@@ -6,6 +6,8 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.icu.util.ULocale
+import com.vasilispngs.appupdater.data.model.Failure
+import com.vasilispngs.appupdater.data.model.FailureException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -35,26 +37,28 @@ class InstallResultTest {
                 "com.google.android.trichromelibrary_744404833; failing!"
         )
 
-        assertEquals(
-            "Requires the shared library com.google.android.trichromelibrary_744404833, install it first.",
-            installer.installResult(status).exceptionOrNull()?.message
-        )
+        assertEquals(Failure.MissingLibrary("com.google.android.trichromelibrary_744404833"), failure(status))
     }
 
     @Test
-    fun `keeps the reason the installer gave`() {
+    fun `names the cause of a failed install as the system installer does`() {
+        mapOf(
+            PackageInstaller.STATUS_FAILURE_BLOCKED to Failure.Blocked,
+            PackageInstaller.STATUS_FAILURE_CONFLICT to Failure.Conflict,
+            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE to Failure.Incompatible,
+            PackageInstaller.STATUS_FAILURE_INVALID to Failure.Invalid,
+            PackageInstaller.STATUS_FAILURE_STORAGE to Failure.Storage
+        ).forEach { (code, failure) -> assertEquals(failure, failure(status(code))) }
+    }
+
+    @Test
+    fun `says the app was not installed instead of the system's debugging text`() {
         val status = status(PackageInstaller.STATUS_FAILURE_ABORTED)
             .putExtra(PackageInstaller.EXTRA_STATUS_MESSAGE, "Session was abandoned")
 
-        assertEquals("Session was abandoned", installer.installResult(status).exceptionOrNull()?.message)
-    }
-
-    @Test
-    fun `says installation failed without a reason`() {
-        assertEquals(
-            "Installation failed",
-            installer.installResult(status(PackageInstaller.STATUS_FAILURE)).exceptionOrNull()?.message
-        )
+        assertEquals(Failure.NotInstalled, failure(status))
+        assertEquals(Failure.NotInstalled, failure(status(PackageInstaller.STATUS_FAILURE)))
+        assertEquals(Failure.NotInstalled, failure(status(PackageInstaller.STATUS_FAILURE_TIMEOUT)))
     }
 
     @Test
@@ -108,6 +112,8 @@ class InstallResultTest {
     }
 
     private fun status(code: Int): Intent = Intent().putExtra(PackageInstaller.EXTRA_STATUS, code)
+
+    private fun failure(status: Intent): Failure? = (installer.installResult(status).exceptionOrNull() as? FailureException)?.failure
 
     private companion object {
         const val SESSION = 7

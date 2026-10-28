@@ -4,11 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.InstallState
 import com.vasilispngs.appupdater.data.model.PlayInstall
 import com.vasilispngs.appupdater.data.model.PlayUpdate
 import com.vasilispngs.appupdater.data.model.installEvent
+import com.vasilispngs.appupdater.data.play.playUpdateFailure
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,7 +63,7 @@ class InstallRepository(
         val request = PlayUpdate(packageName, update.appName, target.name, target.code, target.code == update.newVersionCode)
         if (!PlayUpdateService.schedule(context, request)) {
             playStates.update { it - packageName }
-            finished.tryEmit(InstallEvent.Failed(INSTALLATION_FAILED))
+            finished.tryEmit(InstallEvent.Failed(Failure.NotInstalled))
         }
     }
 
@@ -80,7 +82,7 @@ class InstallRepository(
                     onSuccess = {
                         if (update.latest) InstallEvent.Finished(update.appName) else InstallEvent.FinishedFromPlay(update.appName, update.versionName)
                     },
-                    onFailure = { InstallEvent.Failed(it.message ?: INSTALLATION_FAILED) }
+                    onFailure = { InstallEvent.Failed(it.playUpdateFailure()) }
                 )
             }
         } finally {

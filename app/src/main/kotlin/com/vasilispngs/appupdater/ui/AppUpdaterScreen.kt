@@ -170,12 +170,14 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.InstallState
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.PlayInstall
 import com.vasilispngs.appupdater.data.model.SelfUpdate
 import com.vasilispngs.appupdater.data.model.ThemeMode
+import com.vasilispngs.appupdater.data.repository.ScanProblem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -401,6 +403,7 @@ internal fun AppUpdaterScreen(
     val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
 
     val context = LocalContext.current
+    val resources = LocalResources.current
     val television = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
     val overscan = if (television) {
         WindowInsets(TvOverscanHorizontal, TvOverscanVertical, TvOverscanHorizontal, TvOverscanVertical)
@@ -521,7 +524,7 @@ internal fun AppUpdaterScreen(
                                 loaded = uiState.loaded,
                                 loading = uiState.scanning && !uiState.loaded,
                                 refreshing = uiState.scanning && uiState.loaded,
-                                notice = uiState.notice,
+                                notice = uiState.problems.takeIf { it.isNotEmpty() }?.joinToString("\n") { it.text(resources) },
                                 updates = updates,
                                 installs = uiState.installs,
                                 playInstalls = uiState.playInstalls,
@@ -1228,14 +1231,41 @@ private class FocusScroll(private val platform: BringIntoViewSpec, private val d
 
 internal fun InstallEvent.text(resources: Resources): String = when (this) {
     is InstallEvent.Installed -> resources.getString(R.string.app_installed, appName)
-    is InstallEvent.InstallFailed -> resources.getString(R.string.install_failed, message)
     is InstallEvent.Finished -> resources.getString(R.string.update_installed, appName)
     is InstallEvent.FinishedFromPlay -> resources.getString(
         R.string.update_installed_play,
         appName,
         displayVersion(versionName, resources.getString(R.string.version_number))
     )
-    is InstallEvent.Failed -> resources.getString(R.string.update_failed, message)
+    is InstallEvent.Failed -> failure.text(resources)
+}
+
+internal fun Failure.text(resources: Resources): String = when (this) {
+    Failure.Blocked -> resources.getString(R.string.install_failed_blocked)
+    Failure.Conflict -> resources.getString(R.string.install_failed_conflict)
+    Failure.Incompatible -> resources.getString(R.string.install_failed_incompatible)
+    Failure.Invalid -> resources.getString(R.string.install_failed_invalid)
+    Failure.Storage -> resources.getString(R.string.install_failed_storage)
+    Failure.NotInstalled -> resources.getString(R.string.install_failed)
+    Failure.BadFile -> resources.getString(R.string.install_failed_file)
+    is Failure.MissingLibrary -> resources.getString(R.string.install_failed_library, library)
+    Failure.NotOffered -> resources.getString(R.string.play_not_offered)
+    Failure.PlayUnavailable -> resources.getString(R.string.play_unavailable)
+    Failure.PlayUnreachable -> resources.getString(R.string.play_unreachable)
+    Failure.Unverified -> resources.getString(R.string.play_unverified)
+    is Failure.SignInUnreachable -> resources.getString(R.string.sign_in_unreachable, host)
+    Failure.SignInRejected -> resources.getString(R.string.sign_in_rejected)
+    Failure.SignInRefused -> resources.getString(R.string.sign_in_refused)
+    Failure.SignInLimited -> resources.getString(R.string.sign_in_limited)
+    Failure.SignInUnavailable -> resources.getString(R.string.sign_in_unavailable)
+    Failure.SignInFailed -> resources.getString(R.string.sign_in_failed)
+}
+
+internal fun ScanProblem.text(resources: Resources): String = when (this) {
+    ScanProblem.ApkMirror -> resources.getString(R.string.apkmirror_failed)
+    ScanProblem.ApkMirrorPartial -> resources.getString(R.string.apkmirror_partial)
+    is ScanProblem.Play -> failure.text(resources)
+    is ScanProblem.PlayUnchecked -> resources.getQuantityString(R.plurals.play_unchecked, apps.size, apps.joinToString())
 }
 
 private fun displayVersion(name: String, numberFormat: String): String {

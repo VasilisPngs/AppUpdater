@@ -19,7 +19,7 @@ class UpdatedReceiver : BroadcastReceiver() {
             UPDATED_ID,
             Notification.Builder(context, UPDATES_CHANNEL)
                 .setSmallIcon(R.drawable.ic_updates)
-                .setContentTitle(context.getString(R.string.update_installed, context.getString(R.string.app_name)))
+                .setContentTitle(context.getString(R.string.app_updated))
                 .setContentIntent(context.openApp())
                 .setAutoCancel(true)
                 .build()

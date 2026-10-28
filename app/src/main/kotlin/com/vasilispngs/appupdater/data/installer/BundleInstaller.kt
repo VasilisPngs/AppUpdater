@@ -8,14 +8,16 @@ import android.os.Build
 import android.provider.OpenableColumns
 import android.util.DisplayMetrics
 import com.vasilispngs.appupdater.data.appLabel
+import com.vasilispngs.appupdater.data.model.Failure
+import com.vasilispngs.appupdater.data.model.FailureException
 import com.vasilispngs.appupdater.data.model.InstallState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.util.zip.ZipEntry
-import java.util.zip.ZipException
 import java.util.zip.ZipFile
 
 class BundleInstaller(
@@ -39,10 +41,12 @@ class BundleInstaller(
                 onState(context.packageManager.installedApp(packageName, label))
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: ZipException) {
-                onState(InstallState.Error(label, "This file is not an APK or an APK bundle."))
-            } catch (exception: Exception) {
-                onState(InstallState.Error(label, exception.message ?: INSTALLATION_FAILED))
+            } catch (exception: FailureException) {
+                onState(InstallState.Error(label, exception.failure))
+            } catch (_: IOException) {
+                onState(InstallState.Error(label, Failure.BadFile))
+            } catch (_: Exception) {
+                onState(InstallState.Error(label, Failure.NotInstalled))
             } finally {
                 archive.delete()
             }
@@ -140,7 +144,7 @@ class BundleInstaller(
 
     private fun copyToCache(uri: Uri, target: File) {
         val input = context.contentResolver.openInputStream(uri)
-            ?: throw IllegalArgumentException("This file could not be opened.")
+            ?: throw FailureException(Failure.BadFile)
         input.use { source -> target.outputStream().use { output -> source.copyTo(output, COPY_BUFFER_SIZE) } }
     }
 
@@ -151,7 +155,7 @@ class BundleInstaller(
                 if (cursor.moveToFirst()) cursor.getString(0) else null
             }
         }.getOrNull()
-        return name ?: uri.lastPathSegment ?: "Package"
+        return name ?: uri.lastPathSegment.orEmpty()
     }
 
     private companion object {

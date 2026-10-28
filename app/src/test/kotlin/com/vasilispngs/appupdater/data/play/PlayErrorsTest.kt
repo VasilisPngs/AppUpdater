@@ -1,8 +1,12 @@
 package com.vasilispngs.appupdater.data.play
 
 import com.aurora.gplayapi.exceptions.GooglePlayException
+import com.vasilispngs.appupdater.data.model.Failure
+import com.vasilispngs.appupdater.data.model.FailureException
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.IOException
+import java.net.UnknownHostException
 
 class PlayErrorsTest {
     @Test
@@ -13,29 +17,36 @@ class PlayErrorsTest {
             GooglePlayException.AppRemoved(7),
             GooglePlayException.NotFound(404),
             GooglePlayException.Unknown(-1)
-        ).forEach {
-            assertEquals("Google Play does not offer $PACKAGE $VERSION.", it.deliveryFailure(PACKAGE, VERSION).message)
-        }
+        ).forEach { assertEquals(Failure.NotOffered, it.playUpdateFailure()) }
     }
 
     @Test
-    fun `keeps the reason of a failure that is not about the release`() {
-        assertEquals(
-            "Google Play: HTTP 429",
-            GooglePlayException.Unknown(429, "HTTP 429").deliveryFailure(PACKAGE, VERSION).message
-        )
-        assertEquals(
-            "Google Play: Service Unavailable",
-            GooglePlayException.Server(503, "Service Unavailable").deliveryFailure(PACKAGE, VERSION).message
-        )
-        assertEquals(
-            "Google Play: Token expired",
-            GooglePlayException.AuthException(401, "Token expired").deliveryFailure(PACKAGE, VERSION).message
-        )
+    fun `tells a Google Play failure from a release it does not offer`() {
+        listOf(
+            GooglePlayException.Unknown(429, "HTTP 429"),
+            GooglePlayException.Server(503, "Service Unavailable"),
+            GooglePlayException.AuthException(401, "Token expired")
+        ).forEach { assertEquals(Failure.PlayUnavailable, it.playUpdateFailure()) }
     }
 
-    private companion object {
-        const val PACKAGE = "com.example.app"
-        const val VERSION = 42L
+    @Test
+    fun `tells a lost connection from a Google Play failure`() {
+        assertEquals(Failure.PlayUnreachable, UnknownHostException().playUpdateFailure())
+        assertEquals(Failure.PlayUnreachable, IOException().playLookupFailure())
+    }
+
+    @Test
+    fun `keeps the failure the app already named`() {
+        val signIn = FailureException(Failure.SignInLimited)
+
+        assertEquals(Failure.SignInLimited, signIn.playUpdateFailure())
+        assertEquals(Failure.SignInLimited, signIn.playLookupFailure())
+    }
+
+    @Test
+    fun `says an update failed when nothing names the cause`() {
+        assertEquals(Failure.NotInstalled, IllegalStateException().playUpdateFailure())
+        assertEquals(Failure.PlayUnavailable, IllegalStateException().playLookupFailure())
+        assertEquals(Failure.PlayUnavailable, GooglePlayException.NotFound(404).playLookupFailure())
     }
 }
