@@ -14,6 +14,7 @@ import com.vasilispngs.appupdater.AppUpdaterApplication
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.PlayUpdate
+import com.vasilispngs.appupdater.ui.latestOnPlay
 import com.vasilispngs.appupdater.ui.text
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,22 +66,25 @@ class PlayUpdateService : JobService() {
             .setOngoing(true)
             .build()
 
-    private fun result(update: PlayUpdate, event: InstallEvent): Notification {
-        val text = event.text(resources)
-        return Notification.Builder(this, UPDATES_CHANNEL)
+    private fun result(update: PlayUpdate, event: InstallEvent): Notification =
+        Notification.Builder(this, UPDATES_CHANNEL)
             .setSmallIcon(R.drawable.ic_updates)
             .apply {
-                if (event is InstallEvent.Failed) {
-                    setContentTitle(update.appName)
-                    setContentText(text)
-                    setStyle(Notification.BigTextStyle().bigText(text))
-                } else {
-                    setContentTitle(text)
+                when (event) {
+                    is InstallEvent.Failed -> details(update.appName, event.text(resources))
+                    is InstallEvent.FinishedFromPlay ->
+                        details(getString(R.string.update_installed, event.appName), event.latestOnPlay(resources))
+                    else -> setContentTitle(event.text(resources))
                 }
             }
             .setContentIntent(openApp())
             .setAutoCancel(true)
             .build()
+
+    private fun Notification.Builder.details(title: String, text: String) {
+        setContentTitle(title)
+        setContentText(text)
+        setStyle(Notification.BigTextStyle().bigText(text))
     }
 
     companion object {

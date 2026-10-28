@@ -52,6 +52,7 @@ class InstallMessageTest {
             "Chrome was updated to v142.0, the latest on Google Play",
             InstallEvent.FinishedFromPlay("Chrome", "142.0").text(resources)
         )
+        assertEquals("The latest on Google Play is v142.0", InstallEvent.FinishedFromPlay("Chrome", "142.0").latestOnPlay(resources))
     }
 
     @Test

@@ -34,6 +34,7 @@
     <string name="update_installed">%1$s was updated</string>
     <string name="app_updated">App updated</string>
     <string name="update_installed_play">%1$s was updated to %2$s, the latest on Google Play</string>
+    <string name="latest_on_play">The latest on Google Play is %1$s</string>
     <string name="install_failed">App not installed</string>
     <string name="install_failed_blocked">This app was blocked from being installed</string>
     <string name="install_failed_conflict">This app conflicts with an app already on your device</string>

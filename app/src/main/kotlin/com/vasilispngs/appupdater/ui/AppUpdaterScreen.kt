@@ -1240,6 +1240,9 @@ internal fun InstallEvent.text(resources: Resources): String = when (this) {
     is InstallEvent.Failed -> failure.text(resources)
 }
 
+internal fun InstallEvent.FinishedFromPlay.latestOnPlay(resources: Resources): String =
+    resources.getString(R.string.latest_on_play, displayVersion(versionName, resources.getString(R.string.version_number)))
+
 internal fun Failure.text(resources: Resources): String = when (this) {
     Failure.Blocked -> resources.getString(R.string.install_failed_blocked)
     Failure.Conflict -> resources.getString(R.string.install_failed_conflict)
