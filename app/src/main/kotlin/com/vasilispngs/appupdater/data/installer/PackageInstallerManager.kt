@@ -10,6 +10,7 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.icu.util.ULocale
 import androidx.core.graphics.drawable.toBitmap
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.FailureException
 import kotlinx.coroutines.CancellationException
@@ -198,7 +199,7 @@ class PackageInstallerManager(
         if (status.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE) == PackageInstaller.STATUS_SUCCESS) {
             Result.success(status.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME).orEmpty())
         } else {
-            Result.failure(FailureException(installFailure(status)))
+            Result.failure(FailureException(installFailure(status), code = installerCode(status)))
         }
 
     private fun sessionParams(requireUserAction: Boolean = false): PackageInstaller.SessionParams =
@@ -235,7 +236,13 @@ class PackageInstallerManager(
             ?.let { MISSING_LIBRARY_PATTERN.find(it)?.groupValues?.get(1) }
             ?.let(Failure::MissingLibrary)
 
+    private fun installerCode(status: Intent): ErrorCode? =
+        status.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+            ?.let { INSTALL_STATUS_PATTERN.find(it)?.value }
+            ?.let(ErrorCode::Named)
+
     private companion object {
         val MISSING_LIBRARY_PATTERN = Regex("shared library ([^\\s;]+)")
+        val INSTALL_STATUS_PATTERN = Regex("^INSTALL_[A-Z_]+")
     }
 }

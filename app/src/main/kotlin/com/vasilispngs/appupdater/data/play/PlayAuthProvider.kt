@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.aurora.gplayapi.data.models.AuthData
 import com.aurora.gplayapi.helpers.AuthHelper
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.FailureException
 import kotlinx.serialization.json.Json
@@ -51,12 +52,12 @@ class PlayAuthProvider(private val context: Context, val httpClient: PlayHttpCli
         } catch (exception: UnknownHostException) {
             throw FailureException(Failure.SignInUnreachable(DISPENSER_HOST), exception)
         }
-        if (!response.isSuccessful) throw FailureException(dispenserFailure(response.code))
+        if (!response.isSuccessful) throw FailureException(dispenserFailure(response.code), code = ErrorCode.Http(response.code))
 
         val credentials = JSONObject(String(response.responseBytes))
         val email = credentials.optString("email")
         val token = credentials.optString("authToken")
-        if (email.isEmpty() || token.isEmpty()) throw FailureException(Failure.SignInFailed)
+        if (email.isEmpty() || token.isEmpty()) throw FailureException(Failure.SignInFailed, code = ErrorCode.Http(response.code))
 
         return AuthHelper.using(httpClient).build(
             email = email,

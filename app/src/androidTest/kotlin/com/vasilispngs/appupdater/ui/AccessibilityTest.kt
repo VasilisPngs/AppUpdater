@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.PlayInstall
@@ -54,7 +55,14 @@ class AccessibilityTest {
     fun upToDate() = check(loaded())
 
     @Test
-    fun failedCheck() = check(loaded(problems = listOf(ScanProblem.ApkMirror, ScanProblem.Play(Failure.PlayUnreachable))))
+    fun failedCheck() = check(
+        loaded(
+            problems = listOf(
+                ScanProblem.ApkMirror(ErrorCode.Http(403)),
+                ScanProblem.Play(Failure.PlayUnreachable, ErrorCode.Named("UnknownHostException"))
+            )
+        )
+    )
 
     @Test
     fun settings() {

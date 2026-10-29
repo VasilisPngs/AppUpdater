@@ -1,7 +1,9 @@
 package com.vasilispngs.appupdater.data.installer
 
 import android.content.Context
+import com.vasilispngs.appupdater.data.HttpStatusException
 import com.vasilispngs.appupdater.data.api.SharedHttpClient
+import com.vasilispngs.appupdater.data.errorCode
 import com.vasilispngs.appupdater.data.model.SelfUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +56,7 @@ class SelfUpdater(
 
     fun update() {
         val newer = release ?: return
-        if (state.value != SelfUpdate.Available && state.value != SelfUpdate.Failed) return
+        if (state.value != SelfUpdate.Available && state.value !is SelfUpdate.Failed) return
         work = scope.launch {
             if (download(newer)) install()
         }
@@ -88,27 +90,28 @@ class SelfUpdater(
                     }
                 } == release.digest
             }
-        } catch (_: IOException) {
-            false
+        } catch (exception: IOException) {
+            state.value = SelfUpdate.Failed(exception.errorCode())
+            return false
         }
-        if (!downloaded) state.value = SelfUpdate.Failed
+        if (!downloaded) state.value = SelfUpdate.Failed(null)
         return downloaded
     }
 
     private suspend fun install() {
         state.value = SelfUpdate.Installing
         val marker = File(context.noBackupFilesDir, UPDATED_MARKER)
-        val installed = try {
+        val failure = try {
             withContext(Dispatchers.IO) {
                 marker.createNewFile()
                 packageInstaller.install(listOf(ApkSource(APK_NAME, apk.length()) { apk.inputStream() }))
-            }.isSuccess
-        } catch (_: IOException) {
-            false
+            }.exceptionOrNull()
+        } catch (exception: IOException) {
+            exception
         }
-        if (!installed) {
+        if (failure != null) {
             marker.delete()
-            state.value = SelfUpdate.Failed
+            state.value = SelfUpdate.Failed(failure.errorCode())
         }
         apk.delete()
     }
@@ -116,7 +119,7 @@ class SelfUpdater(
     private fun <T> fetch(url: String, headers: Map<String, String> = emptyMap(), read: (Response) -> T): T {
         val request = Request.Builder().url(url).headers(headers.toHeaders()).build()
         return SharedHttpClient.instance.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+            if (!response.isSuccessful) throw HttpStatusException(response.code)
             read(response)
         }
     }

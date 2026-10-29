@@ -1,11 +1,11 @@
 package com.vasilispngs.appupdater.data.play
 
 import com.aurora.gplayapi.exceptions.GooglePlayException
+import com.vasilispngs.appupdater.data.errorCode
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.FailureException
 import java.io.IOException
-
-private const val HTTP_STATUS_MIN = 100
 
 internal val GooglePlayException.isUnavailable: Boolean
     get() = when (this) {
@@ -14,7 +14,7 @@ internal val GooglePlayException.isUnavailable: Boolean
         is GooglePlayException.AppRemoved,
         is GooglePlayException.NotFound,
         is GooglePlayException.EmptyDownloads -> true
-        is GooglePlayException.Unknown -> code < HTTP_STATUS_MIN
+        is GooglePlayException.Unknown -> errorCode() is ErrorCode.Play
         else -> false
     }
 

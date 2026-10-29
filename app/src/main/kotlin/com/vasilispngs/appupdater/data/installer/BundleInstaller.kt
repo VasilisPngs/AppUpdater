@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.OpenableColumns
 import android.util.DisplayMetrics
 import com.vasilispngs.appupdater.data.appLabel
+import com.vasilispngs.appupdater.data.errorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.FailureException
 import com.vasilispngs.appupdater.data.model.InstallState
@@ -42,11 +43,11 @@ class BundleInstaller(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: FailureException) {
-                onState(InstallState.Error(label, exception.failure))
-            } catch (_: IOException) {
-                onState(InstallState.Error(label, Failure.BadFile))
-            } catch (_: Exception) {
-                onState(InstallState.Error(label, Failure.NotInstalled))
+                onState(InstallState.Error(label, exception.failure, exception.errorCode()))
+            } catch (exception: IOException) {
+                onState(InstallState.Error(label, Failure.BadFile, exception.errorCode()))
+            } catch (exception: Exception) {
+                onState(InstallState.Error(label, Failure.NotInstalled, exception.errorCode()))
             } finally {
                 archive.delete()
             }

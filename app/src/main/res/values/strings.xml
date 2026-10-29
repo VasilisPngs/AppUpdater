@@ -55,6 +55,9 @@
     <string name="sign_in_failed">Couldn\'t sign in to Google Play</string>
     <string name="apkmirror_failed">Couldn\'t check APKMirror</string>
     <string name="apkmirror_partial">Some apps weren\'t checked on APKMirror</string>
+    <string name="error_with_code">%1$s (%2$s)</string>
+    <string name="error_code_http" translatable="false">HTTP %1$d</string>
+    <string name="error_code_play" translatable="false">Google Play %1$d</string>
     <plurals name="updates_available">
         <item quantity="one">%1$d update available</item>
         <item quantity="other">%1$d updates available</item>

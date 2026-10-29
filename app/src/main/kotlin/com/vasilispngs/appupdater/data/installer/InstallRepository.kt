@@ -3,7 +3,9 @@ package com.vasilispngs.appupdater.data.installer
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.vasilispngs.appupdater.data.errorCode
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.InstallState
@@ -63,7 +65,7 @@ class InstallRepository(
         val request = PlayUpdate(packageName, update.appName, target.name, target.code, target.code == update.newVersionCode)
         if (!PlayUpdateService.schedule(context, request)) {
             playStates.update { it - packageName }
-            finished.tryEmit(InstallEvent.Failed(Failure.NotInstalled))
+            finished.tryEmit(InstallEvent.Failed(Failure.NotInstalled, ErrorCode.Named(SCHEDULE_FAILURE)))
         }
     }
 
@@ -82,7 +84,7 @@ class InstallRepository(
                     onSuccess = {
                         if (update.latest) InstallEvent.Finished(update.appName) else InstallEvent.FinishedFromPlay(update.appName, update.versionName)
                     },
-                    onFailure = { InstallEvent.Failed(it.playUpdateFailure()) }
+                    onFailure = { InstallEvent.Failed(it.playUpdateFailure(), it.errorCode()) }
                 )
             }
         } finally {
@@ -96,5 +98,6 @@ class InstallRepository(
 
     private companion object {
         const val RESULT_BUFFER = 64
+        const val SCHEDULE_FAILURE = "JobScheduler.RESULT_FAILURE"
     }
 }

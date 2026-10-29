@@ -21,4 +21,10 @@ sealed interface Failure {
     data object SignInFailed : Failure
 }
 
-class FailureException(val failure: Failure, cause: Throwable? = null) : Exception(cause)
+sealed interface ErrorCode {
+    data class Http(val status: Int) : ErrorCode
+    data class Play(val status: Int) : ErrorCode
+    data class Named(val name: String) : ErrorCode
+}
+
+class FailureException(val failure: Failure, cause: Throwable? = null, val code: ErrorCode? = null) : Exception(cause)

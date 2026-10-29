@@ -12,8 +12,10 @@ import android.os.Build
 import com.aurora.gplayapi.data.models.App
 import com.vasilispngs.appupdater.data.api.ApkMirrorClient
 import com.vasilispngs.appupdater.data.appLabel
+import com.vasilispngs.appupdater.data.errorCode
 import com.vasilispngs.appupdater.data.model.ApkMirrorApp
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.PlayVersion
@@ -47,10 +49,12 @@ sealed interface ScanStatus {
 }
 
 sealed interface ScanProblem {
-    data object ApkMirror : ScanProblem
-    data object ApkMirrorPartial : ScanProblem
-    data class Play(val failure: Failure) : ScanProblem
-    data class PlayUnchecked(val apps: List<String>) : ScanProblem
+    val code: ErrorCode?
+
+    data class ApkMirror(override val code: ErrorCode?) : ScanProblem
+    data class ApkMirrorPartial(override val code: ErrorCode?) : ScanProblem
+    data class Play(val failure: Failure, override val code: ErrorCode?) : ScanProblem
+    data class PlayUnchecked(val apps: List<String>, override val code: ErrorCode?) : ScanProblem
 }
 
 class AppUpdateRepository(
@@ -132,17 +136,18 @@ class AppUpdateRepository(
         val updates = delivery.updates.sortedWith(NEWEST_FIRST)
 
         val problems = buildList {
-            val failedBatches = mirrorResults.count(Result<List<ApkMirrorApp>>::isFailure)
+            val mirrorFailures = mirrorResults.mapNotNull(Result<List<ApkMirrorApp>>::exceptionOrNull)
+            val mirrorCode = mirrorFailures.firstOrNull()?.errorCode()
             when {
-                failedBatches == batches.size -> add(ScanProblem.ApkMirror)
-                failedBatches > 0 -> add(ScanProblem.ApkMirrorPartial)
+                mirrorFailures.size == batches.size -> add(ScanProblem.ApkMirror(mirrorCode))
+                mirrorFailures.isNotEmpty() -> add(ScanProblem.ApkMirrorPartial(mirrorCode))
             }
-            playResult.exceptionOrNull()?.let { add(ScanProblem.Play(it.playLookupFailure())) }
-            val unchecked = (confirmation.unconfirmed + delivery.unchecked)
-                .distinct()
-                .map(packageManager::appLabel)
-                .sortedWith(String.CASE_INSENSITIVE_ORDER)
-            if (unchecked.isNotEmpty()) add(ScanProblem.PlayUnchecked(unchecked))
+            playResult.exceptionOrNull()?.let { add(ScanProblem.Play(it.playLookupFailure(), it.errorCode())) }
+            val unchecked = confirmation.unconfirmed + delivery.unchecked
+            if (unchecked.isNotEmpty()) {
+                val apps = unchecked.keys.map(packageManager::appLabel).sortedWith(String.CASE_INSENSITIVE_ORDER)
+                add(ScanProblem.PlayUnchecked(apps, unchecked.values.first().errorCode()))
+            }
         }
 
         if (problems.isEmpty()) ScanStatus.Success(updates) else ScanStatus.Error(problems, updates)
@@ -173,7 +178,7 @@ class AppUpdateRepository(
             dates = confirmed.mapNotNull { (packageName, details) ->
                 playDate(details.second.updatedOn, details.first.locale)?.let { packageName to it }
             }.toMap(),
-            unconfirmed = results.filter { it.second.isFailure }.map { it.first }
+            unconfirmed = results.mapNotNull { (packageName, result) -> result.exceptionOrNull()?.let { packageName to it } }.toMap()
         )
     }
 
@@ -207,7 +212,7 @@ class AppUpdateRepository(
                         update
                     }
                 },
-                unchecked = checks.filter { it.second?.isFailure == true }.map { it.first.packageName }
+                unchecked = checks.mapNotNull { (update, delivered) -> delivered?.exceptionOrNull()?.let { update.packageName to it } }.toMap()
             )
         }
 
@@ -317,7 +322,7 @@ class AppUpdateRepository(
         const val PLAY_CONFIRMATIONS = 4
     }
 
-    private class PlayConfirmation(val apps: Map<String, App>, val dates: Map<String, Long>, val unconfirmed: List<String>)
+    private class PlayConfirmation(val apps: Map<String, App>, val dates: Map<String, Long>, val unconfirmed: Map<String, Throwable>)
 
-    private class PlayDelivery(val updates: List<AppUpdateInfo>, val unchecked: List<String>)
+    private class PlayDelivery(val updates: List<AppUpdateInfo>, val unchecked: Map<String, Throwable>)
 }

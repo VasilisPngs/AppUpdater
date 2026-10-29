@@ -170,6 +170,7 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.InstallState
@@ -837,11 +838,11 @@ private fun AppUpdateItem(status: SelfUpdate, onUpdate: () -> Unit, modifier: Mo
                 Text(text = stringResource(R.string.self_update_installing))
                 LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            SelfUpdate.Failed -> Text(text = stringResource(R.string.self_update_failed))
+            is SelfUpdate.Failed -> Text(text = stringResource(R.string.self_update_failed).withCode(status.code, LocalResources.current))
             else -> Text(text = stringResource(R.string.self_update_install))
         }
     }
-    if (status == SelfUpdate.Available || status == SelfUpdate.Failed) {
+    if (status == SelfUpdate.Available || status is SelfUpdate.Failed) {
         SegmentedListItem(
             onClick = onUpdate,
             shapes = shapes,
@@ -1237,7 +1238,7 @@ internal fun InstallEvent.text(resources: Resources): String = when (this) {
         appName,
         displayVersion(versionName, resources.getString(R.string.version_number))
     )
-    is InstallEvent.Failed -> failure.text(resources)
+    is InstallEvent.Failed -> failure.text(resources).withCode(code, resources)
 }
 
 internal fun InstallEvent.FinishedFromPlay.latestOnPlay(resources: Resources): String =
@@ -1265,10 +1266,19 @@ internal fun Failure.text(resources: Resources): String = when (this) {
 }
 
 internal fun ScanProblem.text(resources: Resources): String = when (this) {
-    ScanProblem.ApkMirror -> resources.getString(R.string.apkmirror_failed)
-    ScanProblem.ApkMirrorPartial -> resources.getString(R.string.apkmirror_partial)
+    is ScanProblem.ApkMirror -> resources.getString(R.string.apkmirror_failed)
+    is ScanProblem.ApkMirrorPartial -> resources.getString(R.string.apkmirror_partial)
     is ScanProblem.Play -> failure.text(resources)
     is ScanProblem.PlayUnchecked -> resources.getQuantityString(R.plurals.play_unchecked, apps.size, apps.joinToString())
+}.withCode(code, resources)
+
+internal fun String.withCode(code: ErrorCode?, resources: Resources): String =
+    code?.let { resources.getString(R.string.error_with_code, this, it.text(resources)) } ?: this
+
+private fun ErrorCode.text(resources: Resources): String = when (this) {
+    is ErrorCode.Http -> resources.getString(R.string.error_code_http, status)
+    is ErrorCode.Play -> resources.getString(R.string.error_code_play, status)
+    is ErrorCode.Named -> name
 }
 
 private fun displayVersion(name: String, numberFormat: String): String {

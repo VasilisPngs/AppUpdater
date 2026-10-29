@@ -1,5 +1,6 @@
 package com.vasilispngs.appupdater.data.api
 
+import com.vasilispngs.appupdater.data.HttpStatusException
 import com.vasilispngs.appupdater.data.model.ApkMirrorApk
 import com.vasilispngs.appupdater.data.model.ApkMirrorApp
 import okhttp3.MediaType.Companion.toMediaType
@@ -7,7 +8,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.IOException
 
 class ApkMirrorClient(private val userAgent: String) {
 
@@ -25,7 +25,7 @@ class ApkMirrorClient(private val userAgent: String) {
             .build()
 
         val body = SharedHttpClient.instance.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+            if (!response.isSuccessful) throw HttpStatusException(response.code)
             response.body.string()
         }
 

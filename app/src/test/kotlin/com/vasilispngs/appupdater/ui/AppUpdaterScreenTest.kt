@@ -55,6 +55,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.window.core.layout.WindowSizeClass
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstallState
 import com.vasilispngs.appupdater.data.model.InstalledApp
@@ -160,10 +161,19 @@ class AppUpdaterScreenTest {
 
     @Test
     fun `offers to try again when the check failed`() {
-        show(loaded(problems = listOf(ScanProblem.ApkMirror, ScanProblem.Play(Failure.PlayUnreachable))))
+        show(
+            loaded(
+                problems = listOf(
+                    ScanProblem.ApkMirror(ErrorCode.Http(403)),
+                    ScanProblem.Play(Failure.PlayUnreachable, ErrorCode.Named("UnknownHostException"))
+                )
+            )
+        )
 
         compose.onNodeWithText(string(R.string.check_failed)).assertIsDisplayed()
-        compose.onNodeWithText(string(R.string.apkmirror_failed) + "\n" + string(R.string.play_unreachable)).assertIsDisplayed()
+        compose.onNodeWithText(
+            string(R.string.apkmirror_failed) + " (HTTP 403)\n" + string(R.string.play_unreachable) + " (UnknownHostException)"
+        ).assertIsDisplayed()
         compose.onNodeWithText(string(R.string.try_again)).performClick()
 
         assertEquals(1, refreshes)
@@ -301,6 +311,19 @@ class AppUpdaterScreenTest {
         compose.onNodeWithText(string(R.string.self_update_available)).performClick()
 
         assertEquals(0, appUpdates)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `says why the app update failed and offers it again`() {
+        selfUpdate = SelfUpdate.Failed(ErrorCode.Http(404))
+        show(loaded())
+
+        compose.onNodeWithText(string(R.string.settings)).performClick()
+        compose.onNodeWithText(string(R.string.self_update_failed) + " (HTTP 404)").assertIsDisplayed()
+        compose.onNodeWithText(string(R.string.self_update_available)).performClick()
+
+        assertEquals(1, appUpdates)
     }
 
     @Test

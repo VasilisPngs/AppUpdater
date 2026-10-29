@@ -6,10 +6,12 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.icu.util.ULocale
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.FailureException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,8 +59,19 @@ class InstallResultTest {
             .putExtra(PackageInstaller.EXTRA_STATUS_MESSAGE, "Session was abandoned")
 
         assertEquals(Failure.NotInstalled, failure(status))
+        assertNull(code(status))
         assertEquals(Failure.NotInstalled, failure(status(PackageInstaller.STATUS_FAILURE)))
         assertEquals(Failure.NotInstalled, failure(status(PackageInstaller.STATUS_FAILURE_TIMEOUT)))
+    }
+
+    @Test
+    fun `names the system installer's error`() {
+        val status = status(PackageInstaller.STATUS_FAILURE_CONFLICT).putExtra(
+            PackageInstaller.EXTRA_STATUS_MESSAGE,
+            "INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.android.chrome signatures do not match newer version; ignoring!"
+        )
+
+        assertEquals(ErrorCode.Named("INSTALL_FAILED_UPDATE_INCOMPATIBLE"), code(status))
     }
 
     @Test
@@ -114,6 +127,8 @@ class InstallResultTest {
     private fun status(code: Int): Intent = Intent().putExtra(PackageInstaller.EXTRA_STATUS, code)
 
     private fun failure(status: Intent): Failure? = (installer.installResult(status).exceptionOrNull() as? FailureException)?.failure
+
+    private fun code(status: Intent): ErrorCode? = (installer.installResult(status).exceptionOrNull() as? FailureException)?.code
 
     private companion object {
         const val SESSION = 7

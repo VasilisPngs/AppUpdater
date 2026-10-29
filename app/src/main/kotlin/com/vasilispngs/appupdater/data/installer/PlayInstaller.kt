@@ -8,6 +8,7 @@ import com.aurora.gplayapi.DeliveryResponse
 import com.aurora.gplayapi.exceptions.GooglePlayException
 import com.aurora.gplayapi.helpers.PurchaseHelper
 import com.vasilispngs.appupdater.data.api.SharedHttpClient
+import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.FailureException
 import com.vasilispngs.appupdater.data.play.PlayCatalog
@@ -110,7 +111,7 @@ class PlayInstaller(
         val response = fetch(url)
         if (!response.isSuccessful) {
             response.close()
-            throw FailureException(Failure.PlayUnavailable)
+            throw FailureException(Failure.PlayUnavailable, code = ErrorCode.Http(response.code))
         }
         return response.body.byteStream()
     }
