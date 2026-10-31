@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
+import android.system.ErrnoException
+import android.system.OsConstants
 import android.util.DisplayMetrics
 import com.vasilispngs.appupdater.data.appLabel
 import com.vasilispngs.appupdater.data.errorCode
@@ -45,7 +47,7 @@ class BundleInstaller(
             } catch (exception: FailureException) {
                 onState(InstallState.Error(label, exception.failure, exception.errorCode()))
             } catch (exception: IOException) {
-                onState(InstallState.Error(label, Failure.BadFile, exception.errorCode()))
+                onState(InstallState.Error(label, exception.bundleFailure(), exception.errorCode()))
             } catch (exception: Exception) {
                 onState(InstallState.Error(label, Failure.NotInstalled, exception.errorCode()))
             } finally {
@@ -182,6 +184,9 @@ class BundleInstaller(
         val LANGUAGE_PATTERN = Regex("[a-z]{2,3}(_[a-z0-9]{2,8})*")
     }
 }
+
+internal fun IOException.bundleFailure(): Failure =
+    if ((cause as? ErrnoException)?.errno == OsConstants.ENOSPC) Failure.Storage else Failure.BadFile
 
 internal fun PackageManager.installedApp(packageName: String, fallbackName: String): InstallState.Success =
     runCatching { getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0)) }

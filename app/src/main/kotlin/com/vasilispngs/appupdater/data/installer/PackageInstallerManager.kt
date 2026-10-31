@@ -9,6 +9,7 @@ import android.content.IntentSender
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.icu.util.ULocale
+import android.os.storage.StorageManager
 import androidx.core.graphics.drawable.toBitmap
 import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
@@ -24,6 +25,7 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 sealed interface Preapproval {
     data class Approved(val sessionId: Int) : Preapproval
@@ -59,16 +61,17 @@ class PackageInstallerManager(
             return@withContext Result.failure(FailureException(Failure.BadFile))
         }
 
+        val size = sources.sumOf { it.size.coerceAtLeast(0) }
         val installer = context.packageManager.packageInstaller
         val sessionId = preapproved ?: try {
             installer.createSession(
                 sessionParams(requireUserAction).apply {
-                    setSize(sources.sumOf { it.size.coerceAtLeast(0) })
+                    setSize(size)
                     setAppPackageName(packageName)
                 }
             )
         } catch (exception: Exception) {
-            return@withContext Result.failure(exception)
+            return@withContext Result.failure(exception.withoutRoom(size, packageName))
         }
         val session = try {
             installer.openSession(sessionId)
@@ -85,7 +88,7 @@ class PackageInstallerManager(
             throw exception
         } catch (exception: Exception) {
             val _ = runCatching { session.abandon() }
-            Result.failure(exception)
+            Result.failure(exception.withoutRoom(size, packageName))
         }
     }
 
@@ -167,6 +170,18 @@ class PackageInstallerManager(
             pendingConfirmation.value = null
             val _ = runCatching { context.unregisterReceiver(receiver) }
         }
+    }
+
+    private fun Exception.withoutRoom(size: Long, packageName: String?): Exception =
+        if (this is IOException && !hasRoomFor(size, packageName)) FailureException(Failure.Storage, this) else this
+
+    private fun hasRoomFor(size: Long, packageName: String?): Boolean {
+        val volume = try {
+            packageName?.let { context.packageManager.getApplicationInfo(it, PackageManager.ApplicationInfoFlags.of(0)).storageUuid }
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
+        }
+        return context.getSystemService(StorageManager::class.java).getAllocatableBytes(volume ?: StorageManager.UUID_DEFAULT) >= size
     }
 
     internal fun ownsUpdates(packageName: String): Boolean = try {
