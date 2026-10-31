@@ -312,6 +312,7 @@ class ApkMirrorSelectorTest {
         minSdk = minSdk,
         signatureSha1s = sha1s,
         signatureSha256s = sha256s,
+        historySha1s = sha1s,
         isEnabled = true,
         isTelevisionBuild = false
     )

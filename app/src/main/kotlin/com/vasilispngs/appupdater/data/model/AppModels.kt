@@ -7,6 +7,7 @@ data class InstalledApp(
     val minSdk: Int,
     val signatureSha1s: Set<String>,
     val signatureSha256s: Set<String>,
+    val historySha1s: Set<String>,
     val isEnabled: Boolean,
     val isTelevisionBuild: Boolean
 )

@@ -131,7 +131,7 @@ class AccessibilityTest {
 
     private fun entry(name: String, play: Boolean = false): Pair<InstalledApp, AppUpdateInfo> {
         val packageName = "com.example.${name.lowercase()}"
-        return InstalledApp(packageName, "1.0", INSTALLED_CODE, 26, emptySet(), emptySet(), true, false) to AppUpdateInfo(
+        return InstalledApp(packageName, "1.0", INSTALLED_CODE, 26, emptySet(), emptySet(), emptySet(), true, false) to AppUpdateInfo(
             packageName = packageName,
             appName = name,
             newVersionName = "2.0",

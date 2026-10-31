@@ -586,7 +586,7 @@ class AppUpdaterScreenTest {
         apkMirror: Boolean = true
     ): Pair<InstalledApp, AppUpdateInfo> {
         val packageName = "com.example.${name.lowercase()}"
-        return InstalledApp(packageName, current, INSTALLED_CODE, 26, emptySet(), emptySet(), true, false) to AppUpdateInfo(
+        return InstalledApp(packageName, current, INSTALLED_CODE, 26, emptySet(), emptySet(), emptySet(), true, false) to AppUpdateInfo(
             packageName = packageName,
             appName = name,
             newVersionName = latest,

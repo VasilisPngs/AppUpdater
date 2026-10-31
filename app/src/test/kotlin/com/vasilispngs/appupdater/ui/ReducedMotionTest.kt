@@ -61,7 +61,7 @@ class ReducedMotionTest {
                     uiState = AppUpdaterUiState(
                         scanning = false,
                         loaded = true,
-                        installedApps = listOf(InstalledApp(packageName, "1.0", 1L, 26, emptySet(), emptySet(), true, false)),
+                        installedApps = listOf(InstalledApp(packageName, "1.0", 1L, 26, emptySet(), emptySet(), emptySet(), true, false)),
                         updates = listOf(AppUpdateInfo(packageName, APP, "2.0", 2L, null, "https://www.apkmirror.com/", false, null))
                     ),
                     themeMode = ThemeMode.System,

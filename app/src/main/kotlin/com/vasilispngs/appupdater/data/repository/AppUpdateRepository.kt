@@ -269,7 +269,7 @@ class AppUpdateRepository(
 
     private fun matchesSignature(app: App, installed: InstalledApp): Boolean =
         app.certificateSetList.any { set ->
-            runCatching { Base64.getUrlDecoder().decode(set.certificateSet).toHexString() }.getOrNull() in installed.signatureSha1s
+            runCatching { Base64.getUrlDecoder().decode(set.certificateSet).toHexString() }.getOrNull() in installed.historySha1s
         }
 
     private fun playDate(value: String, locale: Locale): Long? = runCatching {
@@ -281,22 +281,24 @@ class AppUpdateRepository(
 
     private fun PackageInfo.toInstalledApp(televisionLaunchers: Set<String>): InstalledApp? {
         val appInfo = applicationInfo ?: return null
-        val certificates = signingInfo.certificates()
+        val history = signingInfo.history()
+        val signers = if (signingInfo?.hasMultipleSigners() == true) history else history.takeLast(1)
 
         return InstalledApp(
             packageName = packageName,
             versionName = versionName.orEmpty(),
             versionCode = longVersionCode,
             minSdk = appInfo.minSdkVersion,
-            signatureSha1s = certificates.digests("SHA-1"),
-            signatureSha256s = certificates.digests("SHA-256"),
+            signatureSha1s = signers.digests("SHA-1"),
+            signatureSha256s = signers.digests("SHA-256"),
+            historySha1s = history.digests("SHA-1"),
             isEnabled = appInfo.enabled,
             isTelevisionBuild = packageName in televisionLaunchers ||
                 reqFeatures?.any { it.name == PackageManager.FEATURE_LEANBACK } == true
         )
     }
 
-    private fun SigningInfo?.certificates(): List<Signature> = when {
+    private fun SigningInfo?.history(): List<Signature> = when {
         this == null -> emptyList()
         hasMultipleSigners() -> apkContentsSigners.toList()
         else -> signingCertificateHistory.toList()
