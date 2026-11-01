@@ -7,7 +7,6 @@ import android.content.IntentFilter
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.Signature
-import android.content.pm.SigningInfo
 import android.os.Build
 import com.aurora.gplayapi.data.models.App
 import com.vasilispngs.appupdater.data.api.ApkMirrorClient
@@ -20,6 +19,7 @@ import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstalledApp
 import com.vasilispngs.appupdater.data.model.PlayVersion
 import com.vasilispngs.appupdater.data.play.PlayCatalog
+import com.vasilispngs.appupdater.data.play.history
 import com.vasilispngs.appupdater.data.play.playCertificateHash
 import com.vasilispngs.appupdater.data.play.playLookupFailure
 import kotlinx.coroutines.CancellationException
@@ -281,7 +281,7 @@ class AppUpdateRepository(
 
     private fun PackageInfo.toInstalledApp(televisionLaunchers: Set<String>): InstalledApp? {
         val appInfo = applicationInfo ?: return null
-        val history = signingInfo.history()
+        val history = signingInfo?.history().orEmpty().asList()
         val signers = if (signingInfo?.hasMultipleSigners() == true) history else history.takeLast(1)
 
         return InstalledApp(
@@ -296,12 +296,6 @@ class AppUpdateRepository(
             isTelevisionBuild = packageName in televisionLaunchers ||
                 reqFeatures?.any { it.name == PackageManager.FEATURE_LEANBACK } == true
         )
-    }
-
-    private fun SigningInfo?.history(): List<Signature> = when {
-        this == null -> emptyList()
-        hasMultipleSigners() -> apkContentsSigners.toList()
-        else -> signingCertificateHistory.toList()
     }
 
     private fun List<Signature>.digests(algorithm: String): Set<String> {
