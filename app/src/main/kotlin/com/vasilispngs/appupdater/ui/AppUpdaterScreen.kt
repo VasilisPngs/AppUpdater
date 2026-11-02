@@ -831,7 +831,10 @@ private fun AppUpdateItem(status: SelfUpdate, onUpdate: () -> Unit, modifier: Mo
     val supporting = @Composable {
         when (status) {
             is SelfUpdate.Downloading -> Column {
-                Text(text = stringResource(R.string.self_update_downloading, (status.progress * 100).roundToInt()))
+                Text(
+                    text = stringResource(R.string.self_update_downloading, (status.progress * 100).roundToInt()),
+                    style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES)
+                )
                 LinearWavyProgressIndicator(progress = { status.progress }, modifier = Modifier.fillMaxWidth())
             }
             SelfUpdate.Installing -> Column {
