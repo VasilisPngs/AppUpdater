@@ -143,6 +143,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalWindow
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.isCrossWindowBlurEnabled
 import androidx.compose.ui.res.painterResource
@@ -398,7 +399,7 @@ internal fun AppUpdaterScreen(
     }
     val navigationBar = navigationSuiteType == NavigationSuiteType.ShortNavigationBarCompact ||
         navigationSuiteType == NavigationSuiteType.ShortNavigationBarMedium
-    val window = LocalActivity.current?.window
+    val window = LocalWindow.current
     val navigationBarScrim = !navigationBar && WindowInsets.navigationBars.getBottom(LocalDensity.current) > 0
     SideEffect(window, navigationBarScrim) { window?.isNavigationBarContrastEnforced = navigationBarScrim }
     val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
