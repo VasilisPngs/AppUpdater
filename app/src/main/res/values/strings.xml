@@ -47,12 +47,6 @@
     <string name="play_unavailable">Google Play isn\'t available right now. Try again later.</string>
     <string name="play_unreachable">Couldn\'t connect to Google Play. Check your internet connection and try again.</string>
     <string name="play_unverified">Couldn\'t verify the download from Google Play</string>
-    <string name="sign_in_unreachable">Couldn\'t reach %1$s. Check your connection and any VPN, Private DNS, or content blocker.</string>
-    <string name="sign_in_rejected">Couldn\'t sign in to Google Play with this device\'s configuration</string>
-    <string name="sign_in_refused">Couldn\'t sign in to Google Play from this network</string>
-    <string name="sign_in_limited">Too many sign-ins to Google Play from this network. Try again in 10 minutes.</string>
-    <string name="sign_in_unavailable">Couldn\'t sign in to Google Play. Try again later.</string>
-    <string name="sign_in_failed">Couldn\'t sign in to Google Play</string>
     <string name="apkmirror_failed">Couldn\'t check APKMirror</string>
     <string name="apkmirror_partial">Some apps weren\'t checked on APKMirror</string>
     <string name="error_with_code">%1$s (%2$s)</string>

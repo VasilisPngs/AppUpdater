@@ -63,8 +63,8 @@ class InstallMessageTest {
             InstallEvent.Failed(Failure.PlayUnavailable, null).text(resources)
         )
         assertEquals(
-            "Couldn't reach auroraoss.com. Check your connection and any VPN, Private DNS, or content blocker.",
-            InstallEvent.Failed(Failure.SignInUnreachable("auroraoss.com"), null).text(resources)
+            "Couldn't connect to Google Play. Check your internet connection and try again.",
+            InstallEvent.Failed(Failure.PlayUnreachable, null).text(resources)
         )
     }
 

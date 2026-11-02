@@ -1257,12 +1257,6 @@ internal fun Failure.text(resources: Resources): String = when (this) {
     Failure.PlayUnavailable -> resources.getString(R.string.play_unavailable)
     Failure.PlayUnreachable -> resources.getString(R.string.play_unreachable)
     Failure.Unverified -> resources.getString(R.string.play_unverified)
-    is Failure.SignInUnreachable -> resources.getString(R.string.sign_in_unreachable, host)
-    Failure.SignInRejected -> resources.getString(R.string.sign_in_rejected)
-    Failure.SignInRefused -> resources.getString(R.string.sign_in_refused)
-    Failure.SignInLimited -> resources.getString(R.string.sign_in_limited)
-    Failure.SignInUnavailable -> resources.getString(R.string.sign_in_unavailable)
-    Failure.SignInFailed -> resources.getString(R.string.sign_in_failed)
 }
 
 internal fun ScanProblem.text(resources: Resources): String = when (this) {

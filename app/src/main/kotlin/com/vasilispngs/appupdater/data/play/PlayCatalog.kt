@@ -1,47 +1,34 @@
 package com.vasilispngs.appupdater.data.play
 
-import com.aurora.gplayapi.data.models.App
-import com.aurora.gplayapi.data.models.AuthData
-import com.aurora.gplayapi.data.models.PlayFile
-import com.aurora.gplayapi.exceptions.GooglePlayException
-import com.aurora.gplayapi.helpers.AppDetailsHelper
-import com.aurora.gplayapi.helpers.PurchaseHelper
+import com.aurora.gplayapi.PlayClient
+import com.aurora.gplayapi.PlayException
+import com.aurora.gplayapi.model.App
+import com.aurora.gplayapi.model.AppFile
+import com.aurora.gplayapi.model.Restriction
 
-class PlayCatalog(private val authProvider: PlayAuthProvider) {
+class PlayCatalog(playClient: Lazy<PlayClient>) {
+    private val client by playClient
 
-    fun lookup(packageNames: List<String>): List<App> {
-        if (packageNames.isEmpty()) return emptyList()
-        return withSession { auth -> detailsHelper(auth).getAppByPackageName(packageNames) }
-            .second
-            .filter { it.displayName.isNotEmpty() }
-    }
+    suspend fun lookup(packageNames: List<String>): List<App> =
+        client.apps.details(packageNames).filter { it.displayName.isNotEmpty() && it.restriction in OFFERED }
 
-    fun details(packageName: String): Pair<AuthData, App> =
-        withSession { auth -> detailsHelper(auth).getAppByPackageName(packageName) }
+    suspend fun details(packageName: String): App = client.apps.details(packageName)
 
-    fun delivers(packageName: String, versionCode: Long, offerType: Int, certificateHash: String?): Boolean = try {
-        withSession { auth ->
-            PurchaseHelper(auth).using(authProvider.httpClient).purchase(
-                packageName = packageName,
-                versionCode = versionCode,
-                offerType = offerType,
-                certificateHash = certificateHash
-            )
-        }.second.any { it.type == PlayFile.Type.BASE }
-    } catch (exception: GooglePlayException) {
+    suspend fun files(packageName: String, versionCode: Long, offerType: Int, certificateHash: String?): List<AppFile> =
+        client.delivery.resolve(
+            packageName = packageName,
+            versionCode = versionCode,
+            offerType = offerType,
+            certificateHash = certificateHash
+        )
+
+    suspend fun delivers(packageName: String, versionCode: Long, offerType: Int, certificateHash: String?): Boolean = try {
+        files(packageName, versionCode, offerType, certificateHash).any { it.type == AppFile.Type.BASE }
+    } catch (exception: PlayException) {
         if (exception.isUnavailable) false else throw exception
     }
 
-    private fun detailsHelper(auth: AuthData): AppDetailsHelper =
-        AppDetailsHelper(auth).using(authProvider.httpClient)
-
-    private fun <T> withSession(block: (AuthData) -> T): Pair<AuthData, T> {
-        val session = authProvider.session()
-        return try {
-            session to block(session)
-        } catch (_: GooglePlayException.AuthException) {
-            val renewed = authProvider.renew(session)
-            renewed to block(renewed)
-        }
+    private companion object {
+        val OFFERED = setOf(Restriction.AVAILABLE, Restriction.UNAVAILABLE_UNLESS_PURCHASED)
     }
 }

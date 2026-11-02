@@ -13,12 +13,6 @@ sealed interface Failure {
     data object PlayUnavailable : Failure
     data object PlayUnreachable : Failure
     data object Unverified : Failure
-    data class SignInUnreachable(val host: String) : Failure
-    data object SignInRejected : Failure
-    data object SignInRefused : Failure
-    data object SignInLimited : Failure
-    data object SignInUnavailable : Failure
-    data object SignInFailed : Failure
 }
 
 sealed interface ErrorCode {

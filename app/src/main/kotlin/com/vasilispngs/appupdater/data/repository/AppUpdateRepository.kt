@@ -8,7 +8,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.os.Build
-import com.aurora.gplayapi.data.models.App
+import com.aurora.gplayapi.model.App
 import com.vasilispngs.appupdater.data.api.ApkMirrorClient
 import com.vasilispngs.appupdater.data.appLabel
 import com.vasilispngs.appupdater.data.errorCode
@@ -117,9 +117,7 @@ class AppUpdateRepository(
 
         val batches = appsToCheck.chunked(API_BATCH_SIZE)
         val (mirrorResults, playResult) = coroutineScope {
-            val play = async {
-                attempt { runInterruptible { playCatalog.lookup(appsToCheck.map(InstalledApp::packageName)) } }
-            }
+            val play = async { attempt { playCatalog.lookup(appsToCheck.map(InstalledApp::packageName)) } }
             val mirror = batches.map { batch ->
                 async { attempt { runInterruptible { client.appExists(batch.map(InstalledApp::packageName)) } } }
             }
@@ -165,18 +163,16 @@ class AppUpdateRepository(
         val permits = Semaphore(PLAY_CONFIRMATIONS)
         val results = candidates.filterNot { it.isTestBuild }.map { app ->
             async {
-                app.packageName to permits.withPermit {
-                    attempt { runInterruptible { playCatalog.details(app.packageName) } }
-                }
+                app.packageName to permits.withPermit { attempt { playCatalog.details(app.packageName) } }
             }
         }.awaitAll()
         val confirmed = results.mapNotNull { (packageName, result) ->
-            result.getOrNull()?.takeUnless { it.second.isTestBuild }?.let { packageName to it }
+            result.getOrNull()?.takeUnless { it.isTestBuild }?.let { packageName to it }
         }
         PlayConfirmation(
-            apps = confirmed.associate { (packageName, details) -> packageName to details.second },
+            apps = confirmed.toMap(),
             dates = confirmed.mapNotNull { (packageName, details) ->
-                playDate(details.second.updatedOn, details.first.locale)?.let { packageName to it }
+                playDate(details.updatedOn)?.let { packageName to it }
             }.toMap(),
             unconfirmed = results.mapNotNull { (packageName, result) -> result.exceptionOrNull()?.let { packageName to it } }.toMap()
         )
@@ -192,14 +188,12 @@ class AppUpdateRepository(
                     if (update.apkMirrorUrl == null || !update.playAvailable || offerType == null) return@async update to null
                     update to permits.withPermit {
                         attempt {
-                            runInterruptible {
-                                playCatalog.delivers(
-                                    update.packageName,
-                                    update.newVersionCode,
-                                    offerType,
-                                    packageManager.playCertificateHash(update.packageName)
-                                )
-                            }
+                            playCatalog.delivers(
+                                update.packageName,
+                                update.newVersionCode,
+                                offerType,
+                                packageManager.playCertificateHash(update.packageName)
+                            )
                         }
                     }
                 }
@@ -269,11 +263,11 @@ class AppUpdateRepository(
 
     private fun matchesSignature(app: App, installed: InstalledApp): Boolean =
         app.certificateSetList.any { set ->
-            runCatching { Base64.getUrlDecoder().decode(set.certificateSet).toHexString() }.getOrNull() in installed.historySha1s
+            runCatching { Base64.getUrlDecoder().decode(set.certificateHash).toHexString() }.getOrNull() in installed.historySha1s
         }
 
-    private fun playDate(value: String, locale: Locale): Long? = runCatching {
-        LocalDate.parse(value.trim(), DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
+    private fun playDate(value: String): Long? = runCatching {
+        LocalDate.parse(value.trim(), DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()))
             .atStartOfDay(ZoneOffset.UTC)
             .toInstant()
             .toEpochMilli()

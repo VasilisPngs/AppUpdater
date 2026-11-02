@@ -4,13 +4,16 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.Signature
 import android.content.pm.SigningInfo
+import com.aurora.gplayapi.PlayClient
+import com.aurora.gplayapi.device.DeviceRegistry
+import com.aurora.gplayapi.engine.OkHttpEngine
+import com.aurora.gplayapi.session.DefaultPlaySessions
 import com.vasilispngs.appupdater.data.model.ApkMirrorApk
 import com.vasilispngs.appupdater.data.model.ApkMirrorApp
 import com.vasilispngs.appupdater.data.model.InstalledApp
-import com.vasilispngs.appupdater.data.play.PlayAuthProvider
 import com.vasilispngs.appupdater.data.play.PlayCatalog
-import com.vasilispngs.appupdater.data.play.PlayHttpClient
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -19,11 +22,16 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import java.security.MessageDigest
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 class RotatedSigningKeyTest {
     private val context = RuntimeEnvironment.getApplication()
-    private val repository = AppUpdateRepository(context, PlayCatalog(PlayAuthProvider(context, PlayHttpClient(context.packageName))))
+    private val engine = OkHttpEngine(OkHttpClient())
+    private val repository = AppUpdateRepository(
+        context,
+        PlayCatalog(lazy { PlayClient(engine, DefaultPlaySessions(engine, device = { DeviceRegistry.default }, locale = { Locale.US })) })
+    )
     private val selector = ApkMirrorSelector(
         sdk = 36,
         abis = listOf("arm64-v8a", "armeabi-v7a", "armeabi"),

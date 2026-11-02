@@ -2,22 +2,16 @@ package com.vasilispngs.appupdater.data.installer
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Base64
-import com.aurora.gplayapi.AndroidAppDeliveryData
-import com.aurora.gplayapi.DeliveryResponse
-import com.aurora.gplayapi.exceptions.GooglePlayException
-import com.aurora.gplayapi.helpers.PurchaseHelper
+import com.aurora.gplayapi.model.AppFile
 import com.vasilispngs.appupdater.data.api.SharedHttpClient
 import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.FailureException
 import com.vasilispngs.appupdater.data.play.PlayCatalog
-import com.vasilispngs.appupdater.data.play.PlayHttpClient
 import com.vasilispngs.appupdater.data.play.playCertificateHash
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import okhttp3.Response
@@ -30,7 +24,6 @@ import java.util.zip.GZIPInputStream
 class PlayInstaller(
     context: Context,
     private val catalog: PlayCatalog,
-    private val httpClient: PlayHttpClient,
     private val packageInstaller: PackageInstallerManager,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
@@ -45,26 +38,21 @@ class PlayInstaller(
     ): Result<Unit> = withContext(ioDispatcher) {
         try {
             onProgress(null)
-            val delivery = runInterruptible {
-                val (session, details) = catalog.details(packageName)
-                val purchases = PurchaseHelper(session).using(httpClient)
-                val certificate = packageManager.playCertificateHash(packageName)
+            val details = catalog.details(packageName)
+            val certificate = packageManager.playCertificateHash(packageName)
+            val app = catalog.files(packageName, versionCode, details.offerType, certificate).apks()
+            val libraries = details.dependencies.dependentLibraries
+                .map { library ->
+                    library.packageName to if (versionCode == details.versionCode) library.versionCode else versionCode
+                }
+                .filter { (name, code) -> name.isNotBlank() && code > 0 && !isSharedLibraryInstalled(name, code) }
+                .map { (name, code) -> catalog.files(name, code, LIBRARY_OFFER_TYPE, certificate).apks() }
 
-                val app = deliver(purchases, packageName, versionCode, details.offerType, certificate)
-                val libraries = details.dependencies.dependentLibraries
-                    .map { library ->
-                        library.packageName to if (versionCode == details.versionCode) library.versionCode else versionCode
-                    }
-                    .filter { (name, code) -> name.isNotBlank() && code > 0 && !isSharedLibraryInstalled(name, code) }
-                    .map { (name, code) -> deliver(purchases, name, code, LIBRARY_OFFER_TYPE, certificate) }
-                Delivery(app, libraries)
-            }
-
-            val apks = delivery.app + delivery.libraries.flatten()
+            val apks = app + libraries.flatten()
             onSize(apks.sumOf { if (it.compressedUrl.isEmpty()) it.size else it.compressedSize })
             val progress = Progress(apks.sumOf { it.size }.coerceAtLeast(1), onProgress)
-            delivery.libraries.forEach { files -> val _ = packageInstaller.install(sources(files, progress)).getOrThrow() }
-            val _ = packageInstaller.install(sources(delivery.app, progress), preapproved, packageName = packageName).getOrThrow()
+            libraries.forEach { files -> val _ = packageInstaller.install(sources(files, progress)).getOrThrow() }
+            val _ = packageInstaller.install(sources(app, progress), preapproved, packageName = packageName).getOrThrow()
             Result.success(Unit)
         } catch (exception: CancellationException) {
             preapproved?.let(packageInstaller::abandon)
@@ -75,31 +63,12 @@ class PlayInstaller(
         }
     }
 
-    private fun deliver(
-        purchases: PurchaseHelper,
-        packageName: String,
-        versionCode: Long,
-        offerType: Int,
-        certificate: String?
-    ): List<PlayApk> {
-        val _ = runCatching { purchases.acquire(packageName, versionCode, offerType) }
-        val data = purchases.getDeliveryResponse(
-            packageName = packageName,
-            updateVersionCode = versionCode,
-            offerType = offerType,
-            deliveryToken = purchases.getDeliveryToken(packageName, versionCode, offerType, certificate),
-            certificateHash = certificate
-        ).delivered()
-        if (data.downloadUrl.isEmpty()) throw FailureException(Failure.NotOffered)
-        return data.apks()
-    }
-
-    private fun sources(apks: List<PlayApk>, progress: Progress): List<ApkSource> =
+    private fun sources(apks: List<AppFile>, progress: Progress): List<ApkSource> =
         apks.map { apk ->
             ApkSource(apk.name, apk.size) { apk.verified(apk.download(), progress::advance) }
         }
 
-    private fun PlayApk.download(): InputStream {
+    private fun AppFile.download(): InputStream {
         if (compressedUrl.isNotEmpty()) {
             val response = fetch(compressedUrl, identity = true)
             if (response.isSuccessful) {
@@ -125,8 +94,6 @@ class PlayInstaller(
         packageManager.getSharedLibraries(PackageManager.PackageInfoFlags.of(0))
             .any { it.name == packageName && it.longVersion == versionCode }
 
-    private class Delivery(val app: List<PlayApk>, val libraries: List<List<PlayApk>>)
-
     private class Progress(private val totalBytes: Long, private val onProgress: (Float?) -> Unit) {
         private var writtenBytes = 0L
         private var reportedPercent = -1
@@ -147,29 +114,10 @@ class PlayInstaller(
     }
 }
 
-internal class PlayApk(
-    val name: String,
-    val url: String,
-    val size: Long,
-    val compressedUrl: String,
-    val compressedSize: Long,
-    val sha1: String,
-    val sha256: String
-)
-
-internal fun AndroidAppDeliveryData.apks(): List<PlayApk> =
-    listOf(PlayApk("base.apk", downloadUrl, downloadSize, compressedDownloadUrl, compressedSize, sha1.decodedHash(), sha256.decodedHash())) +
-        splitDeliveryDataList.mapIndexed { index, split ->
-            PlayApk(
-                "${split.name.ifBlank { "split_$index" }}.apk",
-                split.downloadUrl,
-                split.downloadSize,
-                split.compressedDownloadUrl,
-                split.compressedSize,
-                split.sha1.decodedHash(),
-                split.sha256.decodedHash()
-            )
-        }
+internal fun List<AppFile>.apks(): List<AppFile> {
+    if (none { it.type == AppFile.Type.BASE && it.url.isNotEmpty() }) throw FailureException(Failure.NotOffered)
+    return filter { it.type == AppFile.Type.BASE || it.type == AppFile.Type.SPLIT }
+}
 
 internal fun InputStream.gunzipped(): InputStream? {
     val buffered = BufferedInputStream(this, COPY_BUFFER_SIZE)
@@ -181,7 +129,7 @@ internal fun InputStream.gunzipped(): InputStream? {
     return null
 }
 
-internal fun PlayApk.verified(input: InputStream, onBytes: (Int) -> Unit): InputStream {
+internal fun AppFile.verified(input: InputStream, onBytes: (Int) -> Unit): InputStream {
     val expected = sha256.ifBlank { sha1 }
     if (expected.isBlank()) {
         input.close()
@@ -190,21 +138,6 @@ internal fun PlayApk.verified(input: InputStream, onBytes: (Int) -> Unit): Input
     return VerifiedStream(input, MessageDigest.getInstance(if (sha256.isBlank()) "SHA-1" else "SHA-256"), expected, onBytes)
 }
 
-private fun DeliveryResponse.delivered(): AndroidAppDeliveryData = when (status) {
-    DELIVERED -> appDeliveryData
-    NOT_PURCHASED -> throw GooglePlayException.AppNotPurchased(status)
-    REMOVED -> throw GooglePlayException.AppRemoved(status)
-    NOT_SUPPORTED, DEVICE_NOT_SUPPORTED -> throw GooglePlayException.AppNotSupported(status)
-    else -> throw GooglePlayException.Unknown(status)
-}
-
-private fun String.decodedHash(): String = Base64.decode(this, Base64.URL_SAFE).toHexString()
-
-private const val DELIVERED = 1
-private const val NOT_SUPPORTED = 2
-private const val NOT_PURCHASED = 3
-private const val REMOVED = 7
-private const val DEVICE_NOT_SUPPORTED = 9
 private const val GZIP_MAGIC_BYTES = 2
 
 private class VerifiedStream(

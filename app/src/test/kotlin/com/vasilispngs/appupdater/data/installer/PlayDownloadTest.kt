@@ -1,7 +1,6 @@
 package com.vasilispngs.appupdater.data.installer
 
-import com.aurora.gplayapi.AndroidAppDeliveryData
-import com.aurora.gplayapi.SplitDeliveryData
+import com.aurora.gplayapi.model.AppFile
 import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.FailureException
 import org.junit.Assert.assertArrayEquals
@@ -14,7 +13,6 @@ import org.robolectric.RobolectricTestRunner
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
-import java.util.Base64
 import java.util.zip.GZIPOutputStream
 
 @RunWith(RobolectricTestRunner::class)
@@ -60,31 +58,22 @@ class PlayDownloadTest {
     }
 
     @Test
-    fun `reads the full and compressed files of a Google Play delivery`() {
-        val sha256 = APK.digest("SHA-256")
-        val sha1 = APK.digest("SHA-1")
-        val apks = AndroidAppDeliveryData.newBuilder()
-            .setDownloadUrl("https://example.com/base")
-            .setDownloadSize(1000)
-            .setCompressedDownloadUrl("https://example.com/base.gz")
-            .setCompressedSize(600)
-            .setSha256(sha256.base64Url())
-            .addSplitDeliveryData(
-                SplitDeliveryData.newBuilder()
-                    .setName("config.arm64_v8a")
-                    .setDownloadUrl("https://example.com/split")
-                    .setDownloadSize(500)
-                    .setSha1(sha1.base64Url())
-            )
-            .build()
-            .apks()
+    fun `installs the APKs of a Google Play delivery and leaves its expansion files`() {
+        val files = listOf(
+            AppFile(name = "base.apk", url = "https://example.com/base", type = AppFile.Type.BASE),
+            AppFile(name = "main.1.com.example.obb", url = "https://example.com/obb", type = AppFile.Type.OBB),
+            AppFile(name = "config.arm64_v8a.apk", url = "https://example.com/split", type = AppFile.Type.SPLIT)
+        )
 
-        assertEquals(listOf("base.apk", "config.arm64_v8a.apk"), apks.map { it.name })
-        assertEquals(listOf("https://example.com/base", "https://example.com/split"), apks.map { it.url })
-        assertEquals(listOf("https://example.com/base.gz", ""), apks.map { it.compressedUrl })
-        assertEquals(listOf(1000L, 500L), apks.map { it.size })
-        assertEquals(sha256.toHexString(), apks[0].sha256)
-        assertEquals(sha1.toHexString(), apks[1].sha1)
+        assertEquals(listOf("base.apk", "config.arm64_v8a.apk"), files.apks().map { it.name })
+    }
+
+    @Test
+    fun `says Google Play does not offer a delivery without a base APK`() {
+        val files = listOf(AppFile(name = "config.arm64_v8a.apk", url = "https://example.com/split", type = AppFile.Type.SPLIT))
+
+        val error = assertThrows(FailureException::class.java) { val _ = files.apks() }
+        assertEquals(Failure.NotOffered, error.failure)
     }
 
     @Test
@@ -100,11 +89,9 @@ class PlayDownloadTest {
     }
 
     private fun apk(sha1: String = "", sha256: String = "") =
-        PlayApk("base.apk", "https://example.com/base", APK.size.toLong(), "", 0, sha1, sha256)
+        AppFile(name = "base.apk", url = "https://example.com/base", size = APK.size.toLong(), sha1 = sha1, sha256 = sha256)
 
     private fun ByteArray.digest(algorithm: String): ByteArray = MessageDigest.getInstance(algorithm).digest(this)
-
-    private fun ByteArray.base64Url(): String = Base64.getUrlEncoder().withoutPadding().encodeToString(this)
 
     private companion object {
         val APK = ByteArray(200_000) { (it % 251).toByte() }

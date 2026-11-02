@@ -45,9 +45,6 @@ android {
             signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = true
-                keepRules {
-                    ignoreFrom("com.auroraoss:gplayapi")
-                }
             }
         }
         create("nonMinifiedRelease") {
@@ -105,9 +102,8 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.serialization.core)
     implementation(libs.aurora.gplayapi)
-    implementation(libs.protobuf.javalite)
     androidLintTool(platform(libs.asm.bom))
     baselineProfile(project(":baselineprofile"))
     debugImplementation(libs.androidx.compose.ui.test.manifest)
