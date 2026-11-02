@@ -5,10 +5,8 @@ import android.app.job.JobScheduler
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.net.NetworkCapabilities
-import com.aurora.gplayapi.PlayClient
 import com.aurora.gplayapi.device.DeviceRegistry
 import com.aurora.gplayapi.engine.OkHttpEngine
-import com.aurora.gplayapi.session.DefaultPlaySessions
 import com.vasilispngs.appupdater.data.installer.PlayUpdateService.Companion.rateLimited
 import com.vasilispngs.appupdater.data.installer.PlayUpdateService.Companion.toPlayUpdate
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
@@ -26,7 +24,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.shadows.ShadowSystemClock
 import java.time.Duration
-import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 class PlayUpdateJobTest {
@@ -87,7 +84,7 @@ class PlayUpdateJobTest {
 
     private fun repository(): InstallRepository {
         val engine = OkHttpEngine(OkHttpClient())
-        val catalog = PlayCatalog(lazy { PlayClient(engine, DefaultPlaySessions(engine, device = { DeviceRegistry.default }, locale = { Locale.US })) })
+        val catalog = PlayCatalog(lazyOf(engine), lazyOf(DeviceRegistry.default))
         val packageInstaller = PackageInstallerManager(context)
         return InstallRepository(
             context,

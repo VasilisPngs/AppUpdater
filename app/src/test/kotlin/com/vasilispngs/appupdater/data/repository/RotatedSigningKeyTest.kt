@@ -4,10 +4,8 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.Signature
 import android.content.pm.SigningInfo
-import com.aurora.gplayapi.PlayClient
 import com.aurora.gplayapi.device.DeviceRegistry
 import com.aurora.gplayapi.engine.OkHttpEngine
-import com.aurora.gplayapi.session.DefaultPlaySessions
 import com.vasilispngs.appupdater.data.model.ApkMirrorApk
 import com.vasilispngs.appupdater.data.model.ApkMirrorApp
 import com.vasilispngs.appupdater.data.model.InstalledApp
@@ -22,7 +20,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import java.security.MessageDigest
-import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 class RotatedSigningKeyTest {
@@ -30,7 +27,7 @@ class RotatedSigningKeyTest {
     private val engine = OkHttpEngine(OkHttpClient())
     private val repository = AppUpdateRepository(
         context,
-        PlayCatalog(lazy { PlayClient(engine, DefaultPlaySessions(engine, device = { DeviceRegistry.default }, locale = { Locale.US })) })
+        PlayCatalog(lazyOf(engine), lazyOf(DeviceRegistry.default))
     )
     private val selector = ApkMirrorSelector(
         sdk = 36,
