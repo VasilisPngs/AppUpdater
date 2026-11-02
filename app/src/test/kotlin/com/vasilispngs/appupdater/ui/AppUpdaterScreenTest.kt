@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.graphics.get
 import androidx.window.core.layout.WindowSizeClass
 import com.vasilispngs.appupdater.R
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
@@ -499,9 +500,9 @@ class AppUpdaterScreenTest {
 
     private fun corners(text: String): Pair<Boolean, Boolean> {
         val image = compose.onNodeWithText(text).captureToImage().asAndroidBitmap()
-        val container = image.getPixel(CORNER_INSET, image.height / 2)
-        return (image.getPixel(CORNER_INSET, CORNER_INSET) != container) to
-            (image.getPixel(CORNER_INSET, image.height - 1 - CORNER_INSET) != container)
+        val container = image[CORNER_INSET, image.height / 2]
+        return (image[CORNER_INSET, CORNER_INSET] != container) to
+            (image[CORNER_INSET, image.height - 1 - CORNER_INSET] != container)
     }
 
     private fun backGesture(progress: Float) {
