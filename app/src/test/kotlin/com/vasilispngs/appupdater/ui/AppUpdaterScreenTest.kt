@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.key.Key
@@ -246,7 +247,7 @@ class AppUpdaterScreenTest {
         val blur = context.getSystemService(WindowManager::class.java).isCrossWindowBlurEnabled
         assertTrue(attributes.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND != 0)
         assertEquals(with(Density(context)) { 10.dp.roundToPx() }, attributes.blurBehindRadius)
-        assertEquals(if (blur) 0.2f else 0.32f, attributes.dimAmount, 0f)
+        assertEquals(if (blur) 0.2f else Color.Black.copy(alpha = 0.32f).alpha, attributes.dimAmount, 0f)
     }
 
     @Test

@@ -87,6 +87,7 @@ import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.ScrimDefaults
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -221,7 +222,6 @@ private val PredictiveBackEnterFade = Easing {
 }
 private val DialogBlurRadius = 10.dp
 private const val BLURRED_SCRIM_ALPHA = 0.2f
-private const val SCRIM_ALPHA = 0.32f
 private const val NOTICE_KEY = "notice"
 private const val EMPTY_KEY = "empty"
 private const val INSTALL_TYPE = "install"
@@ -1183,7 +1183,7 @@ private fun ThemeDialog(
 @Composable
 private fun dialogProperties() = DialogProperties(
     blurBehindRadius = DialogBlurRadius,
-    scrimAlpha = if (LocalWindowInfo.current.isCrossWindowBlurEnabled) BLURRED_SCRIM_ALPHA else SCRIM_ALPHA
+    scrimAlpha = if (LocalWindowInfo.current.isCrossWindowBlurEnabled) BLURRED_SCRIM_ALPHA else ScrimDefaults.color.alpha
 )
 
 private fun fadeThrough(): ContentTransform =
