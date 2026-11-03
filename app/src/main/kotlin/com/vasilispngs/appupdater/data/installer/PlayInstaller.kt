@@ -16,8 +16,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import okhttp3.Response
 import java.io.BufferedInputStream
-import java.io.FilterInputStream
 import java.io.InputStream
+import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
@@ -142,17 +142,16 @@ private const val GZIP_MAGIC_BYTES = 2
 
 private class VerifiedStream(
     input: InputStream,
-    private val digest: MessageDigest,
+    digest: MessageDigest,
     private val expected: String,
     private val onBytes: (Int) -> Unit
-) : FilterInputStream(input) {
+) : DigestInputStream(input, digest) {
     private var verified = false
 
     override fun read(): Int = super.read().also { byte ->
         if (byte == -1) {
             verify()
         } else {
-            digest.update(byte.toByte())
             onBytes(1)
         }
     }
@@ -161,7 +160,6 @@ private class VerifiedStream(
         if (count == -1) {
             verify()
         } else {
-            digest.update(buffer, offset, count)
             onBytes(count)
         }
     }
@@ -169,7 +167,7 @@ private class VerifiedStream(
     private fun verify() {
         if (verified) return
         verified = true
-        if (!digest.digest().toHexString().equals(expected, ignoreCase = true)) {
+        if (!messageDigest.digest().toHexString().equals(expected, ignoreCase = true)) {
             throw FailureException(Failure.Unverified)
         }
     }
