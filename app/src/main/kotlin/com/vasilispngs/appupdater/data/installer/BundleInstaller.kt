@@ -28,10 +28,14 @@ class BundleInstaller(
     private val packageInstaller: PackageInstallerManager,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
+    private val cache by lazy {
+        context.cacheDir.apply { listFiles { _, name -> name.startsWith(ARCHIVE_PREFIX) }?.forEach(File::delete) }
+    }
+
     suspend fun install(uri: Uri, isSuggested: ((String, Long) -> Boolean)?, onState: (InstallState) -> Unit) {
         withContext(ioDispatcher) {
             val label = displayName(uri)
-            val archive = File(context.cacheDir, "$ARCHIVE_PREFIX${System.nanoTime()}")
+            val archive = File(cache, "$ARCHIVE_PREFIX${System.nanoTime()}")
             try {
                 onState(InstallState.Installing(label))
                 copyToCache(uri, archive)
@@ -133,7 +137,7 @@ class BundleInstaller(
 
     private fun archivedPackage(zip: ZipFile, archive: File): PackageInfo? {
         val base = zip.getEntry(BASE_APK) ?: return archivedPackage(archive)
-        val file = File(context.cacheDir, "$ARCHIVE_PREFIX${System.nanoTime()}$APK_SUFFIX")
+        val file = File(cache, "$ARCHIVE_PREFIX${System.nanoTime()}$APK_SUFFIX")
         return try {
             zip.getInputStream(base).use { input -> file.outputStream().use { input.copyTo(it, COPY_BUFFER_SIZE) } }
             archivedPackage(file)
