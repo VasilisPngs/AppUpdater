@@ -402,13 +402,12 @@ private fun TvSettings(
                 OptionList(
                     options = ThemeMode.entries,
                     current = themeMode,
-                    label = { stringResource(it.labelRes) },
                     onSelect = onThemeChange,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
                         .onFocusChanged { optionsFocused = it.hasFocus }
-                )
+                ) { stringResource(it.labelRes) }
             }
         }
     }
@@ -425,9 +424,9 @@ private fun TvAction(@DrawableRes icon: Int, @StringRes label: Int, onClick: () 
 private fun <T> OptionList(
     options: List<T>,
     current: T,
-    label: @Composable (T) -> String,
     onSelect: (T) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    label: @Composable (T) -> String
 ) {
     val currentFocus = remember { FocusRequester() }
     Column(
