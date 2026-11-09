@@ -63,6 +63,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
+import androidx.tv.material3.LocalTextStyle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Switch
@@ -79,7 +80,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 import java.text.NumberFormat
-import kotlin.math.roundToInt
 
 private val TvOverscanHorizontal = 48.dp
 private val TvOverscanVertical = 27.dp
@@ -374,7 +374,8 @@ private fun TvSettings(
                                     SettingsSection.AppUpdate -> selfUpdate.text()
                                     SettingsSection.Theme -> stringResource(themeMode.labelRes)
                                     SettingsSection.DisabledApps -> stringResource(R.string.disabled_apps_description)
-                                }
+                                },
+                                style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES)
                             )
                         },
                         trailingContent = if (item == SettingsSection.DisabledApps) {
@@ -522,11 +523,3 @@ private val SettingsSection.titleRes: Int
         SettingsSection.Theme -> R.string.theme
         SettingsSection.DisabledApps -> R.string.disabled_apps
     }
-
-@Composable
-private fun SelfUpdate.text(): String = when (this) {
-    is SelfUpdate.Downloading -> stringResource(R.string.self_update_downloading, (progress * 100).roundToInt())
-    SelfUpdate.Installing -> stringResource(R.string.self_update_installing)
-    is SelfUpdate.Failed -> stringResource(R.string.self_update_failed).withCode(code, LocalResources.current)
-    else -> stringResource(R.string.self_update_install)
-}

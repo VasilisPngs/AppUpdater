@@ -842,24 +842,29 @@ private fun SettingsView(
 }
 
 @Composable
+internal fun SelfUpdate.text(): String = when (this) {
+    is SelfUpdate.Downloading -> stringResource(R.string.self_update_downloading, (progress * 100).roundToInt())
+    SelfUpdate.Installing -> stringResource(R.string.self_update_installing)
+    is SelfUpdate.Failed -> stringResource(R.string.self_update_failed).withCode(code, LocalResources.current)
+    else -> stringResource(R.string.self_update_install)
+}
+
+@Composable
 private fun AppUpdateItem(status: SelfUpdate, onUpdate: () -> Unit, modifier: Modifier = Modifier) {
     val shapes = ListItemDefaults.segmentedShapes(0, 1)
     val headline = @Composable { Text(text = stringResource(R.string.self_update_available)) }
     val supporting = @Composable {
+        val text = status.text()
         when (status) {
             is SelfUpdate.Downloading -> Column {
-                Text(
-                    text = stringResource(R.string.self_update_downloading, (status.progress * 100).roundToInt()),
-                    style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES)
-                )
+                Text(text = text, style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES))
                 LinearWavyProgressIndicator(progress = { status.progress }, modifier = Modifier.fillMaxWidth())
             }
             SelfUpdate.Installing -> Column {
-                Text(text = stringResource(R.string.self_update_installing))
+                Text(text = text)
                 LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            is SelfUpdate.Failed -> Text(text = stringResource(R.string.self_update_failed).withCode(status.code, LocalResources.current))
-            else -> Text(text = stringResource(R.string.self_update_install))
+            else -> Text(text = text)
         }
     }
     if (status == SelfUpdate.Available || status is SelfUpdate.Failed) {
