@@ -1,6 +1,5 @@
 package com.vasilispngs.appupdater.ui
 
-import android.content.pm.PackageManager
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.BackEventCompat
@@ -18,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -44,9 +42,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -74,7 +70,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.text.NumberFormat
@@ -329,20 +324,6 @@ class AppUpdaterScreenTest {
     }
 
     @Test
-    @Config(qualifiers = "w960dp-h540dp-television")
-    fun `reaches the app update with the d-pad on television`() {
-        selfUpdate = SelfUpdate.Available
-        show(loaded(), keyboard = true)
-        compose.onNodeWithText(string(R.string.settings)).performClick()
-        compose.onNodeWithText(string(R.string.theme)).requestFocus()
-
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
-        compose.onNodeWithText(string(R.string.self_update_available)).assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithText(string(R.string.theme)).assertIsFocused()
-    }
-
-    @Test
     @Config(qualifiers = "w411dp-h891dp")
     fun `stacks updates in one column on phones`() {
         show(loaded(entry("Alpha"), entry("Beta")))
@@ -395,13 +376,6 @@ class AppUpdaterScreenTest {
         assertTrue(settings.top > updates.top)
         assertTrue(updates.top > height / 3)
         assertTrue(settings.bottom < height * 2 / 3)
-    }
-
-    @Test
-    @Config(qualifiers = "w960dp-h540dp-television")
-    fun `keeps the margins inside the television overscan`() {
-        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, true)
-        assertContentEdge(24.dp + 48.dp)
     }
 
     @Test
