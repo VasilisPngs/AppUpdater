@@ -15,6 +15,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vasilispngs.appupdater.ui.AppUpdaterScreen
 import com.vasilispngs.appupdater.ui.AppUpdaterViewModel
+import com.vasilispngs.appupdater.ui.theme.AppUpdaterTheme
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AppUpdaterViewModel by viewModels { AppUpdaterViewModel.Factory }
@@ -27,7 +28,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             themeMode?.let { current ->
-                AppUpdaterScreen(viewModel = viewModel, themeMode = current)
+                AppUpdaterTheme {
+                    AppUpdaterScreen(viewModel = viewModel, themeMode = current)
+                }
                 SideEffect { ready = true }
             }
         }

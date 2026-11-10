@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Resources
-import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -41,6 +40,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -51,10 +52,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -178,8 +181,6 @@ import com.vasilispngs.appupdater.data.model.PlayInstall
 import com.vasilispngs.appupdater.data.model.SelfUpdate
 import com.vasilispngs.appupdater.data.model.ThemeMode
 import com.vasilispngs.appupdater.data.repository.ScanProblem
-import com.vasilispngs.appupdater.ui.theme.AppUpdaterTheme
-import com.vasilispngs.appupdater.ui.theme.AppUpdaterTvTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -201,7 +202,9 @@ private val EmptyPadding = 48.dp
 private val EmptyIconSize = 48.dp
 private val AppIconSize = 40.dp
 private val InstallingIconSize = 28.dp
-internal const val TABULAR_FIGURES = "tnum"
+private val TvOverscanHorizontal = 48.dp
+private val TvOverscanVertical = 27.dp
+private const val TABULAR_FIGURES = "tnum"
 private const val PLAY_STORE_PACKAGE = "com.android.vending"
 private const val PLAY_LISTING_URL = "https://play.google.com/store/apps/details?id="
 private const val EXPANDED_COLUMNS = 2
@@ -219,10 +222,10 @@ private val PredictiveBackEnterFade = Easing {
 }
 private val DialogBlurRadius = 10.dp
 private const val BLURRED_SCRIM_ALPHA = 0.2f
-internal const val NOTICE_KEY = "notice"
+private const val NOTICE_KEY = "notice"
 private const val EMPTY_KEY = "empty"
-internal const val INSTALL_TYPE = "install"
-internal const val UPDATE_TYPE = "update"
+private const val INSTALL_TYPE = "install"
+private const val UPDATE_TYPE = "update"
 
 @Serializable
 private sealed interface Screen : NavKey {
@@ -245,7 +248,7 @@ private val TopLevelItems = mapOf(
 )
 
 @get:StringRes
-internal val ThemeMode.labelRes: Int
+private val ThemeMode.labelRes: Int
     get() = when (this) {
         ThemeMode.System -> R.string.theme_system
         ThemeMode.Light -> R.string.theme_light
@@ -263,7 +266,6 @@ fun AppUpdaterScreen(
     ReportDrawnWhen { uiState.loaded }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
-    val television = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
     val coroutineScope = rememberCoroutineScope()
     val bundlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::installBundle)
@@ -278,11 +280,7 @@ fun AppUpdaterScreen(
     val noBrowser = stringResource(R.string.no_browser)
     val noFilePicker = stringResource(R.string.no_file_picker)
     val showMessage: (String) -> Unit = { message ->
-        if (television) {
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-        } else {
-            coroutineScope.launch { snackbarHostState.showSnackbar(message) }
-        }
+        coroutineScope.launch { snackbarHostState.showSnackbar(message) }
     }
     val updateFromPlay: (AppUpdateInfo) -> Unit = { update ->
         when {
@@ -307,8 +305,7 @@ fun AppUpdaterScreen(
 
     uiState.messages.firstOrNull()?.let { message ->
         LaunchedEffect(message.id) {
-            val text = message.event.text(resources)
-            if (television) Toast.makeText(context, text, Toast.LENGTH_LONG).show() else snackbarHostState.showSnackbar(text)
+            snackbarHostState.showSnackbar(message.event.text(resources))
             viewModel.messageShown(message.id)
         }
     }
@@ -320,41 +317,20 @@ fun AppUpdaterScreen(
         }
     }
 
-    val onApkMirror: (String) -> Unit = { if (!openUrl(context, it)) showMessage(noBrowser) }
-    if (television) {
-        AppUpdaterTvTheme {
-            TvAppUpdaterScreen(
-                uiState = uiState,
-                themeMode = themeMode,
-                onRefresh = viewModel::refresh,
-                onPickBundle = pickBundle,
-                onApkMirror = onApkMirror,
-                onPlay = updateFromPlay,
-                onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                onThemeChange = viewModel::setThemeMode,
-                selfUpdate = selfUpdate,
-                onUpdateApp = viewModel::updateApp,
-                modifier = modifier
-            )
-        }
-    } else {
-        AppUpdaterTheme {
-            AppUpdaterScreen(
-                uiState = uiState,
-                themeMode = themeMode,
-                snackbarHostState = snackbarHostState,
-                onRefresh = viewModel::refresh,
-                onPickBundle = pickBundle,
-                onApkMirror = onApkMirror,
-                onPlay = updateFromPlay,
-                onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
-                onThemeChange = viewModel::setThemeMode,
-                selfUpdate = selfUpdate,
-                onUpdateApp = viewModel::updateApp,
-                modifier = modifier
-            )
-        }
-    }
+    AppUpdaterScreen(
+        uiState = uiState,
+        themeMode = themeMode,
+        snackbarHostState = snackbarHostState,
+        onRefresh = viewModel::refresh,
+        onPickBundle = pickBundle,
+        onApkMirror = { if (!openUrl(context, it)) showMessage(noBrowser) },
+        onPlay = updateFromPlay,
+        onIncludeDisabledAppsChange = viewModel::setIncludeDisabledApps,
+        onThemeChange = viewModel::setThemeMode,
+        selfUpdate = selfUpdate,
+        onUpdateApp = viewModel::updateApp,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -428,7 +404,14 @@ internal fun AppUpdaterScreen(
     SideEffect(window, navigationBarScrim) { window?.isNavigationBarContrastEnforced = navigationBarScrim }
     val updatesAvailable = pluralStringResource(R.plurals.updates_available, updates.size, updates.size)
 
+    val context = LocalContext.current
     val resources = LocalResources.current
+    val television = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
+    val overscan = if (television) {
+        WindowInsets(TvOverscanHorizontal, TvOverscanVertical, TvOverscanHorizontal, TvOverscanVertical)
+    } else {
+        WindowInsets(0)
+    }
 
     NavigationSuiteScaffold(
         navigationItems = {
@@ -475,7 +458,7 @@ internal fun AppUpdaterScreen(
                 )
             }
         },
-        modifier = modifier,
+        modifier = modifier.windowInsetsPadding(overscan.only(WindowInsetsSides.Start)),
         navigationSuiteType = navigationSuiteType,
         navigationItemVerticalArrangement = Arrangement.Center
     ) {
@@ -484,7 +467,7 @@ internal fun AppUpdaterScreen(
             val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(if (screen == Screen.Updates) updatesBarState else settingsBarState)
             val listColumns = if (screen == Screen.Updates) columns else 1
             val listWidth = MaxListWidth * listColumns + ListItemDefaults.SegmentedGap * (listColumns - 1)
-            val contentInsets = ScaffoldDefaults.contentWindowInsets
+            val contentInsets = ScaffoldDefaults.contentWindowInsets.add(overscan.only(WindowInsetsSides.Bottom + WindowInsetsSides.End))
             var consumedInsets by remember { mutableStateOf(WindowInsets(0)) }
             BoxWithConstraints(modifier = Modifier.onConsumedWindowInsetsChanged { consumedInsets = it }) {
                 val layoutDirection = LocalLayoutDirection.current
@@ -512,6 +495,7 @@ internal fun AppUpdaterScreen(
                                     )
                                 }
                             },
+                            windowInsets = TopAppBarDefaults.windowInsets.add(overscan.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
                             contentPadding = PaddingValues(horizontal = sideMargin - CompactMargin),
                             scrollBehavior = scrollBehavior
                         )
@@ -842,29 +826,24 @@ private fun SettingsView(
 }
 
 @Composable
-internal fun SelfUpdate.text(): String = when (this) {
-    is SelfUpdate.Downloading -> stringResource(R.string.self_update_downloading, (progress * 100).roundToInt())
-    SelfUpdate.Installing -> stringResource(R.string.self_update_installing)
-    is SelfUpdate.Failed -> stringResource(R.string.self_update_failed).withCode(code, LocalResources.current)
-    else -> stringResource(R.string.self_update_install)
-}
-
-@Composable
 private fun AppUpdateItem(status: SelfUpdate, onUpdate: () -> Unit, modifier: Modifier = Modifier) {
     val shapes = ListItemDefaults.segmentedShapes(0, 1)
     val headline = @Composable { Text(text = stringResource(R.string.self_update_available)) }
     val supporting = @Composable {
-        val text = status.text()
         when (status) {
             is SelfUpdate.Downloading -> Column {
-                Text(text = text, style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES))
+                Text(
+                    text = stringResource(R.string.self_update_downloading, (status.progress * 100).roundToInt()),
+                    style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_FIGURES)
+                )
                 LinearWavyProgressIndicator(progress = { status.progress }, modifier = Modifier.fillMaxWidth())
             }
             SelfUpdate.Installing -> Column {
-                Text(text = text)
+                Text(text = stringResource(R.string.self_update_installing))
                 LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            else -> Text(text = text)
+            is SelfUpdate.Failed -> Text(text = stringResource(R.string.self_update_failed).withCode(status.code, LocalResources.current))
+            else -> Text(text = stringResource(R.string.self_update_install))
         }
     }
     if (status == SelfUpdate.Available || status is SelfUpdate.Failed) {
@@ -1300,7 +1279,7 @@ private fun ErrorCode.text(resources: Resources): String = when (this) {
     is ErrorCode.Named -> name
 }
 
-internal fun displayVersion(name: String, numberFormat: String): String {
+private fun displayVersion(name: String, numberFormat: String): String {
     val version = if (name.length > 1 && name[0].lowercaseChar() == 'v' && name[1].isDigit()) name.substring(1) else name
     return if (version.firstOrNull()?.isDigit() == true) numberFormat.format(version) else version
 }
