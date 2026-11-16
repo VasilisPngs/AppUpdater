@@ -80,7 +80,7 @@ class PackageInstallerManager(
             return@withContext Result.failure(exception)
         }
 
-        try {
+        val (status, prompted) = try {
             runInterruptible { sources.forEach { session.write(it) } }
             sessionLock.withLock { commit(session, sessionId) }
         } catch (exception: CancellationException) {
@@ -88,7 +88,14 @@ class PackageInstallerManager(
             throw exception
         } catch (exception: Exception) {
             val _ = runCatching { session.abandon() }
-            Result.failure(exception.withoutRoom(size, packageName))
+            return@withContext Result.failure(exception.withoutRoom(size, packageName))
+        }
+        val refused = status.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE) ==
+            PackageInstaller.STATUS_FAILURE_ABORTED && !prompted
+        if (refused && !requireUserAction) {
+            install(sources, requireUserAction = true, packageName = packageName)
+        } else {
+            installResult(status)
         }
     }
 
@@ -147,16 +154,17 @@ class PackageInstallerManager(
         }
     }
 
-    private suspend fun commit(session: PackageInstaller.Session, sessionId: Int): Result<String> {
-        val result = CompletableDeferred<Result<String>>()
+    private suspend fun commit(session: PackageInstaller.Session, sessionId: Int): Pair<Intent, Boolean> {
+        val result = CompletableDeferred<Intent>()
+        var prompted = false
         val action = "${context.packageName}.PACKAGE_INSTALL_$sessionId"
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(receiverContext: Context, intent: Intent) {
-                when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
-                    PackageInstaller.STATUS_PENDING_USER_ACTION ->
-                        intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
-                            ?.let { pendingConfirmation.value = it }
-                    else -> result.complete(installResult(intent))
+                if (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE) == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                    prompted = true
+                    intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)?.let { pendingConfirmation.value = it }
+                } else {
+                    result.complete(intent)
                 }
             }
         }
@@ -165,7 +173,7 @@ class PackageInstallerManager(
         return try {
             session.commit(statusReceiver(action, sessionId))
             session.close()
-            result.await()
+            result.await() to prompted
         } finally {
             pendingConfirmation.value = null
             val _ = runCatching { context.unregisterReceiver(receiver) }
