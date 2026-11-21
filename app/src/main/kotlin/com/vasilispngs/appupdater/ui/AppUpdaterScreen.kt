@@ -117,6 +117,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -720,25 +721,27 @@ private fun UpdatesView(
                     horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
                 ) {
                     row.forEachIndexed { column, (app, update) ->
-                        UpdateItem(
-                            app = app,
-                            update = update,
-                            shapes = ListItemDefaults.segmentedShapes(
-                                updateStart + index,
-                                updateStart + (updates.size - column + columns - 1) / columns
-                            ),
-                            install = playInstalls[app.packageName],
-                            cards = cards,
-                            context = context,
-                            iconSizePx = iconSizePx,
-                            motion = motion,
-                            onApkMirror = onApkMirror,
-                            onPlay = onPlay,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .then(if (index == 0) reveal.modifier else Modifier)
-                        )
+                        key(app.packageName) {
+                            UpdateItem(
+                                app = app,
+                                update = update,
+                                shapes = ListItemDefaults.segmentedShapes(
+                                    updateStart + index,
+                                    updateStart + (updates.size - column + columns - 1) / columns
+                                ),
+                                install = playInstalls[app.packageName],
+                                cards = cards,
+                                context = context,
+                                iconSizePx = iconSizePx,
+                                motion = motion,
+                                onApkMirror = onApkMirror,
+                                onPlay = onPlay,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .then(if (index == 0) reveal.modifier else Modifier)
+                            )
+                        }
                     }
                     repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
                 }

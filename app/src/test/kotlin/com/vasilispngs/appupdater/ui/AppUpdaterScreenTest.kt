@@ -1,6 +1,7 @@
 package com.vasilispngs.appupdater.ui
 
 import android.content.pm.PackageManager
+import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.BackEventCompat
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalInputModeManager
@@ -68,6 +70,7 @@ import com.vasilispngs.appupdater.data.model.ThemeMode
 import com.vasilispngs.appupdater.data.repository.ScanProblem
 import com.vasilispngs.appupdater.ui.theme.AppUpdaterTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -444,6 +447,24 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w1100dp-h800dp")
+    fun `keeps each icon on its own app when an update leaves the grid`() {
+        val red = entry("Red")
+        val green = entry("Green")
+        val blue = entry("Blue")
+        mapOf(red to Color.Red, green to Color.Green, blue to Color.Blue).forEach { (app, color) ->
+            shadowOf(context.packageManager).setApplicationIcon(app.first.packageName, ColorDrawable(color.toArgb()))
+        }
+        show(loaded(red, green, blue))
+        compose.waitUntil { shows("Green", Color.Green) && shows("Blue", Color.Blue) }
+
+        state = loaded(red, blue)
+
+        assertTrue(shows("Blue", Color.Blue))
+        assertFalse(shows("Blue", Color.Green))
+    }
+
+    @Test
     fun `moves focus to the next update when the focused one leaves`() {
         val alpha = entry("Alpha")
         val gamma = entry("Gamma")
@@ -497,6 +518,12 @@ class AppUpdaterScreenTest {
     private fun text(value: String): DpRect {
         val nodes = compose.onAllNodesWithText(value, useUnmergedTree = true)
         return List(nodes.fetchSemanticsNodes().size) { nodes[it].getBoundsInRoot() }.minBy { it.top }
+    }
+
+    private fun shows(text: String, color: Color): Boolean {
+        val image = compose.onNodeWithText(text).captureToImage().asAndroidBitmap()
+        val argb = color.toArgb()
+        return (0 until image.height).any { y -> (0 until image.width).any { x -> image[x, y] == argb } }
     }
 
     private fun corners(text: String): Pair<Boolean, Boolean> {
