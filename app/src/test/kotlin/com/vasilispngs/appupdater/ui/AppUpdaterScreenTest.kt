@@ -1,7 +1,6 @@
 package com.vasilispngs.appupdater.ui
 
 import android.content.pm.PackageManager
-import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.BackEventCompat
@@ -55,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.graphics.drawable.toDrawable
 import androidx.core.graphics.get
 import androidx.window.core.layout.WindowSizeClass
 import com.vasilispngs.appupdater.R
@@ -453,7 +453,7 @@ class AppUpdaterScreenTest {
         val green = entry("Green")
         val blue = entry("Blue")
         mapOf(red to Color.Red, green to Color.Green, blue to Color.Blue).forEach { (app, color) ->
-            shadowOf(context.packageManager).setApplicationIcon(app.first.packageName, ColorDrawable(color.toArgb()))
+            shadowOf(context.packageManager).setApplicationIcon(app.first.packageName, color.toArgb().toDrawable())
         }
         show(loaded(red, green, blue))
         compose.waitUntil { shows("Green", Color.Green) && shows("Blue", Color.Blue) }

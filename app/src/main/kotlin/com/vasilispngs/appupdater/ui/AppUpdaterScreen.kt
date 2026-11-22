@@ -34,7 +34,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlexBox
+import androidx.compose.foundation.layout.FlexJustifyContent
+import androidx.compose.foundation.layout.FlexWrap
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -1012,10 +1014,13 @@ private fun UpdateItem(
                         )
                     )
                 }
-                FlowRow(
+                FlexBox(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(SmallSpacing, Alignment.End),
-                    verticalArrangement = Arrangement.spacedBy(SmallSpacing)
+                    config = {
+                        wrap(FlexWrap.Wrap)
+                        justifyContent(FlexJustifyContent.End)
+                        gap(SmallSpacing)
+                    }
                 ) {
                     if (update.playUpdate != null) {
                         SourceButton(
