@@ -151,6 +151,20 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    fun `fades a finished Google Play download out as it was`() {
+        val firefox = entry("Firefox", play = true)
+        show(loaded(firefox, playInstalls = mapOf(firefox.first.packageName to PlayInstall(DOWNLOADED))))
+        compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(DOWNLOADED, 0f..1f))).assertExists()
+        compose.mainClock.autoAdvance = false
+
+        state = state.copy(playInstalls = emptyMap())
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(EXIT_PEEK_MILLIS)
+
+        compose.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate), useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
     fun `shows the loading indicator during the first check`() {
         show(AppUpdaterUiState(scanning = true, loaded = false))
 
@@ -632,6 +646,7 @@ class AppUpdaterScreenTest {
         const val INSTALLED_CODE = 100L
         const val LATEST_CODE = 200L
         const val DOWNLOADED = 0.42f
+        const val EXIT_PEEK_MILLIS = 50L
         const val BUNDLE = "content://downloads/bundle.apkm"
         const val BUNDLE_NAME = "Bundle.apkm"
         const val LONG_VERSION = "141.0.7390.122.4567.890.12345.67890.1234.5678.9012.3456.7890.1234.5678"

@@ -16,10 +16,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.CapturedAnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -73,6 +72,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FadeThroughNavigationTransitions
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -211,10 +211,6 @@ private const val TABULAR_FIGURES = "tnum"
 private const val PLAY_STORE_PACKAGE = "com.android.vending"
 private const val PLAY_LISTING_URL = "https://play.google.com/store/apps/details?id="
 private const val EXPANDED_COLUMNS = 2
-private const val FADE_OUT_MILLIS = 90
-private const val FADE_IN_MILLIS = 210
-private const val FADE_THROUGH_ENTER_SCALE = 0.8f
-private const val FADE_THROUGH_EXIT_SCALE = 1.05f
 private const val PREDICTIVE_BACK_EXIT_SCALE = 0.9f
 private const val PREDICTIVE_BACK_ENTER_SCALE = 1.1f
 private const val PREDICTIVE_BACK_FADE_THRESHOLD = 0.35f
@@ -363,7 +359,6 @@ internal fun AppUpdaterScreen(
     val inputModeManager = LocalInputModeManager.current
     val coroutineScope = rememberCoroutineScope()
     var themeDialog by rememberSaveable { mutableStateOf(false) }
-    var backNavigation by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (inputModeManager.inputMode == InputMode.Keyboard) navigationFocus.requestFocus()
@@ -381,7 +376,6 @@ internal fun AppUpdaterScreen(
     val activeFocus = if (current == Screen.Updates) updatesFocus else settingsFocus
     val navigate: (Screen) -> Unit = { screen ->
         if (screen != current) {
-            backNavigation = false
             backStack.subList(1, backStack.size).clear()
             if (screen != Screen.Updates) backStack.add(screen)
         } else {
@@ -465,7 +459,6 @@ internal fun AppUpdaterScreen(
         navigationSuiteType = navigationSuiteType,
         navigationItemVerticalArrangement = Arrangement.Center
     ) {
-        val motion = MaterialTheme.motionScheme
         val content: @Composable (Screen) -> Unit = { screen ->
             val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(if (screen == Screen.Updates) updatesBarState else settingsBarState)
             val listColumns = if (screen == Screen.Updates) columns else 1
@@ -558,12 +551,8 @@ internal fun AppUpdaterScreen(
         }
         NavDisplay(
             backStack = backStack,
-            onBack = {
-                backNavigation = true
-                backStack.removeLastOrNull()
-            },
-            transitionSpec = { fadeThrough() },
-            popTransitionSpec = { if (backNavigation) backTransition(motion) else fadeThrough() },
+            transitionSpec = { FadeThroughNavigationTransitions.transform() },
+            popTransitionSpec = { FadeThroughNavigationTransitions.transform() },
             predictivePopTransitionSpec = { predictiveBackTransition() }
         ) { screen -> NavEntry(screen, content = content) }
     }
@@ -958,7 +947,7 @@ private fun UpdateItem(
                 label = "icon"
             )
             Box(modifier = Modifier.size(AppIconSize), contentAlignment = Alignment.Center) {
-                AnimatedVisibility(
+                CapturedAnimatedVisibility(
                     visible = install != null,
                     modifier = Modifier.requiredSize(WavyProgressIndicatorDefaults.CircularContainerSize),
                     enter = fadeIn(motion.defaultEffectsSpec()),
@@ -1193,15 +1182,6 @@ private fun dialogProperties() = DialogProperties(
     blurBehindRadius = DialogBlurRadius,
     scrimAlpha = if (LocalWindowInfo.current.isCrossWindowBlurEnabled) BLURRED_SCRIM_ALPHA else ScrimDefaults.color.alpha
 )
-
-private fun fadeThrough(): ContentTransform =
-    (fadeIn(tween(durationMillis = FADE_IN_MILLIS, delayMillis = FADE_OUT_MILLIS, easing = LinearEasing)) +
-        scaleIn(initialScale = FADE_THROUGH_ENTER_SCALE))
-        .togetherWith(fadeOut(tween(durationMillis = FADE_OUT_MILLIS, easing = LinearEasing)) + scaleOut(targetScale = FADE_THROUGH_EXIT_SCALE))
-
-private fun backTransition(motion: MotionScheme) =
-    (fadeIn(motion.defaultEffectsSpec()) + scaleIn(motion.defaultSpatialSpec(), PREDICTIVE_BACK_ENTER_SCALE))
-        .togetherWith(fadeOut(motion.fastEffectsSpec()) + scaleOut(motion.defaultSpatialSpec(), PREDICTIVE_BACK_EXIT_SCALE))
 
 private fun predictiveBackTransition() =
     (fadeIn(tween(easing = PredictiveBackEnterFade)) + scaleIn(tween(easing = PredictiveBackEasing), PREDICTIVE_BACK_ENTER_SCALE))
