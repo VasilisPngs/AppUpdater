@@ -151,6 +151,17 @@ class AppUpdaterScreenTest {
     }
 
     @Test
+    fun `turns a waiting Google Play download's ring into its progress`() {
+        val firefox = entry("Firefox", play = true)
+        show(loaded(firefox, playInstalls = mapOf(firefox.first.packageName to PlayInstall(null))))
+        val waiting = compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).fetchSemanticsNode().id
+
+        state = state.copy(playInstalls = mapOf(firefox.first.packageName to PlayInstall(DOWNLOADED)))
+
+        assertEquals(waiting, compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(DOWNLOADED, 0f..1f))).fetchSemanticsNode().id)
+    }
+
+    @Test
     fun `fades a finished Google Play download out as it was`() {
         val firefox = entry("Firefox", play = true)
         show(loaded(firefox, playInstalls = mapOf(firefox.first.packageName to PlayInstall(DOWNLOADED))))

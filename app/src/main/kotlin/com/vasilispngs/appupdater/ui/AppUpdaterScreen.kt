@@ -85,7 +85,6 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
@@ -954,16 +953,12 @@ private fun UpdateItem(
                     exit = fadeOut(motion.defaultEffectsSpec())
                 ) {
                     val progress = install?.progress
-                    if (progress == null) {
-                        CircularWavyProgressIndicator()
-                    } else {
-                        val animatedProgress by animateFloatAsState(
-                            targetValue = progress,
-                            animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
-                            label = "progress"
-                        )
-                        CircularWavyProgressIndicator(progress = { animatedProgress })
-                    }
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = progress ?: 0f,
+                        animationSpec = WavyProgressIndicatorDefaults.ProgressAnimationSpec,
+                        label = "progress"
+                    )
+                    CircularWavyProgressIndicator(progress = { if (progress == null) Float.NaN else animatedProgress })
                 }
                 iconBitmap?.let { bitmap ->
                     Image(
