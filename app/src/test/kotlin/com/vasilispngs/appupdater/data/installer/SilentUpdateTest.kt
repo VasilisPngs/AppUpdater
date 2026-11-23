@@ -6,13 +6,13 @@ import android.content.pm.PackageInstaller
 import android.os.Looper
 import com.vasilispngs.appupdater.data.model.ErrorCode
 import com.vasilispngs.appupdater.data.model.FailureException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -27,7 +27,8 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(shadows = [SilentUpdateTest.Installer::class, SilentUpdateTest.Session::class])
 class SilentUpdateTest {
-    private val installer = PackageInstallerManager(RuntimeEnvironment.getApplication(), Dispatchers.Default)
+    private val dispatcher = StandardTestDispatcher()
+    private val installer = PackageInstallerManager(RuntimeEnvironment.getApplication(), dispatcher)
 
     @After
     fun reset() {
@@ -36,7 +37,7 @@ class SilentUpdateTest {
     }
 
     @Test
-    fun `asks the user when the system refuses to update without asking`() {
+    fun `asks the user when the system refuses to update without asking`() = runTest(dispatcher) {
         Session.statuses += listOf(status(PackageInstaller.STATUS_FAILURE_ABORTED, "INSTALL_FAILED_ABORTED: Permission denied"))
         Session.statuses += listOf(status(PackageInstaller.STATUS_SUCCESS).putExtra(PackageInstaller.EXTRA_PACKAGE_NAME, PACKAGE))
 
@@ -48,7 +49,7 @@ class SilentUpdateTest {
     }
 
     @Test
-    fun `does not ask again after the user cancels`() {
+    fun `does not ask again after the user cancels`() = runTest(dispatcher) {
         Session.statuses += listOf(
             status(PackageInstaller.STATUS_PENDING_USER_ACTION).putExtra(Intent.EXTRA_INTENT, Intent(CONFIRM)),
             status(PackageInstaller.STATUS_FAILURE_ABORTED, "INSTALL_FAILED_ABORTED: User rejected permissions")
@@ -60,16 +61,14 @@ class SilentUpdateTest {
         assertEquals(listOf(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED), Installer.requested)
     }
 
-    private fun install(): Result<String> {
+    private suspend fun TestScope.install(): Result<String> {
         val apk = ApkSource("base.apk", 3) { "apk".byteInputStream() }
-        val result = CoroutineScope(Dispatchers.Default).async { installer.install(listOf(apk), packageName = PACKAGE) }
-        val deadline = System.currentTimeMillis() + TIMEOUT_MS
-        while (!result.isCompleted && System.currentTimeMillis() < deadline) {
+        val result = async { installer.install(listOf(apk), packageName = PACKAGE) }
+        while (!result.isCompleted) {
             shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(POLL_MS)
+            yield()
         }
-        assertTrue(result.isCompleted)
-        return runBlocking { result.await() }
+        return result.await()
     }
 
     private fun status(code: Int, message: String? = null) =
@@ -103,7 +102,5 @@ class SilentUpdateTest {
     private companion object {
         const val PACKAGE = "com.example.app"
         const val CONFIRM = "android.content.pm.action.CONFIRM_INSTALL"
-        const val TIMEOUT_MS = 10_000L
-        const val POLL_MS = 10L
     }
 }
