@@ -78,6 +78,41 @@ class SplitSelectionTest {
         )
     }
 
+    @Test
+    fun `keeps hyphenated feature modules instead of mistaking their suffix for a language`() {
+        assertEquals(
+            listOf(
+                "base.apk",
+                "split_camera-ui.apk",
+                "split_pay-api.apk",
+                "df-ar.apk",
+                "feature-pro.apk",
+                "split_live-tv.apk",
+                "split_config.arm64_v8a.apk",
+                "split_config.en.apk"
+            ),
+            select(
+                "base.apk",
+                "split_camera-ui.apk",
+                "split_pay-api.apk",
+                "df-ar.apk",
+                "feature-pro.apk",
+                "split_live-tv.apk",
+                "split_config.arm64_v8a.apk",
+                "split_config.en.apk",
+                "split_config.de.apk"
+            )
+        )
+    }
+
+    @Test
+    fun `keeps only the device configuration of hyphenated base splits`() {
+        assertEquals(
+            listOf("base-master.apk", "base-arm64_v8a.apk", "base-en.apk"),
+            select("base-master.apk", "base-arm64_v8a.apk", "base-x86.apk", "base-en.apk", "base-de.apk")
+        )
+    }
+
     private fun select(vararg names: String): List<String> =
         installer.selectSplits(names.map(::ZipEntry)).map(ZipEntry::getName)
 }

@@ -14,12 +14,12 @@ import com.vasilispngs.appupdater.data.model.PlayUpdate
 import com.vasilispngs.appupdater.data.model.installEvent
 import com.vasilispngs.appupdater.data.play.playUpdateFailure
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
@@ -34,20 +34,20 @@ class InstallRepository(
     private val pendingBundles = ConcurrentHashMap.newKeySet<String>()
     private val bundleStates = MutableStateFlow<Map<String, InstallState>>(emptyMap())
     private val playStates = MutableStateFlow<Map<String, PlayInstall>>(emptyMap())
-    private val finished = MutableSharedFlow<InstallEvent>(extraBufferCapacity = RESULT_BUFFER)
+    private val finished = Channel<InstallEvent>(Channel.BUFFERED)
 
     val bundles: StateFlow<Map<String, InstallState>> = bundleStates.asStateFlow()
     val play: StateFlow<Map<String, PlayInstall>> = playStates.asStateFlow()
-    val results: SharedFlow<InstallEvent> = finished.asSharedFlow()
+    val results: Flow<InstallEvent> = finished.receiveAsFlow()
     val confirmation: StateFlow<Intent?> = packageInstaller.confirmation
 
-    fun installBundle(uri: Uri, isSuggested: ((String, Long) -> Boolean)? = null) {
+    fun installBundle(uri: Uri, isSuggested: (suspend (String, Long) -> Boolean)? = null) {
         val key = uri.toString()
         if (!pendingBundles.add(key)) return
 
         scope.launch {
             bundleInstaller.install(uri, isSuggested) { state ->
-                state.installEvent()?.let(finished::tryEmit)
+                state.installEvent()?.let(::report)
                 bundleStates.update { it + (key to state) }
             }
 
@@ -59,13 +59,22 @@ class InstallRepository(
     fun updateFromPlay(update: AppUpdateInfo) {
         val target = update.playUpdate ?: return
         val packageName = update.packageName
-        if (packageName in playStates.value) return
+        var added = false
+        playStates.update { current ->
+            if (packageName in current) {
+                added = false
+                current
+            } else {
+                added = true
+                current + (packageName to PlayInstall(null))
+            }
+        }
+        if (!added) return
 
-        playStates.update { it + (packageName to PlayInstall(null)) }
         val request = PlayUpdate(packageName, update.appName, target.name, target.code, target.code == update.newVersionCode)
         if (!PlayUpdateService.schedule(context, request)) {
             playStates.update { it - packageName }
-            finished.tryEmit(InstallEvent.Failed(Failure.NotInstalled, ErrorCode.Named(SCHEDULE_FAILURE)))
+            report(InstallEvent.Failed(Failure.NotInstalled, ErrorCode.Named(SCHEDULE_FAILURE)))
         }
     }
 
@@ -90,14 +99,17 @@ class InstallRepository(
         } finally {
             playStates.update { it - packageName }
         }
-        event?.let(finished::tryEmit)
+        event?.let(::report)
         return event
+    }
+
+    internal fun report(event: InstallEvent) {
+        val _ = finished.trySend(event)
     }
 
     fun confirmationShown(intent: Intent) = packageInstaller.confirmationShown(intent)
 
     private companion object {
-        const val RESULT_BUFFER = 64
         const val SCHEDULE_FAILURE = "JobScheduler.RESULT_FAILURE"
     }
 }

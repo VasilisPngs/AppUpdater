@@ -5,6 +5,7 @@ import com.vasilispngs.appupdater.data.HttpStatusException
 import com.vasilispngs.appupdater.data.api.SharedHttpClient
 import com.vasilispngs.appupdater.data.errorCode
 import com.vasilispngs.appupdater.data.model.SelfUpdate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,15 +56,20 @@ class SelfUpdater(
     }
 
     fun update() {
+        if (work?.isActive == true) return
         val newer = release ?: return
         if (state.value != SelfUpdate.Available && state.value !is SelfUpdate.Failed) return
+        state.value = SelfUpdate.Downloading(0f)
         work = scope.launch {
-            if (download(newer)) install()
+            if (download(newer)) install(newer)
         }
     }
 
     private suspend fun newerRelease(): Release? = withContext(Dispatchers.IO) {
         apk.delete()
+        if (context.packageManager.packageInstaller.mySessions.isEmpty()) {
+            File(context.noBackupFilesDir, UPDATED_MARKER).delete()
+        }
         val assets = fetch(RELEASE_URL, GITHUB_HEADERS) { JSONObject(it.body.string()).getJSONArray("assets") }
         val asset = (0 until assets.length()).map(assets::getJSONObject).firstOrNull { it.getString("name") == APK_NAME }
             ?: throw IOException("No $APK_NAME in the release")
@@ -98,15 +104,19 @@ class SelfUpdater(
         return downloaded
     }
 
-    private suspend fun install() {
+    private suspend fun install(release: Release) {
         state.value = SelfUpdate.Installing
         val marker = File(context.noBackupFilesDir, UPDATED_MARKER)
         val failure = try {
             withContext(Dispatchers.IO) {
-                marker.createNewFile()
+                marker.writeText(release.digest)
                 packageInstaller.install(listOf(ApkSource(APK_NAME, apk.length()) { apk.inputStream() }))
             }.exceptionOrNull()
-        } catch (exception: IOException) {
+        } catch (exception: CancellationException) {
+            marker.delete()
+            apk.delete()
+            throw exception
+        } catch (exception: Exception) {
             exception
         }
         if (failure != null) {
@@ -141,4 +151,14 @@ internal fun sha256(input: InputStream, onRead: (ByteArray, Int) -> Unit = { _, 
         onRead(buffer, read)
     }
     return "sha256:" + digest.digest().toHexString()
+}
+
+internal fun Context.consumeSelfUpdate(): Boolean {
+    val marker = File(noBackupFilesDir, UPDATED_MARKER)
+    if (!marker.isFile) return false
+    val expected = runCatching { marker.readText() }.getOrNull()
+    marker.delete()
+    if (expected.isNullOrEmpty()) return false
+    val installed = runCatching { File(applicationInfo.sourceDir).inputStream().use(::sha256) }.getOrNull()
+    return installed == expected
 }

@@ -10,11 +10,15 @@ import com.aurora.gplayapi.engine.OkHttpEngine
 import com.vasilispngs.appupdater.data.installer.PlayUpdateService.Companion.rateLimited
 import com.vasilispngs.appupdater.data.installer.PlayUpdateService.Companion.toPlayUpdate
 import com.vasilispngs.appupdater.data.model.AppUpdateInfo
+import com.vasilispngs.appupdater.data.model.Failure
+import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.PlayInstall
 import com.vasilispngs.appupdater.data.model.PlayUpdate
 import com.vasilispngs.appupdater.data.model.PlayVersion
 import com.vasilispngs.appupdater.data.play.PlayCatalog
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -66,6 +70,16 @@ class PlayUpdateJobTest {
         installs.updateFromPlay(update(PlayVersion("3.0", NEWEST)))
 
         assertEquals(1, scheduler.allPendingJobs.size)
+    }
+
+    @Test
+    fun `keeps an install result emitted before the screen starts listening`() = runTest {
+        val installs = repository()
+        val expected = InstallEvent.Failed(Failure.BadFile, null)
+
+        installs.report(expected)
+
+        assertEquals(expected, installs.results.first())
     }
 
     @Test

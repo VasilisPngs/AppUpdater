@@ -12,6 +12,8 @@ import android.os.PersistableBundle
 import android.os.SystemClock
 import com.vasilispngs.appupdater.AppUpdaterApplication
 import com.vasilispngs.appupdater.R
+import com.vasilispngs.appupdater.data.model.ErrorCode
+import com.vasilispngs.appupdater.data.model.Failure
 import com.vasilispngs.appupdater.data.model.InstallEvent
 import com.vasilispngs.appupdater.data.model.PlayUpdate
 import com.vasilispngs.appupdater.ui.latestOnPlay
@@ -48,6 +50,15 @@ class PlayUpdateService : JobService() {
 
     override fun onStopJob(params: JobParameters): Boolean {
         running.remove(params.jobId)?.cancel()
+        if (params.stopReason in RETRYABLE_STOP_REASONS) return true
+        if (params.stopReason != JobParameters.STOP_REASON_CANCELLED_BY_APP &&
+            params.stopReason != JobParameters.STOP_REASON_USER
+        ) {
+            val update = params.extras.toPlayUpdate()
+            val event = InstallEvent.Failed(Failure.NotInstalled, ErrorCode.Named("STOP_REASON_${params.stopReason}"))
+            (application as AppUpdaterApplication).container.installs.report(event)
+            getSystemService(NotificationManager::class.java).notify(update.packageName, RESULT_ID, result(update, event))
+        }
         return false
     }
 
@@ -96,6 +107,12 @@ class PlayUpdateService : JobService() {
         private const val VERSION_CODE = "version_code"
         private const val LATEST = "latest"
         private const val PROGRESS_INTERVAL_MILLIS = 200L
+        private val RETRYABLE_STOP_REASONS = setOf(
+            JobParameters.STOP_REASON_CONSTRAINT_CONNECTIVITY,
+            JobParameters.STOP_REASON_DEVICE_STATE,
+            JobParameters.STOP_REASON_PREEMPT,
+            JobParameters.STOP_REASON_SYSTEM_PROCESSING
+        )
 
         internal fun rateLimited(post: (Float?) -> Unit): (Float?) -> Unit {
             var posted = SystemClock.elapsedRealtime()

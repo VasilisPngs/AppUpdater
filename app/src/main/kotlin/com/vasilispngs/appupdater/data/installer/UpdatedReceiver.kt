@@ -9,21 +9,32 @@ import android.content.Context
 import android.content.Intent
 import com.vasilispngs.appupdater.MainActivity
 import com.vasilispngs.appupdater.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 
 class UpdatedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED || !File(context.noBackupFilesDir, UPDATED_MARKER).delete()) return
-        context.createUpdatesChannel()
-        context.getSystemService(NotificationManager::class.java).notify(
-            UPDATED_ID,
-            Notification.Builder(context, UPDATES_CHANNEL)
-                .setSmallIcon(R.drawable.ic_updates)
-                .setContentTitle(context.getString(R.string.app_updated))
-                .setContentIntent(context.openApp())
-                .setAutoCancel(true)
-                .build()
-        )
+        if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED || !File(context.noBackupFilesDir, UPDATED_MARKER).isFile) return
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (!context.consumeSelfUpdate()) return@launch
+                context.createUpdatesChannel()
+                context.getSystemService(NotificationManager::class.java).notify(
+                    UPDATED_ID,
+                    Notification.Builder(context, UPDATES_CHANNEL)
+                        .setSmallIcon(R.drawable.ic_updates)
+                        .setContentTitle(context.getString(R.string.app_updated))
+                        .setContentIntent(context.openApp())
+                        .setAutoCancel(true)
+                        .build()
+                )
+            } finally {
+                pending.finish()
+            }
+        }
     }
 
     private companion object {

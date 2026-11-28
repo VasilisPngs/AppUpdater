@@ -139,8 +139,24 @@ class AppUpdaterViewModel(
 
     fun installBundle(uri: Uri) = installs.installBundle(uri)
 
-    fun openBundle(uri: Uri) = installs.installBundle(uri) { packageName, versionCode ->
-        state.value.updates.offersFromApkMirror(packageName, versionCode)
+    fun openBundle(uri: Uri) {
+        start()
+        installs.installBundle(uri) { packageName, versionCode ->
+            val current = state.value
+            if (current.loaded) {
+                current.updates.offersFromApkMirror(packageName, versionCode)
+            } else {
+                val installed = repository.getInstalledApp(packageName)?.takeIf { it.versionCode < versionCode }
+                if (installed == null) {
+                    false
+                } else {
+                    when (val status = repository.scanForUpdates(listOf(installed))) {
+                        is ScanStatus.Success -> status.updates
+                        is ScanStatus.Error -> status.partialUpdates
+                    }.offersFromApkMirror(packageName, versionCode)
+                }
+            }
+        }
     }
 
     fun updateFromPlay(update: AppUpdateInfo) = installs.updateFromPlay(update)

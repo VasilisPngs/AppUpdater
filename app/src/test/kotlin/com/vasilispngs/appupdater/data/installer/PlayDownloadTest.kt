@@ -7,11 +7,13 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.EOFException
 import java.security.MessageDigest
 import java.util.zip.GZIPOutputStream
 
@@ -86,6 +88,37 @@ class PlayDownloadTest {
     @Test
     fun `leaves a download that is not gzip to the full file`() {
         assertNull(ByteArrayInputStream(APK).gunzipped())
+    }
+
+    @Test
+    fun `closes a truncated gzip stream`() {
+        var closed = false
+        val truncated = object : ByteArrayInputStream(byteArrayOf(0x1f, 0x8b.toByte())) {
+            override fun close() {
+                closed = true
+                super.close()
+            }
+        }
+
+        assertThrows(EOFException::class.java) { val _ = truncated.gunzipped() }
+        assertTrue(closed)
+    }
+
+    @Test
+    fun `rewinds a retried install batch without losing completed library progress`() {
+        val reported = mutableListOf<Float?>()
+        val progress = Progress(totalBytes = 100, onProgress = reported::add)
+        val library = progress.batch(1)
+        val app = progress.batch(1)
+
+        library.advance(0, 40)
+        app.advance(0, 30)
+        app.advance(0, 30)
+        app.reset()
+        app.advance(0, 30)
+        app.advance(0, 30)
+
+        assertEquals(listOf(0.4f, 0.7f, null, 0.4f, 0.7f, null), reported)
     }
 
     private fun apk(sha1: String = "", sha256: String = "") =

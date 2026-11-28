@@ -3,6 +3,7 @@ package com.vasilispngs.appupdater.data.installer
 import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.icu.util.ULocale
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
@@ -32,7 +33,7 @@ class BundleInstaller(
         context.cacheDir.apply { listFiles { _, name -> name.startsWith(ARCHIVE_PREFIX) }?.forEach(File::delete) }
     }
 
-    suspend fun install(uri: Uri, isSuggested: ((String, Long) -> Boolean)?, onState: (InstallState) -> Unit) {
+    suspend fun install(uri: Uri, isSuggested: (suspend (String, Long) -> Boolean)?, onState: (InstallState) -> Unit) {
         withContext(ioDispatcher) {
             val label = displayName(uri)
             val archive = File(cache, "$ARCHIVE_PREFIX${System.nanoTime()}")
@@ -41,9 +42,10 @@ class BundleInstaller(
                 copyToCache(uri, archive)
 
                 val packageName = ZipFile(archive).use { zip ->
+                    val apkEntries = apkEntries(zip)
                     val requireUserAction = isSuggested != null &&
-                        archivedPackage(zip, archive)?.let { isSuggested(it.packageName, it.longVersionCode) } != true
-                    packageInstaller.install(sources(zip, archive), requireUserAction = requireUserAction).getOrThrow()
+                        archivedPackage(zip, archive, apkEntries)?.let { isSuggested(it.packageName, it.longVersionCode) } != true
+                    packageInstaller.install(sources(zip, archive, apkEntries), requireUserAction = requireUserAction).getOrThrow()
                 }
                 onState(context.packageManager.installedApp(packageName, label))
             } catch (exception: CancellationException) {
@@ -60,12 +62,12 @@ class BundleInstaller(
         }
     }
 
-    private fun sources(zip: ZipFile, archive: File): List<ApkSource> {
-        val apkEntries = zip.entries()
-            .asSequence()
-            .filter { !it.isDirectory && it.name.endsWith(APK_SUFFIX, ignoreCase = true) }
-            .toList()
+    private fun apkEntries(zip: ZipFile): List<ZipEntry> = zip.entries()
+        .asSequence()
+        .filter { !it.isDirectory && it.name.endsWith(APK_SUFFIX, ignoreCase = true) }
+        .toList()
 
+    private fun sources(zip: ZipFile, archive: File, apkEntries: List<ZipEntry>): List<ApkSource> {
         if (apkEntries.isEmpty()) return listOf(ApkSource(BASE_APK, archive.length()) { archive.inputStream() })
 
         return selectSplits(apkEntries).map { entry ->
@@ -86,7 +88,7 @@ class BundleInstaller(
                 qualifier == null -> required += entry
                 qualifier in ABIS -> abis.getOrPut(qualifier, ::mutableListOf) += entry
                 qualifier in DENSITIES -> densities.getOrPut(qualifier, ::mutableListOf) += entry
-                LANGUAGE_PATTERN.matches(qualifier) ->
+                LANGUAGE_PATTERN.matches(qualifier) && qualifier.substringBefore('_') in ISO_LANGUAGES ->
                     languages.getOrPut(qualifier.substringBefore('_'), ::mutableListOf) += entry
                 else -> required += entry
             }
@@ -99,11 +101,13 @@ class BundleInstaller(
 
     private fun configQualifier(fileName: String, splitNames: Set<String>): String? {
         val module = fileName.substringBeforeLast(MODULE_CONFIG_INFIX, "")
+        val hyphenModule = fileName.substringBeforeLast('-', "")
         val qualifier = when {
             fileName.startsWith(SPLIT_CONFIG_PREFIX) -> fileName.removePrefix(SPLIT_CONFIG_PREFIX)
             fileName.startsWith(CONFIG_PREFIX) -> fileName.removePrefix(CONFIG_PREFIX)
             module.isNotEmpty() && module in splitNames -> fileName.substringAfterLast(MODULE_CONFIG_INFIX)
-            fileName.contains('-') -> fileName.substringAfterLast('-')
+            hyphenModule.isNotEmpty() && (hyphenModule in splitNames || "$hyphenModule-$MASTER_SPLIT" in splitNames) ->
+                fileName.substringAfterLast('-')
             else -> return null
         }
         return qualifier.lowercase().replace('-', '_').takeIf { it != MASTER_SPLIT && it != NO_DENSITY }
@@ -135,12 +139,21 @@ class BundleInstaller(
         return matching.ifEmpty { languages[FALLBACK_LANGUAGE] ?: languages.values.flatten() }
     }
 
-    private fun archivedPackage(zip: ZipFile, archive: File): PackageInfo? {
-        val base = zip.getEntry(BASE_APK) ?: return archivedPackage(archive)
+    internal fun archivedPackage(zip: ZipFile, archive: File, apkEntries: List<ZipEntry> = apkEntries(zip)): PackageInfo? {
+        if (apkEntries.isEmpty()) return archivedPackage(archive)
+        val splitNames = apkEntries.mapTo(HashSet()) { splitName(it.name) }
+        val candidates = apkEntries
+            .filter { configQualifier(splitName(it.name), splitNames) == null }
+            .sortedWith(
+                compareByDescending<ZipEntry> { it.name.substringAfterLast('/').equals(BASE_APK, ignoreCase = true) }
+                    .thenByDescending { '.' in splitName(it.name) && !splitName(it.name).startsWith(SPLIT_PREFIX) }
+            )
         val file = File(cache, "$ARCHIVE_PREFIX${System.nanoTime()}$APK_SUFFIX")
         return try {
-            zip.getInputStream(base).use { input -> file.outputStream().use { input.copyTo(it, COPY_BUFFER_SIZE) } }
-            archivedPackage(file)
+            candidates.firstNotNullOfOrNull { entry ->
+                zip.getInputStream(entry).use { input -> file.outputStream().use { input.copyTo(it, COPY_BUFFER_SIZE) } }
+                archivedPackage(file)
+            }
         } finally {
             file.delete()
         }
@@ -169,6 +182,7 @@ class BundleInstaller(
         const val APK_SUFFIX = ".apk"
         const val ARCHIVE_PREFIX = "bundle_"
         const val BASE_APK = "base.apk"
+        const val SPLIT_PREFIX = "split_"
         const val SPLIT_CONFIG_PREFIX = "split_config."
         const val CONFIG_PREFIX = "config."
         const val MODULE_CONFIG_INFIX = ".config."
@@ -186,6 +200,7 @@ class BundleInstaller(
             "xxxhdpi" to DisplayMetrics.DENSITY_XXXHIGH
         )
         val LANGUAGE_PATTERN = Regex("[a-z]{2,3}(_[a-z0-9]{2,8})*")
+        val ISO_LANGUAGES = ULocale.getISOLanguages().mapTo(HashSet(), String::lowercase) + setOf("in", "iw", "ji")
     }
 }
 

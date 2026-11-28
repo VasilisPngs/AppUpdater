@@ -42,11 +42,17 @@ class PlayInstaller(
             val certificate = packageManager.playCertificateHash(packageName)
             val app = catalog.files(packageName, versionCode, details.offerType, certificate).apks()
             val libraries = details.dependencies.dependentLibraries
-                .map { library ->
-                    library.packageName to if (versionCode == details.versionCode) library.versionCode else versionCode
+                .mapNotNull { library ->
+                    val sameVersion = library.versionCode == details.versionCode
+                    val code = if (sameVersion) versionCode else library.versionCode
+                    if (library.packageName.isBlank() || code <= 0 || isSharedLibraryInstalled(library.packageName, code)) {
+                        null
+                    } else {
+                        val libraryCertificate = packageManager.playCertificateHash(library.packageName)
+                            ?: certificate.takeIf { sameVersion }
+                        catalog.files(library.packageName, code, LIBRARY_OFFER_TYPE, libraryCertificate).apks()
+                    }
                 }
-                .filter { (name, code) -> name.isNotBlank() && code > 0 && !isSharedLibraryInstalled(name, code) }
-                .map { (name, code) -> catalog.files(name, code, LIBRARY_OFFER_TYPE, certificate).apks() }
 
             val apks = app + libraries.flatten()
             onSize(apks.sumOf { if (it.compressedUrl.isEmpty()) it.size else it.compressedSize })
@@ -63,19 +69,27 @@ class PlayInstaller(
         }
     }
 
-    private fun sources(apks: List<AppFile>, progress: Progress): List<ApkSource> =
-        apks.map { apk ->
-            ApkSource(apk.name, apk.size) { apk.verified(apk.download(), progress::advance) }
+    private fun sources(apks: List<AppFile>, progress: Progress): List<ApkSource> {
+        val batch = progress.batch(apks.size)
+        return apks.mapIndexed { index, apk ->
+            ApkSource(apk.name, apk.size) {
+                if (index == 0) batch.reset()
+                apk.verified(apk.download()) { batch.advance(index, it) }
+            }
         }
+    }
 
     private fun AppFile.download(): InputStream {
         if (compressedUrl.isNotEmpty()) {
-            val response = fetch(compressedUrl, identity = true)
-            if (response.isSuccessful) {
-                response.body.byteStream().gunzipped()?.let { return it }
-            } else {
-                response.close()
-            }
+            runCatching {
+                val response = fetch(compressedUrl, identity = true)
+                if (response.isSuccessful) {
+                    response.body.byteStream().gunzipped()
+                } else {
+                    response.close()
+                    null
+                }
+            }.getOrNull()?.let { return it }
         }
         val response = fetch(url)
         if (!response.isSuccessful) {
@@ -94,22 +108,45 @@ class PlayInstaller(
         packageManager.getSharedLibraries(PackageManager.PackageInfoFlags.of(0))
             .any { it.name == packageName && it.longVersion == versionCode }
 
-    private class Progress(private val totalBytes: Long, private val onProgress: (Float?) -> Unit) {
-        private var writtenBytes = 0L
-        private var reportedPercent = -1
+    private companion object {
+        const val LIBRARY_OFFER_TYPE = 0
+    }
+}
 
-        fun advance(bytes: Int) {
-            writtenBytes += bytes
-            val percent = (writtenBytes * PERCENT / totalBytes).toInt()
-            if (percent != reportedPercent) {
-                reportedPercent = percent
-                onProgress(if (writtenBytes < totalBytes) percent / PERCENT.toFloat() else null)
+internal class Progress(private val totalBytes: Long, private val onProgress: (Float?) -> Unit) {
+    private val batches = mutableListOf<LongArray>()
+    private var reportedPercent = -1
+
+    fun batch(count: Int): Batch {
+        val slots = LongArray(count)
+        batches += slots
+        return Batch(slots)
+    }
+
+    private fun publish() {
+        val writtenBytes = batches.sumOf(LongArray::sum)
+        val percent = (writtenBytes * PERCENT / totalBytes).toInt()
+        if (percent != reportedPercent) {
+            reportedPercent = percent
+            onProgress(if (writtenBytes < totalBytes) percent / PERCENT.toFloat() else null)
+        }
+    }
+
+    inner class Batch(private val slots: LongArray) {
+        fun reset() {
+            if (slots.any { it != 0L }) {
+                slots.fill(0L)
+                publish()
             }
+        }
+
+        fun advance(index: Int, bytes: Int) {
+            slots[index] += bytes
+            publish()
         }
     }
 
     private companion object {
-        const val LIBRARY_OFFER_TYPE = 0
         const val PERCENT = 100
     }
 }
@@ -121,12 +158,20 @@ internal fun List<AppFile>.apks(): List<AppFile> {
 
 internal fun InputStream.gunzipped(): InputStream? {
     val buffered = BufferedInputStream(this, COPY_BUFFER_SIZE)
-    buffered.mark(GZIP_MAGIC_BYTES)
-    val magic = buffered.read() or (buffered.read() shl Byte.SIZE_BITS)
-    buffered.reset()
-    if (magic == GZIPInputStream.GZIP_MAGIC) return GZIPInputStream(buffered, COPY_BUFFER_SIZE)
-    buffered.close()
-    return null
+    return try {
+        buffered.mark(GZIP_MAGIC_BYTES)
+        val magic = buffered.read() or (buffered.read() shl Byte.SIZE_BITS)
+        buffered.reset()
+        if (magic == GZIPInputStream.GZIP_MAGIC) {
+            GZIPInputStream(buffered, COPY_BUFFER_SIZE)
+        } else {
+            buffered.close()
+            null
+        }
+    } catch (exception: Throwable) {
+        buffered.close()
+        throw exception
+    }
 }
 
 internal fun AppFile.verified(input: InputStream, onBytes: (Int) -> Unit): InputStream {
